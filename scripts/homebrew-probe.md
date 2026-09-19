@@ -1,7 +1,8 @@
 # Homebrew integration probes
 
-Status: execution binding remains unverified. No supported product execution
-versions, delegated runtime guarantees, or successful installation are claimed.
+Status: a frozen-input installation of one dependency-free official bottle is
+demonstrated in an empty isolated prefix. General execution binding remains
+unverified. No Homebrew version is supported for product execution.
 The probe is development tooling; the CLI never calls it. Capability ownership
 will move to the Homebrew adapter when that adapter has real behavior.
 
@@ -34,8 +35,9 @@ retained stderr even when a command exits zero.
 Synthetic tap fixtures are trusted only inside the isolated user configuration.
 They have no bottles, use nonresolving source URLs and abort if installation is
 attempted. They are not production recipes or a proposed installation mechanism.
-Install invocations are native previews and a negative `--force-bottle` test
-against a source-only fixture. The latter must fail before installing anything.
+The default probes use native previews and a negative `--force-bottle` test
+against a source-only fixture. The optional official-bottle probe below performs
+a real installation only in the newly created isolated prefix.
 The nonstandard prefix cannot
 establish normal-prefix bottle relocation, official core coverage, or platform
 compatibility. The script does not impose a total runtime deadline; interrupt a
@@ -57,13 +59,13 @@ Use the source revision record, not that generic string, to identify the test.
 | `hb.execution.force-root-bottle` | Installing the source-only root with `--force-bottle --formula` exits 1 with `has no bottle` | Root rejection is demonstrated; dependency fallback remains separate |
 | `hb.metadata.jws` | Upstream `verify_and_parse_jws` with the bundled Homebrew public key accepts the official document and rejects altered payload bytes and missing signatures | Raw metadata authentication is demonstrated; the resolver's use of those exact bytes remains unproven |
 
-The script asserts both observations against real upstream commands. Neither is
+The script asserts these observations against real upstream commands. Neither is
 a mock verifier or a simulated Homebrew implementation. Preview output repeats
 some actions and is human-readable; it is deliberately not a product plan parser.
 The successful run emitted nonstandard-prefix warnings and denied attempts by
 clang to write an xcrun cache outside the sandbox. Preserve that limitation:
-this is not a clean installation test. No real bottle attestation or vulnerability
-response was verified in the runtime probe. The checksum test uses real local
+this is not a clean installation test. The original probes did not verify real bottle attestations or vulnerability
+responses; the additional probes below address parts of those boundaries. The checksum test uses real local
 fixture bytes and an explicit expected digest, not a downloaded official bottle.
 
 The optional metadata probe calls the private upstream verifier only as a test;
@@ -75,6 +77,107 @@ revision 0, bottle rebuild 2, including platform-specific digests. Its top-level
 date/time-related fields were `outdated`, `deprecation_date`, and `disable_date`;
 none establishes release publication time. This observation is scoped to this
 sample, not proof that no usable publisher timestamp source exists.
+
+## Frozen official-bottle installation
+
+The optional macOS arm64/Tahoe probe is deliberately restricted to `hello 2.12.3`,
+revision 0, rebuild 1, in an empty prefix. It is not a product execution helper.
+Run with an explicitly supplied existing `gh` 2.62.0 binary:
+
+```sh
+sh scripts/probe-homebrew.sh /absolute/path/to/Homebrew-source /path/to/formula.jws.json /path/to/probe-inputs /absolute/path/to/gh
+```
+
+The input directory must contain these separately acquired public inputs. The
+script authenticates recipes before evaluating them; it verifies the attestation
+again, rather than accepting a caller-supplied verification result.
+
+| File | Source / identity |
+| --- | --- |
+| `hello--2.12.3.arm64_tahoe.bottle.1.tar.gz` | Signed formula metadata's `arm64_tahoe` URL; SHA-256 `ae6237e3001bd354783f469d754cee875ee9828910461b85a5803f5990213dde` |
+| `hello.rb` | `Homebrew/homebrew-core` at `6e45565b20d8278093c17d0e5464b814030be473`, `Formula/h/hello.rb`; SHA-256 `5b7509fca45647cc02a4cf9bb7937809f32e8ccb014f255d45dcede17e38bcbf` |
+| `texinfo.rb` | Same commit, `Formula/t/texinfo.rb`; SHA-256 `261567b0fb6e021c1658be4a127ac3ea4699b609c172bcd20fa2acc5f29c96db` |
+| `portable-ruby.tar.gz` | Public GHCR `homebrew/core/portable-ruby` blob `e0088dff5614b39387300136ec7a5f95bf1e07589547245c919524fc9e8b4197`, pinned by the inspected source's `vendor/portable-ruby-arm64-darwin`; Ruby 4.0.7 |
+| `bundle.jsonl` | Public GitHub REST `repos/Homebrew/homebrew-core/attestations/sha256:<bottle-digest>` response; each `attestations[].bundle` serialized as a JSON line |
+| `advisories.json` (optional) | `https://formulae.brew.sh/api/advisories.json`; bounded to 64 MiB for this development probe |
+
+Public GHCR downloads accepted the anonymous `Authorization: Bearer QQ==` value;
+no personal credential was used. Public GitHub attestation retrieval also required
+no credentials. `gh` bundle verification nevertheless fetched Sigstore TUF roots;
+without network it failed even with the previously populated cache. Network is
+allowed only for verification and native `brew fetch`, with writes confined to
+the new probe directory. Installation and its validation run offline.
+
+The verifier constrains the repository, OIDC issuer
+`https://token.actions.githubusercontent.com`, exact workflow
+`https://github.com/Homebrew/homebrew-core/.github/workflows/publish-commit-bottles.yml@refs/heads/main`,
+and GitHub-hosted runners. The result must include the exact bottle name/digest
+and matching certificate fields. Changing the expected workflow makes verification
+fail. This is an explicit supplemental verification because Homebrew's local and
+cache paths can skip native attestation checks. The installed verifier is copied
+and its hash recorded; it is a development dependency, not a supported product
+verifier or independently authenticated tool distribution.
+
+After authenticating both recipe snapshots, native `fetch --force-bottle` stages
+the bottle and OCI manifest. The native resolver, authenticated API and embedded
+recipe must agree on the exact version and empty dependency closure. The manifest's
+runtime dependency list must also be empty. OCI annotations are not authenticated
+by the bottle checksum; they must never silently expand the accepted closure.
+The install sandbox denies writes to input artifacts, recipes, Homebrew's Library,
+and existing cache files. Explicit attempts to append to the artifact and cached
+bottle fail. Installation uses the frozen official recipe by `homebrew/core/hello`,
+with no network or source artifacts available.
+
+Observed on macOS 26.6.2 arm64 with the pinned source: install exits 0, the Cellar
+contains only `hello/2.12.3`, the receipt records `poured_from_bottle: true` and no
+runtime dependencies, and the installed embedded recipe matches the archive.
+The installed `bin/hello` is byte-identical to the verified bottle's binary
+(SHA-256 `2d8f0045734079d1ea64254cc27762f0698f6ee42bbf45c1047487d05015048d`)
+and runs successfully. Input constraints precede installation; post-install
+matching supplements them rather than substituting for prevention.
+
+Two real failures informed this path: the host's copied Ruby was x86_64 and was
+rejected for the selected arm64 bottle; loading the local bottle alone discarded
+the current recipe's relocation stanza and failed with the long isolated prefix.
+The named official-recipe path preserves that metadata. Linking additionally
+reads the `texinfo` recipe to locate `install-info`; it does not install texinfo
+in this empty prefix. Its authenticated snapshot is included explicitly.
+Nonstandard-prefix and denied clang xcrun-cache warnings remain in stderr.
+
+This does not establish dependency-bearing installations, affected dependents,
+existing installed helpers, upgrades, normal-prefix behavior, concurrent external
+Homebrew operations, or crash/cancellation reconciliation. Product execution stays
+disabled. The earlier claim that no successful installation was demonstrated is
+superseded only for the narrowly defined probe above.
+
+## Advisory and publication boundaries
+
+`probe-homebrew-advisories.rb` exercises the pinned native `AdvisoryDatabase`,
+`Vulnerability`, and `CachedFeed` implementations with controlled records and real
+filesystem/cache refresh failure, not a replacement evaluator. It demonstrates:
+
+- A Homebrew revision boundary `2.12.3_1` distinguishes an affected base version
+  from a revision carrying a patch; an uncovered package returns `nil`.
+- The lower-level status method still reports a withdrawn record as open, and
+  maps an incomplete applicability range to open. A product adapter must retain
+  withdrawal and unknown-applicability semantics instead of blindly forwarding it.
+- Failed refresh returns an existing two-day-old cache despite `max_age: 1`;
+  a future cache mtime also passes the freshness comparison. Returned data alone
+  is not evidence that the requested freshness limit was met.
+
+The public feed sampled on 2026-09-20 was 44,002,063 bytes, with 12,768 records
+across 597 formula keys, schema version `1.7.3`. It had no `hello` entry, so this
+sample does not establish a clean vulnerability result for the installed probe.
+The sample's `meta` has no publication/freshness timestamp. An 8 MiB acquisition
+limit correctly rejected this feed; the explicitly bounded development probe uses
+64 MiB. No product input limit or source freshness policy was relaxed.
+
+The verified attestation includes a transparency-log timestamp. It is not used
+as publication time. An unauthenticated request to the GitHub REST organization
+package-version endpoint for `core/hello` returned 401. No usable artifact-bound
+publication timestamp has yet been demonstrated, and no credentials were borrowed
+to bypass that response. These remain independent blockers to eligibility even
+for this successfully installed development fixture.
 
 ## Inspected capabilities and gaps
 

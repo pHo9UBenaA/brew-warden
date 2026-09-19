@@ -41,6 +41,8 @@
 !/scripts/probe-homebrew.sh
 !/scripts/homebrew-probe.md
 !/scripts/probe-homebrew-metadata.rb
+!/scripts/probe-homebrew-install.rb
+!/scripts/probe-homebrew-advisories.rb
 !/scripts/probe-homebrew-integrity.rb
 !/scripts/build-product.sh
 

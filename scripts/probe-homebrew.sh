@@ -1,8 +1,8 @@
 #!/bin/sh
-# Developer-only, offline probe. Never run against the maintainer's prefix.
+# Developer-only, isolated probe. Never run against the maintainer's prefix.
 set -eu
-if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ "$(uname -s)" != Darwin ]; then
-  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source [signed-formula.json]\n' >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 4 ] || [ "$#" -eq 3 ] || [ "$(uname -s)" != Darwin ]; then
+  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source [signed-formula.json [hello-input-directory /absolute/gh]]\n' >&2
   exit 1
 fi
 case "$1" in /*) ;; *) exit 1 ;; esac
@@ -20,8 +20,16 @@ mkdir -p "$probe_root/prefix" "$probe_root/home" "$probe_root/cache" "$probe_roo
 git -C "$source_repo" archive "$revision" > "$probe_root/source.tar"
 tar -xf "$probe_root/source.tar" -C "$probe_root/prefix"
 mkdir -p "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby"
-cp -R "$source_repo/Library/Homebrew/vendor/portable-ruby/$ruby_version" \
-  "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version"
+if [ "$#" -eq 4 ]; then
+  # The real-bottle probe needs the matching native Ruby, not an Intel host copy.
+  cp "$3/portable-ruby.tar.gz" "$probe_root/portable-ruby.tar.gz"
+  ruby_sha=$(shasum -a 256 "$probe_root/portable-ruby.tar.gz" | cut -d ' ' -f 1)
+  test "$ruby_sha" = e0088dff5614b39387300136ec7a5f95bf1e07589547245c919524fc9e8b4197
+  tar -xf "$probe_root/portable-ruby.tar.gz" -C "$probe_root/prefix/Library/Homebrew/vendor"
+else
+  cp -R "$source_repo/Library/Homebrew/vendor/portable-ruby/$ruby_version" \
+    "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version"
+fi
 ln -s "$ruby_version" "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/current"
 shasum -a 256 "$probe_root/source.tar" \
   "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version/bin/ruby" \
@@ -37,7 +45,7 @@ run_brew() {
   label=$1
   shift
   status=0
-  /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
+  /usr/bin/sandbox-exec -f "${brew_sandbox:-$probe_root/sandbox.sb}" /usr/bin/env -i \
     HOME="$probe_root/home" PATH=/usr/bin:/bin:/usr/sbin:/sbin \
     TMPDIR="$probe_root/tmp" XDG_CONFIG_HOME="$probe_root/home/config" \
     HOMEBREW_CACHE="$probe_root/cache" HOMEBREW_LOGS="$probe_root/logs" \
@@ -100,14 +108,92 @@ fi
 printf 'Reproduced: a later preview resolves changed dependencies; no saved plan is consumed.\n'
 cp "$script_dir/probe-homebrew-integrity.rb" "$probe_root/integrity-probe.rb"
 run_brew checksum-cache ruby "$probe_root/integrity-probe.rb" "$probe_root"
+cp "$script_dir/probe-homebrew-advisories.rb" "$probe_root/advisory-probe.rb"
+run_brew advisory-contract ruby "$probe_root/advisory-probe.rb" "$probe_root"
 if run_brew force-no-bottle install --force-bottle --formula brewwarden/probe/probe-leaf; then
   printf 'Expected source-only root formula to be refused.\n' >&2
   exit 1
 fi
 grep -q 'has no bottle' "$probe_root/force-no-bottle.stderr"
-if [ "$#" -eq 2 ]; then
+if [ "$#" -ge 2 ]; then
   cp "$2" "$probe_root/formula.jws.json"
   cp "$script_dir/probe-homebrew-metadata.rb" "$probe_root/metadata-probe.rb"
   run_brew signed-metadata ruby "$probe_root/metadata-probe.rb" "$probe_root/formula.jws.json"
   printf 'Verified official metadata; rejected changed payload and missing signature.\n'
+fi
+
+if [ "$#" -gt 2 ]; then
+  test "$#" -eq 4
+  case "$4" in /*) ;; *) exit 1 ;; esac
+  mkdir -p "$probe_root/inputs" "$probe_root/gh-home"
+  bottle_name=hello--2.12.3.arm64_tahoe.bottle.1.tar.gz
+  cp "$3/$bottle_name" "$3/hello.rb" "$3/texinfo.rb" "$3/bundle.jsonl" "$probe_root/inputs/"
+  cp "$4" "$probe_root/inputs/gh"
+  /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
+    HOME="$probe_root/gh-home" PATH=/usr/bin:/bin \
+    "$probe_root/inputs/gh" --version > "$probe_root/gh-version"
+  grep -q '^gh version 2.62.0 ' "$probe_root/gh-version"
+  shasum -a 256 "$probe_root/inputs/gh" >> "$probe_root/inputs.sha256"
+  # Bundle verification still fetches Sigstore TUF roots. Only this verifier
+  # phase permits network, without credentials and with isolated writable state.
+  sed '/(deny network\*)/d' "$probe_root/sandbox.sb" > "$probe_root/verifier.sb"
+  /usr/bin/sandbox-exec -f "$probe_root/verifier.sb" /usr/bin/env -i \
+    HOME="$probe_root/gh-home" PATH=/usr/bin:/bin GH_CONFIG_DIR="$probe_root/gh-home" \
+    "$probe_root/inputs/gh" attestation verify "$probe_root/inputs/$bottle_name" \
+    --bundle "$probe_root/inputs/bundle.jsonl" --repo Homebrew/homebrew-core \
+    --cert-identity 'https://github.com/Homebrew/homebrew-core/.github/workflows/publish-commit-bottles.yml@refs/heads/main' \
+    --cert-oidc-issuer https://token.actions.githubusercontent.com --deny-self-hosted-runners \
+    --format json > "$probe_root/inputs/verified-attestation.json" 2> "$probe_root/attestation.stderr"
+  if /usr/bin/sandbox-exec -f "$probe_root/verifier.sb" /usr/bin/env -i \
+    HOME="$probe_root/gh-home" PATH=/usr/bin:/bin GH_CONFIG_DIR="$probe_root/gh-home" \
+    "$probe_root/inputs/gh" attestation verify "$probe_root/inputs/$bottle_name" \
+    --bundle "$probe_root/inputs/bundle.jsonl" --repo Homebrew/homebrew-core \
+    --cert-identity 'https://github.com/Homebrew/homebrew-core/.github/workflows/not-the-publisher.yml@refs/heads/main' \
+    --cert-oidc-issuer https://token.actions.githubusercontent.com --deny-self-hosted-runners \
+    --format json > "$probe_root/wrong-identity.stdout" 2> "$probe_root/wrong-identity.stderr"; then
+    printf 'Unexpected signer identity accepted.\n' >&2
+    exit 1
+  fi
+  grep -q 'Error: verifying with issuer' "$probe_root/wrong-identity.stderr"
+  if [ -f "$3/advisories.json" ]; then
+    cp "$3/advisories.json" "$probe_root/advisories.json"
+    run_brew advisory-sample ruby "$probe_root/advisory-probe.rb" "$probe_root" "$probe_root/advisories.json"
+  fi
+  core_dir="$probe_root/prefix/Library/Taps/homebrew/homebrew-core"
+  mkdir -p "$core_dir/Formula/h" "$core_dir/Formula/t"
+  cp "$probe_root/inputs/hello.rb" "$core_dir/Formula/h/hello.rb"
+  cp "$probe_root/inputs/texinfo.rb" "$core_dir/Formula/t/texinfo.rb"
+  cp "$script_dir/probe-homebrew-install.rb" "$probe_root/install-probe.rb"
+  # Immutable inputs for the confined preflight and execution processes.
+  cat >> "$probe_root/sandbox.sb" <<EOF
+(deny file-write* (subpath "$probe_root/inputs")
+  (subpath "$probe_root/prefix/Library")
+  (literal "$probe_root/formula.jws.json")
+  (literal "$probe_root/install-probe.rb"))
+EOF
+  if /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /bin/sh -c 'echo changed >> "$1"' sh \
+    "$probe_root/inputs/$bottle_name" 2> "$probe_root/immutable-input.stderr"; then
+    printf 'Input protection failed.\n' >&2
+    exit 1
+  fi
+  # Fetch using the authenticated, unmodified core recipe; this creates native
+  # OCI metadata/cache paths. This phase is not allowed to install packages.
+  run_brew authenticate-inputs ruby "$probe_root/install-probe.rb" "$probe_root" inputs
+  brew_sandbox="$probe_root/verifier.sb"
+  run_brew fetch-official fetch --force-bottle --formula homebrew/core/hello
+  unset brew_sandbox
+  run_brew install-before ruby "$probe_root/install-probe.rb" "$probe_root" before
+  if /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /bin/sh -c 'echo changed >> "$1"' sh \
+    "$(cat "$probe_root/cached-bottle-path")" 2> "$probe_root/immutable-cache.stderr"; then
+    printf 'Cache protection failed.\n' >&2
+    exit 1
+  fi
+  run_brew install-frozen install --formula --force-bottle homebrew/core/hello
+  run_brew install-after ruby "$probe_root/install-probe.rb" "$probe_root" after
+  tar -xOf "$probe_root/inputs/$bottle_name" hello/2.12.3/bin/hello > "$probe_root/expected-hello"
+  cmp "$probe_root/expected-hello" "$probe_root/prefix/Cellar/hello/2.12.3/bin/hello"
+  /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
+    "$probe_root/prefix/bin/hello" --greeting=brewwarden > "$probe_root/hello.stdout"
+  test "$(cat "$probe_root/hello.stdout")" = brewwarden
+  printf 'Verified and installed the same official zero-dependency bottle in the isolated prefix.\n'
 fi
