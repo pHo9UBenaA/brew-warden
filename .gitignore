@@ -91,3 +91,4 @@
 /.cache/
 /bin/
 /dist/
+!/scripts/macos-vm.md

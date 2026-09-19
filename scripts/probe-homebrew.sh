@@ -1,8 +1,8 @@
 #!/bin/sh
 # Developer-only, isolated probe. Never run against the maintainer's prefix.
 set -eu
-if [ "$#" -lt 1 ] || [ "$#" -gt 5 ] || [ "$#" -eq 3 ] || [ "$(uname -s)" != Darwin ]; then
-  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source [signed-formula.json [input-directory /absolute/gh [hello|jq]]]\n' >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 6 ] || [ "$#" -eq 3 ] || [ "$(uname -s)" != Darwin ]; then
+  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source [signed-formula.json [input-directory /absolute/gh [hello|jq [--vm-prefix]]]]\n' >&2
   exit 1
 fi
 case "$1" in /*) ;; *) exit 1 ;; esac
@@ -17,35 +17,48 @@ script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 revision=edb70f031e4170c780799633a1226ff73e1077f4
 ruby_version=4.0.7
 probe_root=$(mktemp -d /private/tmp/brewwarden-probe.XXXXXXXX)
+probe_prefix="$probe_root/prefix"
+if [ "$#" -eq 6 ]; then
+  # A fixed standard prefix is permitted only inside an Apple virtual machine.
+  # Refuse existing state; preparation belongs to the disposable VM driver.
+  test "$6" = --vm-prefix
+  case "$(/usr/sbin/sysctl -n hw.model)" in VirtualMac*) ;; *)
+    printf 'Standard-prefix probes require an Apple virtual machine.\n' >&2
+    exit 1 ;;
+  esac
+  probe_prefix=/opt/homebrew
+  test ! -e "$probe_prefix" && test ! -L "$probe_prefix"
+fi
+printf '%s\n' "$probe_prefix" > "$probe_root/install-prefix"
 printf 'Probe evidence directory: %s\n' "$probe_root"
 printf '%s\n' "$revision" > "$probe_root/source-revision"
 sw_vers > "$probe_root/os-version"
 uname -m > "$probe_root/architecture"
 # Retain every run, including failures, for inspection. No host brew is invoked.
-mkdir -p "$probe_root/prefix" "$probe_root/home" "$probe_root/cache" "$probe_root/tmp" "$probe_root/logs"
+mkdir -p "$probe_prefix" "$probe_root/home" "$probe_root/cache" "$probe_root/tmp" "$probe_root/logs"
 git -C "$source_repo" archive "$revision" > "$probe_root/source.tar"
-tar -xf "$probe_root/source.tar" -C "$probe_root/prefix"
-mkdir -p "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby"
+tar -xf "$probe_root/source.tar" -C "$probe_prefix"
+mkdir -p "$probe_prefix/Library/Homebrew/vendor/portable-ruby"
 if [ "$#" -ge 4 ]; then
   # The real-bottle probe needs the matching native Ruby, not an Intel host copy.
   cp "$3/portable-ruby.tar.gz" "$probe_root/portable-ruby.tar.gz"
   ruby_sha=$(shasum -a 256 "$probe_root/portable-ruby.tar.gz" | cut -d ' ' -f 1)
   test "$ruby_sha" = e0088dff5614b39387300136ec7a5f95bf1e07589547245c919524fc9e8b4197
-  tar -xf "$probe_root/portable-ruby.tar.gz" -C "$probe_root/prefix/Library/Homebrew/vendor"
+  tar -xf "$probe_root/portable-ruby.tar.gz" -C "$probe_prefix/Library/Homebrew/vendor"
 else
   cp -R "$source_repo/Library/Homebrew/vendor/portable-ruby/$ruby_version" \
-    "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version"
+    "$probe_prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version"
 fi
-ln -s "$ruby_version" "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/current"
+ln -s "$ruby_version" "$probe_prefix/Library/Homebrew/vendor/portable-ruby/current"
 shasum -a 256 "$probe_root/source.tar" \
-  "$probe_root/prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version/bin/ruby" \
+  "$probe_prefix/Library/Homebrew/vendor/portable-ruby/$ruby_version/bin/ruby" \
   > "$probe_root/inputs.sha256"
 cat > "$probe_root/sandbox.sb" <<EOF
 (version 1)
 (allow default)
 (deny network*)
 (deny file-write*)
-(allow file-write* (subpath "$probe_root") (literal "/dev/null"))
+(allow file-write* (subpath "$probe_root") (subpath "$probe_prefix") (literal "/dev/null"))
 EOF
 run_brew() {
   label=$1
@@ -59,16 +72,16 @@ run_brew() {
     HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_INSTALL_FROM_API=1 \
     HOMEBREW_NO_ENV_HINTS=1 HOMEBREW_NO_COLOR=1 HOMEBREW_DEVELOPER=1 \
     HOMEBREW_NO_INSTALL_CLEANUP=1 HOMEBREW_NO_BOOTSNAP=1 \
-    "$probe_root/prefix/bin/brew" "$@" \
+    "$probe_prefix/bin/brew" "$@" \
     > "$probe_root/$label.stdout" 2> "$probe_root/$label.stderr" || status=$?
   printf '%s\n' "$status" > "$probe_root/$label.status"
   printf '%s: exit %s\n' "$label" "$status"
   return "$status"
 }
 run_brew prefix --prefix
-test "$(cat "$probe_root/prefix.stdout")" = "$probe_root/prefix"
+test "$(cat "$probe_root/prefix.stdout")" = "$probe_prefix"
 run_brew version --version
-tap_dir="$probe_root/prefix/Library/Taps/brewwarden/homebrew-probe"
+tap_dir="$probe_prefix/Library/Taps/brewwarden/homebrew-probe"
 mkdir -p "$tap_dir/Formula"
 cat > "$tap_dir/Formula/probe-leaf.rb" <<'EOF'
 class ProbeLeaf < Formula
@@ -179,7 +192,7 @@ if [ "$#" -gt 2 ]; then
     cp "$3/advisories.json" "$probe_root/advisories.json"
     run_brew advisory-sample ruby "$probe_root/advisory-probe.rb" "$probe_root" "$probe_root/advisories.json"
   fi
-  core_dir="$probe_root/prefix/Library/Taps/homebrew/homebrew-core"
+  core_dir="$probe_prefix/Library/Taps/homebrew/homebrew-core"
   for recipe in $recipe_names; do
     letter=$(printf '%s' "$recipe" | cut -c 1)
     case "$recipe" in lib*) letter=lib ;; esac
@@ -190,7 +203,7 @@ if [ "$#" -gt 2 ]; then
   # Immutable inputs for the confined preflight and execution processes.
   cat >> "$probe_root/sandbox.sb" <<EOF
 (deny file-write* (subpath "$probe_root/inputs")
-  (subpath "$probe_root/prefix/Library")
+  (subpath "$probe_prefix/Library")
   (literal "$probe_root/formula.jws.json")
   (literal "$probe_root/install-probe.rb"))
 EOF
@@ -229,13 +242,13 @@ EOF
   if [ "$scenario" = hello ]; then
     bottle_name=hello--2.12.3.arm64_tahoe.bottle.1.tar.gz
     tar -xOf "$probe_root/inputs/$bottle_name" hello/2.12.3/bin/hello > "$probe_root/expected-hello"
-    cmp "$probe_root/expected-hello" "$probe_root/prefix/Cellar/hello/2.12.3/bin/hello"
+    cmp "$probe_root/expected-hello" "$probe_prefix/Cellar/hello/2.12.3/bin/hello"
     /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
-      "$probe_root/prefix/bin/hello" --greeting=brewwarden > "$probe_root/hello.stdout"
+      "$probe_prefix/bin/hello" --greeting=brewwarden > "$probe_root/hello.stdout"
     test "$(cat "$probe_root/hello.stdout")" = brewwarden
   else
     /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
-      "$probe_root/prefix/bin/jq" -n '"brewwarden" | test("^brew")' > "$probe_root/jq.stdout"
+      "$probe_prefix/bin/jq" -n '"brewwarden" | test("^brew")' > "$probe_root/jq.stdout"
     test "$(cat "$probe_root/jq.stdout")" = true
   fi
   printf 'Verified and installed the official %s closure in the isolated prefix.\n' "$scenario"

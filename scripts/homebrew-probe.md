@@ -268,3 +268,23 @@ integration contract remain authoritative for policy.
 The local Docker daemon was unavailable during this investigation. No VM or
 normal-prefix installation was run. These outstanding tests keep execution
 unavailable; they do not prevent independent policy/configuration work.
+
+## Standard-prefix macOS VM acceptance
+
+The optional sixth argument `--vm-prefix` selects `/opt/homebrew` only when
+`sysctl hw.model` identifies an Apple virtual machine and that prefix does not
+exist (including dangling symlinks). Physical-host invocations fail before prefix
+creation. The default remains a fresh temporary prefix. This guard prevents an
+accidental physical-host invocation; it is not remote attestation of a guest.
+See [the disposable VM procedure](macos-vm.md) for the tested environment.
+
+The `jq` scenario passes in an empty standard prefix on macOS 26.6.2 (25G83),
+arm64, VirtualMac2,1. Authentication, wrong-signer refusal, changed-cache refusal,
+frozen-input write refusal, offline installation, exact installed closure/receipts,
+and the dependency-loading smoke test all pass. The installed closure contains
+only `jq 1.8.2` and `oniguruma 6.9.10`. The sandbox denies an incidental xcrun
+cache write outside the test directories; native installation still exits zero.
+
+This proves the bounded empty-prefix scenario at the native platform prefix.
+Existing-state upgrades, affected dependents, external Homebrew concurrency and
+interrupted execution remain unverified. No product execution is enabled.
