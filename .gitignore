@@ -28,8 +28,8 @@
 !/.githooks/commit-msg
 !/.githooks/pre-commit
 !/.githooks/pre-push
-!/.agents/skills/brew-security-change/SKILL.md
-!/.agents/skills/brew-security-review/SKILL.md
+!/.agents/skills/brewwarden-change/SKILL.md
+!/.agents/skills/brewwarden-review/SKILL.md
 !/scripts/setup-hooks.sh
 !/scripts/verify.sh
 !/scripts/env.sh

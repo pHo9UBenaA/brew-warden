@@ -1,6 +1,6 @@
 ---
-name: brew-security-review
-description: Review brew-security policy, execution boundaries, dependency choices, or development harness changes. Use for requested reviews and consequential security changes.
+name: brewwarden-review
+description: Review brewwarden policy, execution boundaries, dependency choices, or development harness changes. Use for requested reviews and consequential security changes.
 ---
 
 # Review behavior and boundaries

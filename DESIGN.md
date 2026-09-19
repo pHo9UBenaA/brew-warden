@@ -23,26 +23,58 @@ Go is the proposed product language and is used by the harness. Follow the
 
 ## User operations
 
-The name `brew-security` is provisional. Compatibility with `brew security` and
-Homebrew's environment filtering requires an integration experiment.
+The project and repository name is `brewwarden` (BrewWarden). `bwd` is the short
+executable name; `brewwarden` exposes the identical interface. Product commands
+remain unimplemented.
 
-| Operation | Behavior |
-| --- | --- |
-| `status` | Show installed state, holds, urgent candidates, and unknown evidence |
-| `plan install <name>` | Resolve, verify, and save an installation plan |
-| `plan upgrade [name...]` | Resolve and verify an update, including changed dependencies |
-| `apply <plan-id>` | Revalidate and execute the exact supported plan |
-| `emergency plan <name> --advisory <id>` | Propose a bounded age exception tied to verified fix evidence |
-| `emergency plan <name> --reason <text>` | Record a user-requested age exception separately from verified advisories |
-| `explain <plan-id>` / `history [name]` | Explain evidence, changes, exceptions, and outcomes |
-| `doctor` | Diagnose supported Homebrew/verifier versions, configuration, and storage |
+```sh
+bwd brew install wget
+bwd brew upgrade openssl@3
+bwd brew upgrade
+```
 
-Future convenience commands may combine planning and application. Interactive
-and noninteractive paths must share the policy engine. `--yes` can skip a prompt,
-never verification or a hold. There is no universal `--force` bypass.
+Follow the prefix interaction documented by
+[Socket Firewall Free](https://docs.socket.dev/docs/socket-firewall-free): users
+add a wrapper to their package-manager command. BrewWarden's security policy and
+execution binding remain its own contracts, including cached artifacts.
 
-No monitoring schedule or automatic update is enabled by default. The initial
-emergency workflow suggests an update and waits for the user's execution choice.
+Invoking a supported mutation authorizes that operation and its required
+dependency changes. Internally resolve a plan, verify evidence, revalidate the
+exact execution target, execute, and record the result. If checks pass, proceed
+without a BrewWarden confirmation prompt, including in noninteractive use.
+Holds, denials, and unavailable required evidence stop execution with a reason.
+Homebrew's own prompts and privilege requirements remain separate.
+
+Plans are internal records, not a public `plan`/`apply` workflow. Do not initially
+add BrewWarden `--yes`, `--dry-run`, or universal `--force` options. Diagnostic
+commands (`status`, `history`, `doctor`) may expose evidence without authorizing
+mutations. Emergency age exceptions require explicit, bounded user intent;
+ordinary install/upgrade commands never grant them automatically. Their syntax
+must be designed with the exception implementation, not as a generic bypass.
+
+## Argument handling and routing
+
+- Wrapper options such as `--help` and `--version` precede `brew`. Tokens after
+  `brew` belong to Homebrew; do not consume a child's `--help` or reinterpret its
+  `--dry-run` as a BrewWarden option. Support child flags only after their meaning
+  and execution binding have been verified for that command and brew version.
+- Initially accept the literal `brew` target, not arbitrary executables or shell
+  strings. Resolve Homebrew to an explicit executable path and avoid recursion.
+  Preserve argument boundaries; never concatenate a shell command.
+- Classify commands, aliases, flags, and nested operations. Unsupported mutations,
+  external commands, and ambiguous arguments fail explicitly. Only documented
+  read-only operations may bypass the mutation flow. An unrestricted brew call
+  after a preflight check is not verified-plan execution.
+- Preserve child standard input/output, terminal behavior, and exit status when
+  executed; send wrapper diagnostics to stderr. Propagate cancellation and record
+  partial/unknown outcomes. Wrapper failures exit nonzero without launching the
+  protected mutation; do not fall back to unwrapped execution.
+
+Installing the binary on PATH is sufficient to invoke the prefix form; it does
+not intercept plain `brew`. Any future shell alias or PATH shim is optional,
+reversible, and subject to separate integration tests. Do not replace Homebrew's
+executable or silently edit shell startup files. Direct Homebrew paths, a different
+PATH, and other clients remain outside the wrapper's coverage.
 
 ## Artifact and signature evidence
 
@@ -105,9 +137,10 @@ Incomplete source responses must not make a candidate look fixed.
 
 ## Emergency updates
 
-Emergency updates are a first-class workflow: propose, explain the exact target
-and dependencies, then apply at the user's choice. Unattended emergency execution
-requires a later explicit opt-in design.
+Emergency updates are a first-class workflow: explain the exact target and
+dependencies, then execute only when the user explicitly requests the bounded
+age exception. A recommendation alone never authorizes an exception or execution.
+No background monitoring or automatic emergency updates are enabled by default.
 
 Automatic recommendation requires:
 
@@ -179,7 +212,7 @@ exceptions. Passing a local bottle alone does not prove dependencies are fixed.
 Possible approaches include a constrained immutable-metadata execution path or
 an upstream-supported pre-execution integration. Do not generate executable Ruby
 recipes as an unexamined shortcut. If binding cannot be demonstrated, ship
-planning and inspection while explicitly rejecting apply. This is a release gate,
+inspection while explicitly rejecting mutation commands. This is a release gate,
 not a retreat from the all-in-one product goal.
 
 An upgrade can partially succeed. Record both exit status and actual state.
@@ -222,8 +255,8 @@ reconciliation diagnostics should remain available.
 1. Probe Go distribution, verifiers, Homebrew plan binding, and advisory coverage.
 2. Implement typed evidence, strict configuration, pure decisions, and history;
    model normal and emergency decisions together.
-3. Integrate official bottle planning and checks; enable apply and emergency apply
-   only for demonstrated execution paths.
+3. Integrate official bottle planning and checks; enable normal and emergency
+   execution only for demonstrated paths.
 4. Add cask, third-party tap, and upstream-signature support by explicit capability.
 5. Improve presentation/performance and design optional automation separately.
 

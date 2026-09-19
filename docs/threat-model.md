@@ -21,9 +21,13 @@ An API outage is not evidence that a signature was removed or a vulnerability wa
 fixed. A valid signature, old release, or empty advisory response is not proof of
 harmless software.
 
+Only operations routed through BrewWarden are in scope. A proposed PATH shim
+can be bypassed by direct Homebrew paths or a different environment; installing
+the binary alone does not intercept commands.
+
 Own-process locking does not lock Homebrew launched elsewhere. Rechecking before
 execution is not a proof against all time-of-check/time-of-use changes. Product
-apply remains unavailable until the relevant execution path is demonstrated.
+mutation execution remains unavailable until the relevant execution path is demonstrated.
 Post-install inspection cannot prevent code that already ran during installation.
 
 Do not test updates in a maintainer's normal Homebrew prefix. Use fixtures and

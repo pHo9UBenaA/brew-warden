@@ -1,11 +1,23 @@
-# brew-security
+# BrewWarden
 
-An all-in-one Homebrew security CLI under design: release-age policy, artifact
+Security policies and verification for Homebrew.
+
+BrewWarden is an all-in-one CLI under design: release-age policy, artifact
 and signature verification, vulnerability checks, dependency-aware installation
 plans, emergency updates, and evidence history.
 
 **Product behavior is not implemented yet.** The repository contains the design
-and development harness. License and public repository identity are not yet set.
+and development harness. The intended interface prefixes supported commands:
+
+```sh
+bwd brew install wget
+bwd brew upgrade
+```
+
+Checks pass: execute without an extra BrewWarden prompt. Checks fail: stop and
+explain. `brewwarden` is the full executable name; `bwd` is its short form.
+Plain `brew` calls are not intercepted. The public repository URL and license
+are not yet set.
 
 ## Development
 

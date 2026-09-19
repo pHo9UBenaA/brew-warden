@@ -1,6 +1,6 @@
 ---
-name: brew-security-change
-description: Implement brew-security behavior or architecture changes with evidence for policy decisions and adapter boundaries. Use for features and fixes, not routine prose edits.
+name: brewwarden-change
+description: Implement brewwarden behavior or architecture changes with evidence for policy decisions and adapter boundaries. Use for features and fixes, not routine prose edits.
 ---
 
 # Implement a bounded change
