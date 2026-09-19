@@ -1,12 +1,13 @@
 #!/bin/sh
 # Developer-only, offline probe. Never run against the maintainer's prefix.
 set -eu
-if [ "$#" -ne 1 ] || [ "$(uname -s)" != Darwin ]; then
-  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source\n' >&2
+if [ "$#" -lt 1 ] || [ "$#" -gt 2 ] || [ "$(uname -s)" != Darwin ]; then
+  printf 'Usage (macOS): scripts/probe-homebrew.sh /absolute/Homebrew/source [signed-formula.json]\n' >&2
   exit 1
 fi
 case "$1" in /*) ;; *) exit 1 ;; esac
 source_repo=$1
+script_dir=$(CDPATH= cd -- "$(dirname -- "$0")" && pwd)
 revision=edb70f031e4170c780799633a1226ff73e1077f4
 ruby_version=4.0.7
 probe_root=$(mktemp -d /private/tmp/brewwarden-probe.XXXXXXXX)
@@ -97,3 +98,16 @@ if grep -q 'probe-extra' "$probe_root/preview-before.stdout"; then
   exit 1
 fi
 printf 'Reproduced: a later preview resolves changed dependencies; no saved plan is consumed.\n'
+cp "$script_dir/probe-homebrew-integrity.rb" "$probe_root/integrity-probe.rb"
+run_brew checksum-cache ruby "$probe_root/integrity-probe.rb" "$probe_root"
+if run_brew force-no-bottle install --force-bottle --formula brewwarden/probe/probe-leaf; then
+  printf 'Expected source-only root formula to be refused.\n' >&2
+  exit 1
+fi
+grep -q 'has no bottle' "$probe_root/force-no-bottle.stderr"
+if [ "$#" -eq 2 ]; then
+  cp "$2" "$probe_root/formula.jws.json"
+  cp "$script_dir/probe-homebrew-metadata.rb" "$probe_root/metadata-probe.rb"
+  run_brew signed-metadata ruby "$probe_root/metadata-probe.rb" "$probe_root/formula.jws.json"
+  printf 'Verified official metadata; rejected changed payload and missing signature.\n'
+fi

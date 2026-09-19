@@ -9,6 +9,8 @@ will move to the Homebrew adapter when that adapter has real behavior.
 
 ```sh
 sh scripts/probe-homebrew.sh /absolute/path/to/Homebrew-source
+# Optional: verify a separately acquired official signed formula API document.
+sh scripts/probe-homebrew.sh /absolute/path/to/Homebrew-source /path/to/formula.jws.json
 ```
 
 Requires macOS with working `/usr/bin/sandbox-exec`, Git, tar, cp, shasum, and an
@@ -32,7 +34,9 @@ retained stderr even when a command exits zero.
 Synthetic tap fixtures are trusted only inside the isolated user configuration.
 They have no bottles, use nonresolving source URLs and abort if installation is
 attempted. They are not production recipes or a proposed installation mechanism.
-The only install invocations are native previews. The nonstandard prefix cannot
+Install invocations are native previews and a negative `--force-bottle` test
+against a source-only fixture. The latter must fail before installing anything.
+The nonstandard prefix cannot
 establish normal-prefix bottle relocation, official core coverage, or platform
 compatibility. The script does not impose a total runtime deadline; interrupt a
 stalled run and retain its incomplete evidence as unavailable, never successful.
@@ -49,19 +53,33 @@ Use the source revision record, not that generic string, to identify the test.
 | --- | --- | --- |
 | `hb.verify.subject-coverage` | `verify --json --deps` on the source-only fixture exits 0, prints `[]`, and warns that the `tahoe` bottle is unavailable | Require an exact expected-subject inventory; process success is insufficient |
 | `hb.plan.reresolution` | `install --dry-run --formula` first lists `probe-leaf`; after adding a dependency to the same root recipe, a second invocation lists both `probe-leaf` and `probe-extra`; both exit 0 | Previews resolve current metadata; they do not consume an immutable prior plan |
+| `hb.artifact.checksum-cache` | Native `Downloadable::VerificationCache` verifies original and unchanged bytes, rejects replacement bytes with the same size and restored mtime, and rejects a missing checksum | Native cache revalidation is reusable; this does not prevent replacement after a check or prove installation consumption |
+| `hb.execution.force-root-bottle` | Installing the source-only root with `--force-bottle --formula` exits 1 with `has no bottle` | Root rejection is demonstrated; dependency fallback remains separate |
+| `hb.metadata.jws` | Upstream `verify_and_parse_jws` with the bundled Homebrew public key accepts the official document and rejects altered payload bytes and missing signatures | Raw metadata authentication is demonstrated; the resolver's use of those exact bytes remains unproven |
 
 The script asserts both observations against real upstream commands. Neither is
 a mock verifier or a simulated Homebrew implementation. Preview output repeats
 some actions and is human-readable; it is deliberately not a product plan parser.
 The successful run emitted nonstandard-prefix warnings and denied attempts by
 clang to write an xcrun cache outside the sandbox. Preserve that limitation:
-this is not a clean installation test. No bottle, attestation, metadata signature,
-or vulnerability response was verified in the runtime probe.
+this is not a clean installation test. No real bottle attestation or vulnerability
+response was verified in the runtime probe. The checksum test uses real local
+fixture bytes and an explicit expected digest, not a downloaded official bottle.
+
+The optional metadata probe calls the private upstream verifier only as a test;
+it is not yet a supported product adapter. The tested official document came from
+`https://formulae.brew.sh/api/formula.jws.json`, with SHA-256
+`611a287a2b6a0c98218fe51cebf62e96810a0cd66002ee1396fcb8aa2e87cc71`.
+It contained 8,608 formulae. The authenticated `wget` sample was version 1.25.0,
+revision 0, bottle rebuild 2, including platform-specific digests. Its top-level
+date/time-related fields were `outdated`, `deprecation_date`, and `disable_date`;
+none establishes release publication time. This observation is scoped to this
+sample, not proof that no usable publisher timestamp source exists.
 
 ## Inspected capabilities and gaps
 
-All source links below pin the same inspected revision. These are source findings,
-not additional runtime results or supported product capabilities. The design and
+All source links below pin the same inspected revision. These are source findings;
+only the tests above are runtime results. None enables product execution. The design and
 integration contract remain authoritative for policy.
 
 | Capability | Native guarantee candidate and source | Remaining work before delegation |

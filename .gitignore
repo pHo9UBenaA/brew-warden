@@ -39,6 +39,8 @@
 !/scripts/check.sh
 !/scripts/probe-homebrew.sh
 !/scripts/homebrew-probe.md
+!/scripts/probe-homebrew-metadata.rb
+!/scripts/probe-homebrew-integrity.rb
 
 # Diagnostic-only product entrypoints and their execution refusal tests.
 !/cmd/bwd/main.go
