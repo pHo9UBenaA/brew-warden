@@ -42,7 +42,8 @@ separate adapters outside, instead of creating an adapter utility bucket.
 
 The initial product packages are the two entrypoints, composition, and the
 diagnostic-only CLI, and a pure domain evidence evaluator. There is no executor
-or Homebrew pass-through. Domain acceptance tests live under `tests` and provide
+or Homebrew pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
+the adapter owning local JSON schemas and filesystem access. Domain acceptance tests live under `tests` and provide
 explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.

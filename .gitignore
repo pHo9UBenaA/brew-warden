@@ -51,6 +51,12 @@
 !/internal/domain/evidence.go
 !/internal/domain/decision.go
 !/tests/policy_test.go
+!/internal/ports/config.go
+!/internal/adapters/localstate/json.go
+!/internal/adapters/localstate/config.go
+!/internal/adapters/localstate/config_test.go
+!/internal/adapters/localstate/files.go
+!/internal/adapters/localstate/files_test.go
 
 # Development tooling. Add new source files explicitly when introducing them.
 !/tools/repo-check/architecture.go

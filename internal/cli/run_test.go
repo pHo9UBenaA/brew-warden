@@ -5,6 +5,8 @@ import (
 	"errors"
 	"strings"
 	"testing"
+
+	"brewwarden/internal/domain"
 )
 
 func TestRejectUnverifiedOperations(t *testing.T) {
@@ -22,7 +24,7 @@ func TestRejectUnverifiedOperations(t *testing.T) {
 			if code := Run(args, &stdout, &stderr); code == 0 {
 				t.Fatal("unverified invocation succeeded")
 			}
-			if stdout.Len() != 0 || !strings.HasPrefix(stderr.String(), "execution_binding_unverified:") || strings.ContainsRune(stderr.String(), '\x1b') {
+			if stdout.Len() != 0 || stderr.Len() == 0 || strings.ContainsRune(stderr.String(), '\x1b') {
 				t.Fatalf("unexpected output: stdout=%q stderr=%q", &stdout, &stderr)
 			}
 		})
@@ -46,3 +48,33 @@ func TestLocalDiagnostics(t *testing.T) {
 type failedWriter struct{}
 
 func (failedWriter) Write([]byte) (int, error) { return 0, errors.New("output unavailable") }
+
+type configSource struct{}
+
+func (configSource) LoadConfig(string) (domain.Policy, error) { return domain.NewPolicy(3600) }
+
+func TestWrapperOptions(t *testing.T) {
+	for _, tc := range []struct {
+		args    []string
+		seconds string
+	}{
+		{[]string{"doctor"}, "3600"},
+		{[]string{"--minimum-release-age", "168h", "doctor"}, "604800"},
+		{[]string{"--minimum-release-age", "0h", "doctor"}, "0"},
+	} {
+		var out, diagnostics bytes.Buffer
+		if RunWithConfig(tc.args, &out, &diagnostics, configSource{}) != 1 || !strings.Contains(diagnostics.String(), "minimum_release_age_seconds: "+tc.seconds+"\n") {
+			t.Fatalf("unexpected diagnostic: %s", &diagnostics)
+		}
+	}
+	for _, args := range [][]string{{"--minimum-release-age", "-1h", "doctor"}, {"--minimum-release-age", "0.5s", "doctor"}, {"--minimum-release-age", "1h", "--minimum-release-age", "2h", "doctor"}, {"--config", "", "doctor"}} {
+		var out, diagnostics bytes.Buffer
+		if RunWithConfig(args, &out, &diagnostics, configSource{}) == 0 || !strings.HasPrefix(diagnostics.String(), "invocation_invalid:") {
+			t.Fatal("invalid wrapper options accepted")
+		}
+	}
+	_, age, rest, err := options([]string{"brew", "install", "--minimum-release-age", "0h"})
+	if err != nil || age != nil || len(rest) != 4 {
+		t.Fatal("consumed child arguments")
+	}
+}

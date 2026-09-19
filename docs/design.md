@@ -267,6 +267,21 @@ must not weaken user policy through merging.
 Reject unknown configuration fields, ambiguous duplicate keys, invalid values,
 and implicit type coercion. A policy change invalidates prior decisions.
 
+The initial local configuration adapter supports this schema with defaults for
+omitted sections. `schemaVersion` is required. It rejects nulls, duplicate or
+mis-cased keys, invalid UTF-8, trailing values and documents above 64 KiB. Only
+`homebrew/core`, mandatory checksum/provenance verification, and `suggest` mode
+with age-only waivers are accepted. Configured trust expansion and disabling
+required checks remain unsupported. Minimum hours are nonnegative integers;
+the CLI duration must be an exact nonnegative number of seconds.
+
+The default path is `brewwarden/config.json` within Go's OS user configuration
+directory (`~/Library/Application Support` on macOS). `--config PATH` explicitly
+selects another file; no current-directory configuration is discovered. A missing
+default file uses defaults; an explicitly requested missing file fails. Final
+symlinks, nonregular files, and group/other-writable files are rejected. Parent
+directories follow the trusted-user filesystem boundary in the threat model.
+
 Store separate immutable JSON records for observations, plans, and attempts in
 private directories. Use a single writer, temporary files, synchronization,
 same-filesystem rename, and required directory synchronization. Prevent path and

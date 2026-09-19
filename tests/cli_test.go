@@ -26,7 +26,7 @@ func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 		}
 		for _, args := range [][]string{{"brew", "install", "wget"}, {"brew", "upgrade"}, {"brew", "install", "--help"}, {"brew", "bundle", "exec", "--install", "sh"}, {"doctor"}} {
 			cmd := exec.Command(binary, args...)
-			cmd.Env = []string{"PATH=" + dir, "BREWWARDEN_TEST_MARKER=" + marker}
+			cmd.Env = []string{"PATH=" + dir, "HOME=" + dir, "XDG_CONFIG_HOME=" + dir, "BREWWARDEN_TEST_MARKER=" + marker}
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			if err := cmd.Run(); err == nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 1 {
