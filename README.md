@@ -10,6 +10,7 @@ plans, emergency updates, and evidence history.
 diagnostic that reports the unresolved execution-binding gate. It does not launch
 Homebrew. Pure evidence eligibility rules exist, but live evidence collection
 and installation enforcement are not implemented.
+`history` shows immutable records of supported requests refused before execution.
 The intended interface prefixes supported commands:
 
 ```sh
@@ -35,6 +36,7 @@ require a C compiler for race detection.
 ./scripts/check.sh all   # Includes advisory database access
 go run ./cmd/bwd --help
 go run ./cmd/bwd doctor  # Exits nonzero: execution binding is unverified
+go run ./cmd/bwd history
 ```
 
 Optional Task v3 aliases are listed by `task --list`. See

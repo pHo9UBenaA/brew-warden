@@ -21,8 +21,12 @@ func Run(args []string, stdout, stderr io.Writer) int {
 }
 
 func RunWithConfig(args []string, stdout, stderr io.Writer, source ports.ConfigSource) int {
+	return RunWithServices(args, stdout, stderr, source, nil)
+}
+
+func RunWithServices(args []string, stdout, stderr io.Writer, source ports.ConfigSource, journal ports.History) int {
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd brew install|upgrade ... (disabled)\nHomebrew commands are unavailable pending execution-binding verification."); err != nil {
+		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nHomebrew commands are unavailable pending execution-binding verification."); err != nil {
 			return 1
 		}
 		return 0
@@ -31,6 +35,10 @@ func RunWithConfig(args []string, stdout, stderr io.Writer, source ports.ConfigS
 	if err != nil {
 		_, _ = fmt.Fprintln(stderr, "invocation_invalid: "+err.Error())
 		return 1
+	}
+	// History must remain available even when policy configuration is invalid.
+	if len(rest) == 1 && rest[0] == "history" {
+		return showHistory(stdout, stderr, journal)
 	}
 	policy := domain.DefaultPolicy()
 	if source != nil {
@@ -55,7 +63,42 @@ func RunWithConfig(args []string, stdout, stderr io.Writer, source ports.ConfigS
 	// nested commands and apparently read-only brew operations. Do not echo
 	// untrusted tokens into the terminal or consume a child's --help.
 	_, _ = fmt.Fprintln(stderr, executionUnavailable)
+	if journal != nil && len(rest) >= 2 && rest[0] == "brew" && domain.ValidRequest(rest[1], rest[2:]) {
+		if id, err := journal.RecordRefusal(rest[1], rest[2:], policy); err != nil {
+			_, _ = fmt.Fprintln(stderr, "history_unavailable: the refused request could not be durably recorded; no Homebrew process was started.")
+		} else {
+			_, _ = fmt.Fprintln(stderr, "history_record: "+string(id))
+		}
+	}
 	return 1
+}
+
+func showHistory(stdout, stderr io.Writer, journal ports.History) int {
+	if journal == nil {
+		_, _ = fmt.Fprintln(stderr, "history_unavailable: no history source is configured.")
+		return 1
+	}
+	entries, err := journal.History()
+	if err != nil {
+		_, _ = fmt.Fprintln(stderr, "history_unavailable: cannot validate the history records.")
+		return 1
+	}
+	if len(entries) == 0 {
+		if _, err := fmt.Fprintln(stdout, "No recorded requests."); err != nil {
+			return 1
+		}
+	}
+	for _, entry := range entries {
+		if !entry.ID.Valid() || !entry.Refusal.Valid() {
+			_, _ = fmt.Fprintln(stderr, "history_invalid: invalid record returned by history source.")
+			return 1
+		}
+		r := entry.Refusal
+		if _, err := fmt.Fprintf(stdout, "%s %s refused %s %q (%s)\n", entry.ID, time.Unix(r.OccurredAt, 0).UTC().Format(time.RFC3339), r.Operation, r.Targets, r.ReasonCode); err != nil {
+			return 1
+		}
+	}
+	return 0
 }
 
 func options(args []string) (location string, age *int64, rest []string, err error) {

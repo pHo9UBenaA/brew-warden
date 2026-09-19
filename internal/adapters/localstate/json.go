@@ -84,6 +84,13 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int) error {
 		if err != nil || end != json.Delim('}') {
 			return errors.New("unterminated JSON object")
 		}
+		for i := 0; i < t.NumField(); i++ {
+			field := t.Field(i)
+			name := strings.Split(field.Tag.Get("json"), ",")[0]
+			if field.Tag.Get("required") == "true" && !seen[name] {
+				return errors.New("missing required JSON field")
+			}
+		}
 	case reflect.Slice:
 		if token != json.Delim('[') {
 			return errors.New("expected JSON array")

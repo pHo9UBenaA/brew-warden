@@ -18,20 +18,22 @@ var versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
 // Artifact identifies bytes, including same-version bottle rebuilds and platform.
 // Exported values are revalidated when evaluated; serialization is not trust.
 type Artifact struct {
-	Tap      string
-	Name     string
-	Version  string
-	Revision int
-	Rebuild  int
-	OS       string
-	Arch     string
-	SHA256   Digest
+	Tap       string
+	Name      string
+	Version   string
+	Revision  int
+	Rebuild   int
+	OS        string
+	Arch      string
+	BottleTag string
+	SHA256    Digest
 }
 
 func (a Artifact) Valid() bool {
 	return a.Tap == "homebrew/core" && formulaName.MatchString(a.Name) &&
 		versionText.MatchString(a.Version) && a.Revision >= 0 && a.Rebuild >= 0 &&
-		a.OS == "macos" && (a.Arch == "arm64" || a.Arch == "amd64") && a.SHA256.Valid()
+		a.OS == "macos" && (a.Arch == "arm64" || a.Arch == "amd64") &&
+		formulaName.MatchString(a.BottleTag) && a.SHA256.Valid()
 }
 
 type Claim uint8

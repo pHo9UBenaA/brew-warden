@@ -14,5 +14,10 @@ func Main() {
 	if base, err := os.UserConfigDir(); err == nil {
 		configPath = filepath.Join(base, "brewwarden", "config.json")
 	}
-	os.Exit(cli.RunWithConfig(os.Args[1:], os.Stdout, os.Stderr, localstate.Files{ConfigPath: configPath}))
+	statePath := ""
+	if configPath != "" {
+		statePath = filepath.Join(filepath.Dir(configPath), "history")
+	}
+	files := localstate.Files{ConfigPath: configPath, StatePath: statePath}
+	os.Exit(cli.RunWithServices(os.Args[1:], os.Stdout, os.Stderr, files, files))
 }

@@ -3,6 +3,8 @@
 Status: proposed design, updated 2026-09-19. The development harness and initial
 diagnostic-only CLI and pure evidence eligibility evaluation exist. Evidence
 collection, durable exception consumption and installation enforcement do not.
+Strict user configuration and immutable pre-execution refusal history are also
+implemented. Refusal history is not the execution-attempt journal.
 
 ## Purpose and scope
 
@@ -26,7 +28,7 @@ Go is the product language and is used by the harness. Follow the
 
 The project and repository name is `brewwarden` (BrewWarden). `bwd` is the short
 executable name; `brewwarden` exposes the identical interface. Only local help
-and an execution-unavailable `doctor` diagnostic are implemented. All Homebrew
+an execution-unavailable `doctor` diagnostic, and `history` are implemented. All Homebrew
 invocations are rejected without launching a child process.
 
 ```sh
@@ -292,6 +294,21 @@ An ID can hash the exact stored bytes. Revalidate their schema and contents when
 reading. A hash is not a signature or protection against the local administrator.
 If an execution record cannot be persisted, do not begin a mutation. Read-only
 reconciliation diagnostics should remain available.
+
+The initial `history` command lists only requests refused before Homebrew starts.
+Supported install/upgrade request shapes produce immutable refusal records under
+`history` beside the default user configuration; changing `--config` does not
+redirect history. Other unsupported arguments are not logged. Records use random
+event IDs, SHA-256 IDs over exact stored bytes, mode 0600 files in a 0700 directory,
+a nonblocking single-writer lock, file synchronization, same-directory rename,
+and directory synchronization. Reads revalidate schema and content digests.
+History remains readable with invalid policy configuration. A history failure is
+reported and never enables execution. Uncommitted `.pending-*` refusal files are
+ignored; they cannot represent an executing attempt. This store does not yet
+consume emergency exceptions or reconcile interrupted installations. The directory
+inventory is bounded to 10,000 entries and rejects an oversized/corrupt inventory
+rather than dropping old records. Full-disk and abrupt-process termination
+acceptance testing remain required for a future execution journal.
 
 ## Implementation and acceptance
 

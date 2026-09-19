@@ -10,6 +10,7 @@ import (
 
 type Files struct {
 	ConfigPath string
+	StatePath  string
 }
 
 func (f Files) LoadConfig(location string) (domain.Policy, error) {

@@ -57,6 +57,11 @@
 !/internal/adapters/localstate/config_test.go
 !/internal/adapters/localstate/files.go
 !/internal/adapters/localstate/files_test.go
+!/internal/domain/history.go
+!/internal/ports/history.go
+!/internal/adapters/localstate/history.go
+!/internal/adapters/localstate/history_test.go
+!/tests/history_test.go
 
 # Development tooling. Add new source files explicitly when introducing them.
 !/tools/repo-check/architecture.go

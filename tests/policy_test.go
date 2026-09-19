@@ -10,7 +10,7 @@ import (
 func eligibleAssessment() domain.Assessment {
 	const now = int64(2000000)
 	digest := domain.Digest(strings.Repeat("a", 64))
-	root := domain.Artifact{Tap: "homebrew/core", Name: "wget", Version: "1.0", OS: "macos", Arch: "arm64", SHA256: digest}
+	root := domain.Artifact{Tap: "homebrew/core", Name: "wget", Version: "1.0", OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe", SHA256: digest}
 	dep := root
 	dep.Name = "openssl@3"
 	nodes := []domain.Node{{Artifact: root, Dependencies: []domain.Artifact{dep}}, {Artifact: dep}}
@@ -69,6 +69,7 @@ func TestEvidenceDecisions(t *testing.T) {
 		}, domain.Hold},
 		{"same version rebottle", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].Subject.Rebuild++ }, domain.Hold},
 		{"wrong platform", func(a *domain.Assessment) { a.Nodes[0].Evidence[2].Subject.Arch = "amd64" }, domain.Hold},
+		{"different macOS bottle", func(a *domain.Assessment) { a.Nodes[0].Evidence[2].Subject.BottleTag = "arm64_sonoma" }, domain.Hold},
 		{"missing dependency", func(a *domain.Assessment) { a.Nodes = a.Nodes[:1] }, domain.Hold},
 		{"cycle", func(a *domain.Assessment) { a.Nodes[1].Dependencies = a.Targets }, domain.Hold},
 		{"extra unrequested node", func(a *domain.Assessment) { a.Nodes[0].Dependencies = nil }, domain.Hold},

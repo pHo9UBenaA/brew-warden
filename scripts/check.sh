@@ -47,6 +47,8 @@ case "$1" in
   fuzz)
     go test ./tools/repo-check -run='^$' -fuzz='^FuzzCommitMessage$' \
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+    go test ./internal/adapters/localstate -run='^$' -fuzz='^FuzzConfig$' \
+      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     ;;
   lint)
     require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"
