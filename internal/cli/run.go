@@ -14,6 +14,9 @@ import (
 
 const executionUnavailable = "execution_binding_unverified: Homebrew execution is disabled; verified artifacts and the complete dependency plan are not bound to installation."
 
+// Version is set by the reproducible development build; it is not a release claim.
+var Version = "development"
+
 // Run never launches Homebrew. In particular, child flags cannot select wrapper
 // diagnostics, and unknown commands cannot fall through to an unchecked process.
 func Run(args []string, stdout, stderr io.Writer) int {
@@ -25,6 +28,12 @@ func RunWithConfig(args []string, stdout, stderr io.Writer, source ports.ConfigS
 }
 
 func RunWithServices(args []string, stdout, stderr io.Writer, source ports.ConfigSource, journal ports.History) int {
+	if len(args) == 1 && args[0] == "--version" {
+		if _, err := fmt.Fprintln(stdout, "BrewWarden "+Version); err != nil {
+			return 1
+		}
+		return 0
+	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nHomebrew commands are unavailable pending execution-binding verification."); err != nil {
 			return 1

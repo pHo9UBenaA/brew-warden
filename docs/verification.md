@@ -16,6 +16,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and a freshly built checker binary | Advisory database |
 | `./scripts/check.sh build` / `task build` | Harness binary at `bin/repo-check` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
+| `sh scripts/build-product.sh darwin/arm64` (or `darwin/amd64`) | Two forced rebuilds from a clean committed source; compare bytes and retain build metadata/digests in a unique `.cache` directory | None required |
 | `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
 
 ## Boundaries
@@ -65,5 +66,8 @@ Staticcheck is an additional analysis tool, not a Go security certification.
 The baseline tests both CLI binaries against a tripwire `brew` executable and
 checks refusal of mutations and nested operations. Upstream probes are explicit,
 separate from the baseline, and do not install packages. Installation binding,
-native artifact distribution, release signing, and release reproducibility remain
+native artifact distribution and release signing remain
 unimplemented; the development harness does not establish those guarantees.
+The development build script checks repeatability of unsigned development
+artifacts only. It does not publish, tag, sign or notarize a release, establish
+provenance of the compiler, or attest a supported installation capability.

@@ -43,6 +43,10 @@ func TestLocalDiagnostics(t *testing.T) {
 	if Run([]string{"--help"}, failedWriter{}, &stderr) == 0 {
 		t.Fatal("failed output must not succeed")
 	}
+	stdout.Reset()
+	if Run([]string{"--version"}, &stdout, &stderr) != 0 || !strings.HasPrefix(stdout.String(), "BrewWarden ") {
+		t.Fatal("missing local version")
+	}
 }
 
 type failedWriter struct{}
