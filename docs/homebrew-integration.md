@@ -43,9 +43,12 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 ## Preflight investigation
 
 The developer-only [isolated probe and current evidence](../scripts/homebrew-probe.md)
-reproduce missing-bottle verification and dependency re-resolution with pinned
-upstream source. They do not establish an installation-binding mechanism. No
-Homebrew version is currently supported for product execution.
+reproduce missing-bottle verification, dependency re-resolution, and advisory
+cache/coverage boundaries with pinned upstream source. Frozen-input real installs
+of `hello` and the `jq`/`oniguruma` closure now succeed in empty temporary prefixes.
+These bounded probes do not establish a general installation-binding mechanism
+for existing prefixes and upgrades. No Homebrew version is currently supported
+for product execution.
 
 The [manual](https://docs.brew.sh/Manpage) documents install/upgrade `--dry-run`
 previews and `brew verify --deps --json` for fetching bottles and checking their

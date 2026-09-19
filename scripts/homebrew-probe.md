@@ -1,7 +1,7 @@
 # Homebrew integration probes
 
-Status: a frozen-input installation of one dependency-free official bottle is
-demonstrated in an empty isolated prefix. General execution binding remains
+Status: frozen-input installations of a dependency-free official bottle and
+a two-package dependency closure are demonstrated in empty isolated prefixes. General execution binding remains
 unverified. No Homebrew version is supported for product execution.
 The probe is development tooling; the CLI never calls it. Capability ownership
 will move to the Homebrew adapter when that adapter has real behavior.
@@ -144,11 +144,64 @@ reads the `texinfo` recipe to locate `install-info`; it does not install texinfo
 in this empty prefix. Its authenticated snapshot is included explicitly.
 Nonstandard-prefix and denied clang xcrun-cache warnings remain in stderr.
 
-This does not establish dependency-bearing installations, affected dependents,
+This does not establish arbitrary dependency graphs, affected dependents,
 existing installed helpers, upgrades, normal-prefix behavior, concurrent external
 Homebrew operations, or crash/cancellation reconciliation. Product execution stays
 disabled. The earlier claim that no successful installation was demonstrated is
 superseded only for the narrowly defined probe above.
+
+## Dependency-bearing installation
+
+A second bounded scenario installs `jq 1.8.2` (revision 0, rebuild 1) and its
+complete runtime dependency `oniguruma 6.9.10` (revision/rebuild 0) together:
+
+```sh
+sh scripts/probe-homebrew.sh /absolute/path/to/Homebrew-source /path/to/formula.jws.json /path/to/jq-inputs /absolute/path/to/gh jq
+```
+
+Use the same Ruby archive as above. Supply `jq.rb`, `oniguruma.rb`, `autoconf.rb`,
+`automake.rb`, `libtool.rb`, and `m4.rb` from the authenticated API's pinned source
+commit and paths. Each snapshot's exact bytes are authenticated before native
+recipe loading. The build-only recipes are needed for native dependency analysis;
+no build-tool bottles or source archives are staged or installed. `fetch --deps`
+expands build dependencies as well, so the probe fetches each explicitly accepted
+runtime bottle individually and independently checks the full runtime graph.
+
+| Artifact file | SHA-256 |
+| --- | --- |
+| `jq--1.8.2.arm64_tahoe.bottle.1.tar.gz` | `ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036` |
+| `oniguruma--6.9.10.arm64_tahoe.bottle.tar.gz` | `eb6bda3b333f497b5d294388f39fd0902a5c79a52ae16858eff711d2d104cc4d` |
+
+Acquire the corresponding GitHub attestation bundles as above, using filenames
+`jq-bundle.jsonl` and `oniguruma-bundle.jsonl`. The jq signer is the publish-commit
+workflow already described. The oniguruma signer is explicitly constrained to
+`https://github.com/Homebrew/homebrew-core/.github/workflows/dispatch-build-bottle.yml@refs/heads/main`.
+This additional identity was checked against the
+[pinned official workflow](https://github.com/Homebrew/homebrew-core/blob/5710e3f85ca59a6dfe9619404049704992ea1142/.github/workflows/dispatch-build-bottle.yml):
+its upload job attests the bottle archives before publishing them to GHCR. An
+unexpected identity remains a failure; there is no repository-wide wildcard or
+automatic trust of the subject supplied by an input certificate. These identities
+are probe scope, not a product trust policy.
+
+The API, current recipes, embedded recipes, and OCI metadata must agree on exact
+runtime edges, candidate versions and revisions. Recipes requiring post-install
+steps, optional/test dependencies or requirements are rejected by this bounded
+probe. Build-only declarations are checked separately. After successful integrity
+inspection, the probe deliberately changes the selected cached bottle (oniguruma
+in this scenario) and requires `cache digest mismatch` before installation. It
+restores the verified bytes, revalidates everything, freezes inputs, and then
+executes the real native install. Attempts to change frozen input/cache bytes
+are separately required to fail.
+
+Observed on the same macOS arm64 environment: only `jq/1.8.2` and
+`oniguruma/6.9.10` are installed, both receipts record bottle pours, and receipt
+runtime edges and embedded recipe bytes match the verified closure. The jq
+regular-expression smoke test runs successfully against its installed dependency.
+These `:any` bottles require relocation: unlike the `hello` `:any_skip_relocation`
+binary, their installed binaries are not claimed byte-identical to the archive.
+The exact consumed bottle archives are authenticated, rehashed, and frozen before
+native relocation. General relocation correctness, existing-prefix upgrades,
+affected dependents and external concurrency remain separate acceptance work.
 
 ## Advisory and publication boundaries
 
