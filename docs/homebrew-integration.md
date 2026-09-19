@@ -5,6 +5,11 @@ variables, APIs, and implementation before writing a replacement. Prefer reusing
 verified capabilities and implementing the missing guarantees in BrewWarden.
 Do not equate delegation with trust in every upstream behavior, or reimplement a
 check solely to make it appear independent.
+Reuse is a preference, not a requirement to depend on brittle private APIs or
+human-readable output. Compare guarantee coverage and maintenance cost; use a
+maintained library for a justified gap. BrewWarden owns the policy decision even
+when Homebrew supplies evidence. Reimplementing all checks and using Homebrew as
+a final check does not, by itself, bind preflight results to installation.
 
 ## Capability records
 
@@ -34,6 +39,29 @@ For each implemented row, link to its owning adapter and contract tests, and rec
 Keep detailed operational records beside the owning adapter once it exists;
 this document remains the short index. Do not duplicate command definitions or
 version tables across core policy, CLI, documentation, and multiple adapters.
+
+## Preflight investigation
+
+The [manual](https://docs.brew.sh/Manpage) documents install/upgrade `--dry-run`
+previews and `brew verify --deps --json` for fetching bottles and checking their
+attestations. These are candidates for planning and preflight evidence, not an
+established execution contract. Do not equate a preview with artifact verification,
+an immutable executable plan, or absence of helper/bootstrap side effects.
+
+Source inspected at `2f1c682db046d37c4b6c09aa43837be6ff270c39`:
+
+- [Install preview](https://github.com/Homebrew/brew/blob/2f1c682db046d37c4b6c09aa43837be6ff270c39/Library/Homebrew/install.rb#L370-L397)
+  prints planned actions and returns before installation.
+- [Bottle verification](https://github.com/Homebrew/brew/blob/2f1c682db046d37c4b6c09aa43837be6ff270c39/Library/Homebrew/dev-cmd/verify.rb#L40-L85)
+  expands recursive dependencies and returns attestation results, but a missing
+  platform bottle follows a warning path without setting `verification_failed`.
+  Match evidence against every expected subject; exit zero alone is insufficient.
+
+These observations are source inspection, not isolated runtime validation. Before
+enabling mutations, prove that the verified closure includes every package the
+actual operation may change, including affected dependents, and that execution
+consumes the verified metadata and bytes. Supplement native checks where needed;
+do not treat a second verifier as a substitute for this binding.
 
 ## Code and evidence ownership
 

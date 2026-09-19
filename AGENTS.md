@@ -16,7 +16,9 @@
   dependencies or input handling, read [implementation rules](docs/dependencies.md).
 - Before implementing or changing a security feature, follow
   [Homebrew integration](docs/homebrew-integration.md): inspect upstream support,
-  establish its actual guarantees, and implement only the missing guarantees.
+  establish its actual guarantees, and prefer reuse with justified gap filling.
+  Homebrew compromise is out of scope; previews and duplicate checks do not prove
+  execution binding. Begin product work with the integration probes in the design.
 - Use `.agents/skills/brewwarden-change` for behavior/boundary changes and
   `.agents/skills/brewwarden-review` for consequential reviews.
 - Test behavior with realistic failure cases. Architecture fixtures must resolve

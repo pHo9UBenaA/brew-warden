@@ -281,6 +281,13 @@ reconciliation diagnostics should remain available.
 4. Add cask, third-party tap, and upstream-signature support by explicit capability.
 5. Improve presentation/performance and design optional automation separately.
 
+The first step is unresolved implementation work, not approval to assume feasible
+enforcement. Evaluate native previews and pre-install verification through the
+[integration contract](homebrew-integration.md#preflight-investigation). Establish
+the execution-binding mechanism, timestamp sources, revision-aware advisory
+mapping/freshness, and helper bootstrap behavior before claiming support. Continue
+independent pure-policy work while a probe is unresolved; keep mutations disabled.
+
 Acceptance must cover invalid signatures under emergency mode, expired/replayed
 exceptions, changed policy/digests, incomplete advisory responses, same-version
 rebottles, platform-specific artifacts, changed dependencies, cache substitution,

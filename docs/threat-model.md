@@ -3,6 +3,9 @@
 Trust the OS, the running tool, selected trust roots, supported Homebrew and
 verifier versions, and user-owned state. A same-user attacker who can replace
 these components is outside the local wrapper's enforcement boundary.
+Defending against a compromised Homebrew implementation is explicitly out of
+scope. Trusting that implementation does not establish that every invocation
+covered all required subjects or that preflight and execution use the same inputs.
 
 | Input or boundary | Required handling |
 | --- | --- |
