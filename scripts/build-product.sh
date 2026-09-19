@@ -1,5 +1,6 @@
 #!/bin/sh
-# Build unsigned diagnostic-only development artifacts; never publish them.
+# Build diagnostic-only development artifacts without a publisher signature.
+# The Go linker may add a platform-required ad-hoc signature. Never publish here.
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh

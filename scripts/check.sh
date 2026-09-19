@@ -36,12 +36,15 @@ case "$1" in
   build)
     mkdir -p bin
     go build -trimpath -o bin/repo-check ./tools/repo-check
+    go build -trimpath -o bin/bwd ./cmd/bwd
+    go build -trimpath -o bin/brewwarden ./cmd/brewwarden
     ;;
   race)
     CGO_ENABLED=1 go test -race -shuffle=on -count=1 -timeout=5m ./...
     ;;
   cover)
-    go test -covermode=atomic -coverprofile=.cache/coverage.out -shuffle=on -count=1 -timeout=5m ./...
+    coverage_packages=$(go list ./... | paste -sd , -)
+    go test -coverpkg="$coverage_packages" -covermode=atomic -coverprofile=.cache/coverage.out -shuffle=on -count=1 -timeout=5m ./...
     go tool cover -func=.cache/coverage.out
     ;;
   fuzz)
@@ -60,6 +63,8 @@ case "$1" in
     "$binary" -test ./...
     ./scripts/check.sh build
     "$binary" -mode=binary ./bin/repo-check
+    "$binary" -mode=binary ./bin/bwd
+    "$binary" -mode=binary ./bin/brewwarden
     ;;
   *) printf 'Unknown check: %s\n' "$1" >&2; exit 1 ;;
 esac

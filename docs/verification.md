@@ -10,11 +10,11 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/setup-tools.sh` / `task tools` | Install pinned Staticcheck and govulncheck under `.cache/tools` | Go proxy and checksum database |
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
-| `./scripts/check.sh cover` / `task test-cover` | Coverage report at `.cache/coverage.out` | None required |
+| `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
 | `./scripts/check.sh fuzz` / `task fuzz` | Commit-message and strict configuration parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
-| `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and a freshly built checker binary | Advisory database |
-| `./scripts/check.sh build` / `task build` | Harness binary at `bin/repo-check` | None required |
+| `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
+| `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
 | `sh scripts/build-product.sh darwin/arm64` (or `darwin/amd64`) | Two forced rebuilds from a clean committed source; compare bytes and retain build metadata/digests in a unique `.cache` directory | None required |
 | `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
@@ -68,6 +68,7 @@ checks refusal of mutations and nested operations. Upstream probes are explicit,
 separate from the baseline, and do not install packages. Installation binding,
 native artifact distribution and release signing remain
 unimplemented; the development harness does not establish those guarantees.
-The development build script checks repeatability of unsigned development
-artifacts only. It does not publish, tag, sign or notarize a release, establish
+The development build script checks repeatability of development artifacts
+without a publisher signature; Go may add a linker ad-hoc signature on macOS.
+It does not publish, tag, apply a publisher signature or notarize a release, establish
 provenance of the compiler, or attest a supported installation capability.
