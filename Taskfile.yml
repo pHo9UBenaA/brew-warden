@@ -1,0 +1,36 @@
+version: '3'
+
+tasks:
+  default:
+    desc: List development commands
+    cmds: ['task --list']
+  setup:
+    desc: Enable local Git hooks
+    cmds: ['./scripts/setup-hooks.sh']
+  tools:
+    desc: Download and build pinned development tools (network)
+    cmds: ['./scripts/setup-tools.sh']
+  check:
+    desc: Run all checks, including vulnerability DB access
+    cmds: ['./scripts/check.sh all']
+  verify:
+    desc: Run baseline offline checks
+    cmds: ['./scripts/verify.sh']
+  build:
+    desc: Build the repository checker (product CLI is not implemented)
+    cmds: ['./scripts/check.sh build']
+  test-race:
+    desc: Run race detection and shuffled tests (requires a C compiler)
+    cmds: ['./scripts/check.sh race']
+  test-cover:
+    desc: Report test coverage without an arbitrary percentage gate
+    cmds: ['./scripts/check.sh cover']
+  fuzz:
+    desc: Fuzz commit message handling (FUZZTIME defaults to 10s)
+    cmds: ['./scripts/check.sh fuzz']
+  lint:
+    desc: Run pinned Staticcheck
+    cmds: ['./scripts/check.sh lint']
+  vuln:
+    desc: Scan source, tests, and checker binary (network)
+    cmds: ['./scripts/check.sh vuln']

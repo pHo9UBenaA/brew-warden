@@ -1,0 +1,5 @@
+#!/bin/sh
+set -eu
+export GOTOOLCHAIN=local GOPROXY=off GOSUMDB=off GOWORK=off GOFLAGS=-mod=readonly CGO_ENABLED=0
+export GOCACHE="${GOCACHE:-$(git rev-parse --show-toplevel)/.cache/go-build}"
+go run ./tools/repo-check commit-msg "$1"

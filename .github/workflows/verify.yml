@@ -1,0 +1,59 @@
+name: Verify
+
+on:
+  pull_request:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 4 * * 1'
+  push:
+    branches: [main, master]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: verify-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  verify:
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest]
+    runs-on: ${{ matrix.os }}
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5
+        with:
+          go-version-file: .go-version
+          cache: false
+      - name: Prepare pinned development tools
+        run: ./scripts/setup-tools.sh
+      - name: Verify repository
+        run: ./scripts/check.sh all
+      - name: Validate commit messages
+        if: github.event_name == 'pull_request' || github.event_name == 'push'
+        env:
+          GOTOOLCHAIN: local
+          GOPROXY: 'off'
+          GOSUMDB: 'off'
+          GOWORK: 'off'
+          GOFLAGS: -mod=readonly
+          CGO_ENABLED: '0'
+          TIP: ${{ github.event.pull_request.head.sha || github.sha }}
+          BASE: ${{ github.event.pull_request.base.sha || github.event.before }}
+        shell: sh
+        run: |
+          case "$BASE" in
+            ''|0000000000000000000000000000000000000000)
+              go run ./tools/repo-check commits "$TIP"
+              ;;
+            *)
+              go run ./tools/repo-check commits "$TIP" "$BASE"
+              ;;
+          esac

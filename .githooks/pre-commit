@@ -1,0 +1,8 @@
+#!/bin/sh
+set -eu
+# Worktree checks must not certify a different staged version of a tracked file.
+if ! git diff --quiet --; then
+  printf 'Pre-commit requires a fully staged tracked worktree. Stage or stash outstanding tracked edits.\n' >&2
+  exit 1
+fi
+exec ./scripts/verify.sh

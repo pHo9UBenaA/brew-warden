@@ -1,0 +1,55 @@
+# Ignore files by default; traverse directories to reach explicit exceptions.
+*
+!*/
+
+# Public root files.
+!/.gitignore
+!/.editorconfig
+!/AGENTS.md
+!/CONTRIBUTING.md
+!/DESIGN.md
+!/README.md
+!/go.mod
+!/.go-version
+!/Taskfile.yml
+
+# Reviewed design and development documentation.
+!/docs/architecture.md
+!/docs/dependencies.md
+!/docs/archive/initial-research.md
+!/docs/archive/language-evaluation.md
+!/docs/archive/jev-evaluation.md
+!/docs/threat-model.md
+!/docs/verification.md
+
+# Public automation and agent instructions.
+!/.github/workflows/verify.yml
+!/.github/dependabot.yml
+!/.githooks/commit-msg
+!/.githooks/pre-commit
+!/.githooks/pre-push
+!/.agents/skills/brew-security-change/SKILL.md
+!/.agents/skills/brew-security-review/SKILL.md
+!/scripts/setup-hooks.sh
+!/scripts/verify.sh
+!/scripts/env.sh
+!/scripts/tool-versions.env
+!/scripts/setup-tools.sh
+!/scripts/check.sh
+
+# Development tooling. Add new source files explicitly when introducing them.
+!/tools/repo-check/architecture.go
+!/tools/repo-check/architecture_test.go
+!/tools/repo-check/commit.go
+!/tools/repo-check/commit_test.go
+!/tools/repo-check/fuzz_test.go
+!/tools/repo-check/hygiene_test.go
+!/tools/repo-check/hooks_test.go
+!/tools/repo-check/scripts_test.go
+!/tools/repo-check/hygiene.go
+!/tools/repo-check/main.go
+
+# Prune generated trees rather than traversing them.
+/.cache/
+/bin/
+/dist/
