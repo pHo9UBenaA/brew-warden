@@ -38,6 +38,9 @@
 !/scripts/tool-versions.env
 !/scripts/setup-tools.sh
 !/scripts/check.sh
+!/scripts/probe-container.sh
+!/scripts/container-check.sh
+!/tests/container/Dockerfile
 !/scripts/probe-homebrew.sh
 !/scripts/homebrew-probe.md
 !/scripts/probe-homebrew-metadata.rb

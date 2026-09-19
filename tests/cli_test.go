@@ -12,7 +12,15 @@ import (
 // Exercise both shipped entrypoints with a tripwire brew executable. No host
 // Homebrew is reachable through PATH and no installation is performed.
 func TestEntrypointsNeverLaunchBrew(t *testing.T) {
-	dir := t.TempDir()
+	root := t.TempDir()
+	dir := filepath.Join(root, "bin")
+	if err := os.Mkdir(dir, 0o700); err != nil {
+		t.Fatal(err)
+	}
+	// On Linux the first invocation creates XDG_CONFIG_HOME/brewwarden.
+	// Keep state separate so it cannot become the second binary's output path.
+	home := filepath.Join(root, "home")
+	config := filepath.Join(root, "config")
 	marker := filepath.Join(dir, "brew-invoked")
 	if err := os.WriteFile(filepath.Join(dir, "brew"), []byte("#!/bin/sh\n/usr/bin/touch \"$BREWWARDEN_TEST_MARKER\"\nexit 0\n"), 0o700); err != nil {
 		t.Fatal(err)
@@ -26,7 +34,7 @@ func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 		}
 		for _, args := range [][]string{{"brew", "install", "wget"}, {"brew", "upgrade"}, {"brew", "install", "--help"}, {"brew", "bundle", "exec", "--install", "sh"}, {"doctor"}} {
 			cmd := exec.Command(binary, args...)
-			cmd.Env = []string{"PATH=" + dir, "HOME=" + dir, "XDG_CONFIG_HOME=" + dir, "BREWWARDEN_TEST_MARKER=" + marker}
+			cmd.Env = []string{"PATH=" + dir, "HOME=" + home, "XDG_CONFIG_HOME=" + config, "BREWWARDEN_TEST_MARKER=" + marker}
 			var stdout, stderr bytes.Buffer
 			cmd.Stdout, cmd.Stderr = &stdout, &stderr
 			if err := cmd.Run(); err == nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 1 {

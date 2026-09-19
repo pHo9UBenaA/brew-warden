@@ -17,6 +17,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
 | `sh scripts/build-product.sh darwin/arm64` (or `darwin/amd64`) | Two forced rebuilds from a clean committed source; compare bytes and retain build metadata/digests in a unique `.cache` directory | None required |
+| `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 | `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
 
 ## Boundaries
@@ -65,10 +66,37 @@ Staticcheck is an additional analysis tool, not a Go security certification.
 
 The baseline tests both CLI binaries against a tripwire `brew` executable and
 checks refusal of mutations and nested operations. Upstream probes are explicit,
-separate from the baseline, and do not install packages. Installation binding,
-native artifact distribution and release signing remain
+separate from the baseline. Their optional official-bottle scenarios perform
+real installs only in newly created isolated prefixes; see their scoped evidence.
+Product installation enforcement, native artifact distribution and release signing remain
 unimplemented; the development harness does not establish those guarantees.
 The development build script checks repeatability of development artifacts
 without a publisher signature; Go may add a linker ad-hoc signature on macOS.
 It does not publish, tag, apply a publisher signature or notarize a release, establish
 provenance of the compiler, or attest a supported installation capability.
+
+## Disposable Linux container
+
+`probe-container.sh` uses the platform-specific official Go image pinned in
+`tests/container/Dockerfile`. It requires a running Docker engine; it does not
+start one or change its global configuration. The default source is committed
+`HEAD`; pass a Git revision to reproduce another commit, or `--worktree` to test
+tracked and explicitly allowlisted untracked files. The current container harness
+is copied explicitly for pre-commit validation. Each run records its source archive,
+base revision, harness hashes, local image ID, stdout, stderr and exit status under
+a unique `.cache/container-probe.*` directory. Worktree runs also record status
+and the tracked diff. Ignored caches and private files are not build inputs.
+
+The container runs as UID/GID 10001, with a read-only root filesystem, no network,
+no host mounts, no passed credentials, no Docker socket, no capabilities, and no
+new privileges. CPU, memory, process and temporary-storage limits are explicit in
+the driver. Its temporary filesystem permits execution because Go tests build and
+execute child binaries there; the first no-exec run correctly failed this boundary.
+Images/build cache are retained for reuse; containers are removed after each run.
+This is an explicit developer command, never invoked by product code or hooks.
+
+Verified on OrbStack's Linux arm64 engine: offline baseline and race tests pass.
+The first Linux run exposed a real fixture collision between the `brewwarden`
+binary path and `XDG_CONFIG_HOME/brewwarden`; the integration test now separates
+executable and user-state directories. These results validate exercised Linux
+code paths, not macOS Homebrew bottle compatibility or a Linux product release.
