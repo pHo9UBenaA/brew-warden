@@ -7,7 +7,7 @@
   using Conventional Commits without asking again. Preserve unrelated user work;
   report blockers instead of bypassing checks or signing. Do not push or publish
   unless separately requested. Do not create empty commits for discussion-only tasks.
-- Product behavior follows [DESIGN.md](DESIGN.md). Keep execution unavailable
+- Product behavior follows [docs/design.md](docs/design.md). Keep execution unavailable
   until verified artifacts and the complete dependency plan are bound to execution.
   Unknown evidence never means success; emergency mode waives only bounded age
   conditions, never integrity, trust, or plan binding.

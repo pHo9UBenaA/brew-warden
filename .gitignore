@@ -7,13 +7,13 @@
 !/.editorconfig
 !/AGENTS.md
 !/CONTRIBUTING.md
-!/DESIGN.md
 !/README.md
 !/go.mod
 !/.go-version
 !/Taskfile.yml
 
 # Reviewed design and development documentation.
+!/docs/design.md
 !/docs/architecture.md
 !/docs/dependencies.md
 !/docs/archive/initial-research.md

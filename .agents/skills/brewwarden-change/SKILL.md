@@ -6,7 +6,7 @@ description: Implement brewwarden behavior or architecture changes with evidence
 # Implement a bounded change
 
 Read [architecture](../../../docs/architecture.md) when ownership or imports
-change, and [the product design](../../../DESIGN.md) for policy behavior.
+change, and [the product design](../../../docs/design.md) for policy behavior.
 
 Identify the owning layer and a realistic input that distinguishes the desired
 behavior. For a defect, observe that example failing for the intended reason;

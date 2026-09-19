@@ -7,7 +7,7 @@ description: Review brewwarden policy, execution boundaries, dependency choices,
 
 Establish the actual diff or implementation scope, including staged, unstaged,
 and relevant untracked files. Read [the threat model](../../../docs/threat-model.md)
-and the affected contract in [the design](../../../DESIGN.md).
+and the affected contract in [the design](../../../docs/design.md).
 
 Trace artifact identity and evidence through policy, exceptions, plan storage,
 revalidation, and execution. Look for missing-to-success conversions, weaker

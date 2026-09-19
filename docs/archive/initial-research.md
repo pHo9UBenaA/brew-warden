@@ -2,7 +2,7 @@
 
 Research date: 2026-09-19. This is the initial investigation, retained as evidence.
 The subsequent product decision is an all-in-one tool; overlap with existing OSS
-is acceptable. [Product design](../../DESIGN.md) supersedes the earlier preference for a
+is acceptable. [Product design](../design.md) supersedes the earlier preference for a
 narrow audit-only starting product. [Language evaluation](language-evaluation.md) covers language.
 
 Public documentation and source at fixed commits were inspected. No competing

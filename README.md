@@ -36,7 +36,7 @@ Optional Task v3 aliases are listed by `task --list`. See
 
 ## Documentation
 
-- [Product design](DESIGN.md)
+- [Product design](docs/design.md)
 - [Contributing](CONTRIBUTING.md)
 - [Architecture](docs/architecture.md)
 - [Threat model](docs/threat-model.md)

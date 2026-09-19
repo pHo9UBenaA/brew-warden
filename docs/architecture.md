@@ -1,9 +1,10 @@
 # Architecture
 
-Use a small hexagonal architecture: deterministic decisions at the center,
-application workflows around them, and explicit adapters for effects. This fits
-security policy that must be exercised without a live package manager. It does
-not require a class or interface for every function.
+Use hexagonal architecture with mandatory dependency boundaries: deterministic
+decisions at the center, application workflows around them, and explicit adapters
+for effects. The import rules below are enforced by the repository checker.
+Keep abstractions limited to real boundaries; an interface for every function
+is not required. This does not relax dependency direction or separation of effects.
 
 ```text
 cmd -> composition -> CLI + application + adapters

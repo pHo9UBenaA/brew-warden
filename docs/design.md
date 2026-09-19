@@ -17,9 +17,9 @@ upstream signatures, and Linux, enabling each only after its guarantees have
 been tested. Unsupported paths must not fall through to an unchecked brew call.
 
 Go is the proposed product language and is used by the harness. Follow the
-[dependency and implementation rules](docs/dependencies.md). See
-[architecture](docs/architecture.md) for source boundaries and
-[threat model](docs/threat-model.md) for trust assumptions.
+[dependency and implementation rules](dependencies.md). See
+[architecture](architecture.md) for source boundaries and
+[threat model](threat-model.md) for trust assumptions.
 
 ## User operations
 
@@ -174,7 +174,7 @@ rather than replaying an exception or marking the package permanently trusted.
 
 ## Architecture and data
 
-Use the [hexagonal structure](docs/architecture.md): domain policy, core-owned
+Use the [hexagonal structure](architecture.md): domain policy, core-owned
 ports, application workflows, concrete adapters, CLI, and outer composition.
 The policy engine accepts typed evidence, policy, and explicit time, and performs
 no I/O. Do not interpret external prose as execution instructions.
