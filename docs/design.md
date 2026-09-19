@@ -16,7 +16,7 @@ Start with official core bottles on macOS. Design for casks, third-party taps,
 upstream signatures, and Linux, enabling each only after its guarantees have
 been tested. Unsupported paths must not fall through to an unchecked brew call.
 
-Go is the proposed product language and is used by the harness. Follow the
+Go is the product language and is used by the harness. Follow the
 [dependency and implementation rules](dependencies.md). See
 [architecture](architecture.md) for source boundaries and
 [threat model](threat-model.md) for trust assumptions.
@@ -31,6 +31,7 @@ remain unimplemented.
 bwd brew install wget
 bwd brew upgrade openssl@3
 bwd brew upgrade
+bwd --minimum-release-age 168h brew install wget
 ```
 
 Follow the prefix interaction documented by
@@ -43,7 +44,11 @@ dependency changes. Internally resolve a plan, verify evidence, revalidate the
 exact execution target, execute, and record the result. If checks pass, proceed
 without a BrewWarden confirmation prompt, including in noninteractive use.
 Holds, denials, and unavailable required evidence stop execution with a reason.
-Homebrew's own prompts and privilege requirements remain separate.
+Homebrew's own prompts and privilege requirements remain separate. Resolve all
+requested targets and their complete dependency closure before any installation
+begins. If any target or required dependency is held or denied, stop the entire
+operation; do not silently skip targets. This does not make execution atomic:
+record partial results if a failure occurs after installation starts.
 
 Plans are internal records, not a public `plan`/`apply` workflow. Do not initially
 add BrewWarden `--yes`, `--dry-run`, or universal `--force` options. Diagnostic
@@ -89,8 +94,11 @@ PATH, and other clients remain outside the wrapper's coverage.
   authenticate the Homebrew-built bottle by itself.
 - Model cask checksums, macOS signatures, and notarization separately. A locally
   calculated digest does not turn `no_check` into an upstream checksum match.
-- A missing or unsupported required verifier holds the operation. Do not install
-  the verifier automatically while checking the package.
+- Require no separately installed helper commands beyond Homebrew itself and
+  its normal runtime. Do not require or silently download gh, gpg/gpgv, cosign,
+  jq, or a scanner executable. Use verification code linked into BrewWarden or
+  demonstrated Homebrew-native capabilities that do not add helper requirements.
+  Missing or unsupported required verification still holds the operation.
 - Preserve artifact changes as facts. A legitimate rebuild can change a digest
   without changing the upstream version; this is not automatically malware.
 
@@ -101,23 +109,25 @@ and local first-observation time separate. Record each source and its trust
 conditions. A Git author or committer timestamp is not an independently verified
 publication timestamp.
 
-The provisional default is seven days measured from first observation of the
-exact digest (`observed`). Evaluate onboarding friction before fixing this
-choice. Also support a `published` policy with explicit acceptable timestamp
-sources; `both` requires both conditions. Unknown dates never become ancient
-releases implicitly.
+Fetch metadata dynamically and measure age from a supported publisher's release
+or distribution publication time bound to the selected version/artifact. Do not
+start a fresh waiting period when the user first installs or invokes BrewWarden.
+For example, a release published ten days ago satisfies a seven-day threshold on
+first use if the publication evidence for the selected candidate is sufficient.
 
-Repeated observations do not reset the first observation. New digest means new
-artifact. Preserve revision, rebuild, OS, and architecture; separately evaluate
-recipe and dependency changes that can affect installation. An unrelated prose
-change need not reset artifact age.
+Expose `--minimum-release-age <duration>` before `brew`; `168h` expresses seven
+days. An explicit argument overrides the optional configuration value. Keep seven
+days as the provisional default until representative metadata has been evaluated.
+The minimum age setting does not waive any integrity, provenance, or vulnerability
+check. Local observations are audit/cache data, not the default age clock.
 
-Limitations: old releases are new observations on first use; infrequent runs
-create delays; unobserved replacement-and-restoration events may be missed;
-local clock/state tampering is outside the trust boundary. Detect clock rollback
-and hold, but do not claim to prevent all clock manipulation. Waiting alone does
-not detect an already malicious release. A public observation service would add
-operational trust and is not part of the initial product.
+The adapter must distinguish upstream publication from Homebrew adoption and
+bottle publication/rebuilds, and document which event the threshold covers. Do
+not inherit an old upstream date for an unverified replacement artifact. Select
+and test the authoritative timestamp sources during the first integration probe;
+a usable authenticated publication timestamp is not assumed to exist for every
+package. Missing, conflicting, or future-dated evidence holds the age check rather
+than fabricating a date or falling back to local first-observation waiting.
 
 ## Vulnerability evidence
 
@@ -130,10 +140,19 @@ availability, package identity, version applicability, and freshness. Zero searc
 results do not mean safe. Do not apply an upstream advisory blindly to a patched
 Homebrew revision.
 
-Normal eligibility and urgency are separate. Show fixed, remaining, and newly
-introduced findings. Enforce the configured vulnerability policy, including
-new problems, without silently treating an emergency as permission to ignore it.
-Incomplete source responses must not make a candidate look fixed.
+Use built-in refusal rules rather than requiring users to configure a security
+policy matrix. Deny any known, applicable, non-withdrawn vulnerability affecting
+a selected candidate or its required dependency closure, regardless of severity
+or fix availability. Do not classify a withdrawn advisory or a demonstrably fixed
+Homebrew revision as affected solely from an upstream version string.
+
+A successful supported lookup with no applicable advisory means "no known
+applicable findings", not proof of safety. An unavailable/stale required source,
+unsupported package/version mapping, or unresolved applicability holds the
+operation. Define concrete source freshness limits with the source adapter;
+users should not need to select CVSS thresholds or resolve package mappings.
+Normal eligibility and urgency are separate. Incomplete source responses must
+not make a candidate look fixed; emergency age exceptions never waive these rules.
 
 ## Emergency updates
 
@@ -222,14 +241,15 @@ separate plan. Interrupted executing attempts become unknown until reconciled.
 
 ## Configuration and storage
 
-Start with one user-owned JSON configuration, not executable configuration or
-implicit current-directory policy. Future project policy must be explicit and
+Provide built-in defaults and CLI options; no configuration file is required
+for ordinary use. An optional user-owned JSON configuration can persist settings.
+Do not use executable configuration or implicit current-directory policy. Future project policy must be explicit and
 must not weaken user policy through merging.
 
 ```json
 {
   "schemaVersion": 1,
-  "age": { "mode": "observed", "minimumHours": 168 },
+  "age": { "minimumHours": 168 },
   "trust": { "allowedTaps": ["homebrew/core"] },
   "verification": { "requireChecksum": true, "requireBottleAttestation": true },
   "emergency": { "mode": "suggest", "waivableRules": ["age"] }
@@ -252,7 +272,8 @@ reconciliation diagnostics should remain available.
 
 ## Implementation and acceptance
 
-1. Probe Go distribution, verifiers, Homebrew plan binding, and advisory coverage.
+1. Probe Homebrew plan binding, authenticated publication metadata, embedded
+   verification, and advisory coverage without separate helper executables.
 2. Implement typed evidence, strict configuration, pure decisions, and history;
    model normal and emergency decisions together.
 3. Integrate official bottle planning and checks; enable normal and emergency

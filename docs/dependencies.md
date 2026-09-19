@@ -1,6 +1,6 @@
 # Dependencies and implementation
 
-Go is used for the harness and remains the proposed product language. Product
+Go is the product and harness language. Product
 feasibility is not yet demonstrated. Use a supported patched Go toolchain;
 the module's Go 1.24 directive is a compatibility floor, not a release pin.
 The local module path must be replaced with the actual public identity before
@@ -13,9 +13,16 @@ publishing imports.
   native/runtime components, and build/CI tools as part of the trust surface.
 - Start with standard-library CLI handling, JSON configuration, and file records.
   No application cgo, unsafe, plugins, dynamic loading, or executable configuration.
-- Use maintained verifiers for OpenPGP, Sigstore, and JWS; do not reimplement their
-  trust protocols to avoid dependencies. Missing required verifiers hold the
-  operation; never install them implicitly.
+- Ship verification within the BrewWarden binary using maintained libraries where
+  necessary. No separately installed gh, gpg/gpgv, cosign, jq, or scanner commands
+  may be required. Homebrew and its normal runtime are the existing managed system.
+  Do not hide additional runtime dependencies by downloading or bundling helper
+  executables. Reuse Homebrew verification only where no extra helper is required
+  and the actual guarantee is demonstrated.
+- Do not reimplement OpenPGP, Sigstore, or JWS trust protocols to avoid modules.
+  Justified linked libraries are preferable to an external installation burden;
+  update the module gate and audit their transitive dependencies when selected.
+  Unsupported required verification holds the operation.
 - Development tools are separate from product dependencies. Pin additional tools
   explicitly; tests must not implicitly download tools or modules.
 
