@@ -14,6 +14,9 @@
 - For ownership/import changes, read [architecture](docs/architecture.md); for
   security-sensitive behavior, read [threat model](docs/threat-model.md); for
   dependencies or input handling, read [implementation rules](docs/dependencies.md).
+- Before implementing or changing a security feature, follow
+  [Homebrew integration](docs/homebrew-integration.md): inspect upstream support,
+  establish its actual guarantees, and implement only the missing guarantees.
 - Use `.agents/skills/brewwarden-change` for behavior/boundary changes and
   `.agents/skills/brewwarden-review` for consequential reviews.
 - Test behavior with realistic failure cases. Architecture fixtures must resolve

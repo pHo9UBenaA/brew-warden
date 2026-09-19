@@ -94,11 +94,11 @@ PATH, and other clients remain outside the wrapper's coverage.
   authenticate the Homebrew-built bottle by itself.
 - Model cask checksums, macOS signatures, and notarization separately. A locally
   calculated digest does not turn `no_check` into an upstream checksum match.
-- Require no separately installed helper commands beyond Homebrew itself and
-  its normal runtime. Do not require or silently download gh, gpg/gpgv, cosign,
-  jq, or a scanner executable. Use verification code linked into BrewWarden or
-  demonstrated Homebrew-native capabilities that do not add helper requirements.
-  Missing or unsupported required verification still holds the operation.
+- Reuse Homebrew's demonstrated checks and supplement their gaps according to
+  [Homebrew integration](homebrew-integration.md). Homebrew-managed helper use
+  is eligible for evaluation; its dependencies, credentials, bootstrap exceptions,
+  and side effects remain explicit. An enabled option alone is not verification
+  evidence. Unsupported required verification still holds the operation.
 - Preserve artifact changes as facts. A legitimate rebuild can change a digest
   without changing the upstream version; this is not automatically malware.
 
@@ -272,8 +272,8 @@ reconciliation diagnostics should remain available.
 
 ## Implementation and acceptance
 
-1. Probe Homebrew plan binding, authenticated publication metadata, embedded
-   verification, and advisory coverage without separate helper executables.
+1. Probe Homebrew plan binding, authenticated publication metadata, existing
+   verification capabilities and their gaps, delegated helpers, and advisory coverage.
 2. Implement typed evidence, strict configuration, pure decisions, and history;
    model normal and emergency decisions together.
 3. Integrate official bottle planning and checks; enable normal and emergency

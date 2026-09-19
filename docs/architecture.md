@@ -43,6 +43,15 @@ separate adapters outside, instead of creating an adapter utility bucket.
 There are no product packages yet. Create them with their first real behavior;
 empty interfaces and placeholder applications would not strengthen the design.
 
+## Homebrew boundary
+
+Keep Homebrew command/environment construction, output decoding, and version
+compatibility inside `internal/adapters/homebrew`. Core policy consumes typed
+claims, subjects, and verification outcomes, not Homebrew flags. Implement missing
+effects in separate adapters and compose them outside; keep additional pure rules
+in the core. Follow [Homebrew integration](homebrew-integration.md) for the required
+capability records and contract tests. Do not create placeholder abstractions.
+
 ## Enforcement
 
 `go run ./tools/repo-check architecture` parses every repository `.go` file,

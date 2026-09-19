@@ -9,6 +9,12 @@ Establish the actual diff or implementation scope, including staged, unstaged,
 and relevant untracked files. Read [the threat model](../../../docs/threat-model.md)
 and the affected contract in [the design](../../../docs/design.md).
 
+Review the [Homebrew capability records](../../../docs/homebrew-integration.md)
+against upstream source and tests. Check for duplicate implementations, implicit
+trust in enabled flags, skipped checks reported as verified, scattered upstream
+options, and unhandled version/deprecation changes. Verify attribution between
+Homebrew guarantees and BrewWarden's additional checks.
+
 Trace artifact identity and evidence through policy, exceptions, plan storage,
 revalidation, and execution. Look for missing-to-success conversions, weaker
 verification under emergency mode, unchecked dependencies, stale approvals,

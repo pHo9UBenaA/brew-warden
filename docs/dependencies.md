@@ -1,7 +1,6 @@
 # Dependencies and implementation
 
-Go is the product and harness language. Product
-feasibility is not yet demonstrated. Use a supported patched Go toolchain;
+Go is the product and harness language. Product feasibility is not yet demonstrated. Use a supported patched Go toolchain;
 the module's Go 1.24 directive is a compatibility floor, not a release pin.
 The local module path must be replaced with the actual public identity before
 publishing imports.
@@ -13,16 +12,18 @@ publishing imports.
   native/runtime components, and build/CI tools as part of the trust surface.
 - Start with standard-library CLI handling, JSON configuration, and file records.
   No application cgo, unsafe, plugins, dynamic loading, or executable configuration.
-- Ship verification within the BrewWarden binary using maintained libraries where
-  necessary. No separately installed gh, gpg/gpgv, cosign, jq, or scanner commands
-  may be required. Homebrew and its normal runtime are the existing managed system.
-  Do not hide additional runtime dependencies by downloading or bundling helper
-  executables. Reuse Homebrew verification only where no extra helper is required
-  and the actual guarantee is demonstrated.
-- Do not reimplement OpenPGP, Sigstore, or JWS trust protocols to avoid modules.
-  Justified linked libraries are preferable to an external installation burden;
-  update the module gate and audit their transitive dependencies when selected.
-  Unsupported required verification holds the operation.
+- Prefer demonstrated Homebrew capabilities before adding verification libraries
+  or executables. Follow [Homebrew integration](homebrew-integration.md) for
+  guarantee boundaries, evidence, compatibility, and delegated dependencies.
+- Do not categorically require embedded verification or prohibit Homebrew's own
+  use of gh. Existing or Homebrew-managed helpers are candidates, not assumed
+  bundled components. Account for installation, updates, credentials, bootstrap
+  exceptions, and unplanned mutations before enabling such a path. Do not make
+  users manually assemble a separate toolchain or silently add unrelated helpers.
+- Implement missing cryptographic guarantees with maintained libraries when
+  needed; do not hand-roll OpenPGP, Sigstore, or JWS protocols. Audit selected
+  modules and update dependency gates. Unsupported required verification holds
+  the operation, regardless of which component was expected to provide it.
 - Development tools are separate from product dependencies. Pin additional tools
   explicitly; tests must not implicitly download tools or modules.
 

@@ -8,6 +8,11 @@ description: Implement brewwarden behavior or architecture changes with evidence
 Read [architecture](../../../docs/architecture.md) when ownership or imports
 change, and [the product design](../../../docs/design.md) for policy behavior.
 
+For each security feature, follow [Homebrew integration](../../../docs/homebrew-integration.md).
+Inspect upstream support first; record the delegated guarantee, gaps, exact
+options, supported versions, and owning adapter/tests. Add only the required
+supplement, and keep upstream command details out of core policy.
+
 Identify the owning layer and a realistic input that distinguishes the desired
 behavior. For a defect, observe that example failing for the intended reason;
 unresolved imports and broken setup are not reproductions. Fix the cause without

@@ -15,6 +15,7 @@
 # Reviewed design and development documentation.
 !/docs/design.md
 !/docs/architecture.md
+!/docs/homebrew-integration.md
 !/docs/dependencies.md
 !/docs/archive/initial-research.md
 !/docs/archive/language-evaluation.md
