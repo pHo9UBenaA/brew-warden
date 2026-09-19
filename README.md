@@ -6,16 +6,19 @@ BrewWarden is an all-in-one CLI under design: release-age policy, artifact
 and signature verification, vulnerability checks, dependency-aware installation
 plans, emergency updates, and evidence history.
 
-**Product behavior is not implemented yet.** The repository contains the design
-and development harness. The intended interface prefixes supported commands:
+**Installation is disabled.** The initial CLI provides local help and a `doctor`
+diagnostic that reports the unresolved execution-binding gate. It does not launch
+Homebrew. Policy evaluation and installation enforcement are not implemented.
+The intended interface prefixes supported commands:
 
 ```sh
 bwd brew install wget
 bwd brew upgrade
 ```
 
-Checks pass: execute without an extra BrewWarden prompt. Checks fail: stop and
-explain. `brewwarden` is the full executable name; `bwd` is its short form.
+The planned behavior is to execute after checks pass, without an extra BrewWarden
+prompt, and stop when checks fail. Currently both commands above fail closed.
+`brewwarden` is the full executable name; `bwd` is its short form.
 Plain `brew` calls are not intercepted. The public repository URL and license
 are not yet set.
 
@@ -29,6 +32,8 @@ require a C compiler for race detection.
 ./scripts/verify.sh
 ./scripts/setup-tools.sh  # Explicit download of pinned development tools
 ./scripts/check.sh all   # Includes advisory database access
+go run ./cmd/bwd --help
+go run ./cmd/bwd doctor  # Exits nonzero: execution binding is unverified
 ```
 
 Optional Task v3 aliases are listed by `task --list`. See

@@ -42,6 +42,11 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 
 ## Preflight investigation
 
+The developer-only [isolated probe and current evidence](../scripts/homebrew-probe.md)
+reproduce missing-bottle verification and dependency re-resolution with pinned
+upstream source. They do not establish an installation-binding mechanism. No
+Homebrew version is currently supported for product execution.
+
 The [manual](https://docs.brew.sh/Manpage) documents install/upgrade `--dry-run`
 previews and `brew verify --deps --json` for fetching bottles and checking their
 attestations. These are candidates for planning and preflight evidence, not an

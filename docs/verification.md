@@ -14,7 +14,9 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh fuzz` / `task fuzz` | Commit-message parser fuzzing; `FUZZTIME` defaults to 10s | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and a freshly built checker binary | Advisory database |
-| `./scripts/check.sh build` / `task build` | Harness binary at `bin/repo-check`; no product CLI yet | None required |
+| `./scripts/check.sh build` / `task build` | Harness binary at `bin/repo-check` | None required |
+| `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
+| `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
 
 ## Boundaries
 
@@ -60,6 +62,8 @@ The [Go security guidance](https://go.dev/doc/security/best-practices) covers
 vulnerability scans, supported toolchains, fuzzing, races, vet, and release notices.
 Staticcheck is an additional analysis tool, not a Go security certification.
 
-Product integration, native artifact distribution, release signing, and release
-reproducibility remain unimplemented. Add their checks with the relevant code;
-the development harness does not establish those guarantees.
+The baseline tests both CLI binaries against a tripwire `brew` executable and
+checks refusal of mutations and nested operations. Upstream probes are explicit,
+separate from the baseline, and do not install packages. Installation binding,
+native artifact distribution, release signing, and release reproducibility remain
+unimplemented; the development harness does not establish those guarantees.

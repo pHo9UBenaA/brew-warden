@@ -40,8 +40,10 @@ a clock port belongs to the application boundary. Adapters do not import use
 cases or other adapters. Share a real semantic contract inward, or compose
 separate adapters outside, instead of creating an adapter utility bucket.
 
-There are no product packages yet. Create them with their first real behavior;
-empty interfaces and placeholder applications would not strengthen the design.
+The initial product packages are the two entrypoints, composition, and the
+diagnostic-only CLI. There is no executor or Homebrew pass-through. Create other
+layers with their first real behavior; empty interfaces and placeholder
+applications would not strengthen the design.
 
 ## Homebrew boundary
 

@@ -37,6 +37,16 @@
 !/scripts/tool-versions.env
 !/scripts/setup-tools.sh
 !/scripts/check.sh
+!/scripts/probe-homebrew.sh
+!/scripts/homebrew-probe.md
+
+# Diagnostic-only product entrypoints and their execution refusal tests.
+!/cmd/bwd/main.go
+!/cmd/brewwarden/main.go
+!/internal/cli/run.go
+!/internal/cli/run_test.go
+!/internal/composition/main.go
+!/tests/cli_test.go
 
 # Development tooling. Add new source files explicitly when introducing them.
 !/tools/repo-check/architecture.go

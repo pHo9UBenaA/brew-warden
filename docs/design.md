@@ -1,7 +1,7 @@
 # Product design
 
-Status: proposed design, updated 2026-09-19. The development harness exists;
-product behavior and installation enforcement do not yet exist.
+Status: proposed design, updated 2026-09-19. The development harness and initial
+diagnostic-only CLI exist; policy evaluation and installation enforcement do not.
 
 ## Purpose and scope
 
@@ -24,8 +24,9 @@ Go is the product language and is used by the harness. Follow the
 ## User operations
 
 The project and repository name is `brewwarden` (BrewWarden). `bwd` is the short
-executable name; `brewwarden` exposes the identical interface. Product commands
-remain unimplemented.
+executable name; `brewwarden` exposes the identical interface. Only local help
+and an execution-unavailable `doctor` diagnostic are implemented. All Homebrew
+invocations are rejected without launching a child process.
 
 ```sh
 bwd brew install wget
