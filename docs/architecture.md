@@ -48,6 +48,11 @@ explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.
 
+The `githubrelease` adapter owns exact publisher mappings, bounded public HTTP
+requests, release-response validation and upstream publication observations.
+It returns typed evidence plus the exact raw bytes for eventual durable storage.
+The diagnostic CLI does not instantiate it or treat it as execution permission.
+
 ## Homebrew boundary
 
 Keep Homebrew command/environment construction, output decoding, and version

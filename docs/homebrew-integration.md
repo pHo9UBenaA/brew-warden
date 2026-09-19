@@ -71,6 +71,12 @@ actual operation may change, including affected dependents, and that execution
 consumes the verified metadata and bytes. Supplement native checks where needed;
 do not treat a second verifier as a substitute for this binding.
 
+The [GitHub publication adapter](../internal/adapters/githubrelease/README.md)
+now implements a limited supplemental upstream-source publication claim. It
+requires an exact publisher asset digest matching the authenticated recipe;
+missing publication binding remains unknown. It does not date bottle rebuilds
+or enable product execution.
+
 ## Code and evidence ownership
 
 Organize the Homebrew adapter by capability so command construction, parsing,

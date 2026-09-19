@@ -1,8 +1,10 @@
 # Product design
 
 Status: proposed design, updated 2026-09-19. The development harness and initial
-diagnostic-only CLI and pure evidence eligibility evaluation exist. Evidence
-collection, durable exception consumption and installation enforcement do not.
+diagnostic-only CLI and pure evidence eligibility evaluation exist. A narrowly
+mapped GitHub upstream-publication collector is implemented and tested separately.
+Authenticated Homebrew candidate planning, durable exception consumption and
+product installation enforcement are not wired.
 Strict user configuration and immutable pre-execution refusal history are also
 implemented. Refusal history is not the execution-attempt journal.
 

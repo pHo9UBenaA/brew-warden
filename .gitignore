@@ -66,6 +66,9 @@
 !/internal/adapters/localstate/config_test.go
 !/internal/adapters/localstate/files.go
 !/internal/adapters/localstate/files_test.go
+!/internal/adapters/githubrelease/release.go
+!/internal/adapters/githubrelease/release_test.go
+!/internal/adapters/githubrelease/README.md
 !/internal/domain/history.go
 !/internal/ports/history.go
 !/internal/adapters/localstate/history.go

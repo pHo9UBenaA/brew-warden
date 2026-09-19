@@ -11,7 +11,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message and strict configuration parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration and publication-response parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
@@ -43,7 +43,7 @@ and substitute only the recursive verification invocation. Coverage percentages
 do not include code exercised in those separately built subprocesses.
 
 Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
-template comments, and control-byte rejection. Preserve discovered regressions
+configuration, publisher responses, template comments, and control-byte rejection. Preserve discovered regressions
 as seed cases or explicitly allowlisted corpus files. Add fuzz targets for actual
 product parsers as they appear. Coverage has no arbitrary percentage gate; race
 and fuzz checks cover only exercised behavior. Do not treat a clean advisory
