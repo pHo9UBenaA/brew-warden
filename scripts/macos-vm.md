@@ -65,4 +65,5 @@ base, unrelated VMs or evidence as part of verification.
 
 The first successful standard-prefix run is recorded in the owning
 [Homebrew capability record](homebrew-probe.md#standard-prefix-macos-vm-acceptance).
-It does not establish upgrade, concurrency, vulnerability or product readiness.
+The same record also documents the tested jq upgrade continuation. General
+upgrade closure, concurrency, vulnerability and product readiness remain open.

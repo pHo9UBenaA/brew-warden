@@ -92,3 +92,5 @@
 /bin/
 /dist/
 !/scripts/macos-vm.md
+!/scripts/probe-homebrew-command.sh
+!/scripts/probe-homebrew-upgrade.sh

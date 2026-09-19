@@ -286,5 +286,53 @@ only `jq 1.8.2` and `oniguruma 6.9.10`. The sandbox denies an incidental xcrun
 cache write outside the test directories; native installation still exits zero.
 
 This proves the bounded empty-prefix scenario at the native platform prefix.
-Existing-state upgrades, affected dependents, external Homebrew concurrency and
-interrupted execution remain unverified. No product execution is enabled.
+The bounded upgrade below additionally covers an unchanged existing dependency.
+Affected dependents, external Homebrew concurrency and interrupted execution
+remain unverified. No product execution is enabled.
+
+## Upgrade with an unchanged existing dependency
+
+After a successful standard-prefix `jq` VM probe, run this developer-only
+continuation inside the same disposable guest:
+
+```sh
+sh scripts/probe-homebrew-upgrade.sh /private/tmp/brewwarden-probe.RUN /path/to/old-jq-inputs
+```
+
+The input directory must contain `jq--1.8.1.arm64_tahoe.bottle.tar.gz` and
+`jq-old-bundle.jsonl`. The old bottle SHA-256 is
+`90b0fe4ad51959380f16fe8d84c5be8ab525478c32f1f7034c72d99de2442c9b`.
+It is available from the public `homebrew/core/jq` OCI index tag `1.8.1`;
+request `application/vnd.oci.image.index.v1+json` explicitly. The old fixture's
+provenance must verify against the same pinned dispatch-build-bottle identity
+used for oniguruma. This establishes a real historical bottle for fixture setup,
+not an approved downgrade, an old signed-API snapshot, or vulnerability clearance.
+
+The script refuses physical hosts, unexpected paths, unsuccessful initial probes,
+and repeated preparation attempts. It revalidates the initial installed closure,
+removes only the fixture jq with native autoremove disabled, and installs the
+verified old local bottle. No dependency-removal suppression is exposed as a
+product option. The common command boundary owns all Homebrew environment options.
+
+Before upgrade it verifies the current candidate's metadata, provenance, archive
+bytes and graph again; checks that the installed versions are exactly jq 1.8.1
+and oniguruma 6.9.10; and records every existing dependency file's SHA-256, mode
+and symlink target. It then runs native `upgrade --formula --force-bottle` with
+network denied. The final jq receipt, installed recipe and runtime dependencies
+must match the verified 1.8.2 candidate. The old 1.8.1 keg remains because cleanup
+is disabled. The dependency snapshot must remain identical, and a regex smoke
+test must load the installed oniguruma successfully.
+
+Observed on macOS 26.6.2 (25G83), arm64, in a fresh Tart clone: all checks pass.
+Native output reports exactly one requested upgrade, jq 1.8.1 to 1.8.2. The first
+attempt revealed two actual upstream behaviors: uninstall autoremoves unused
+dependencies unless disabled, and fetching an already cached OCI manifest still
+recreates its convenience symlink. The common probe now freezes every regular
+cache input (including actual symlink targets), while permitting native recreation
+of these output aliases. Exact artifact bytes remain immutable; attempts to alter
+the cached bottle still fail. This change was retested from a fresh VM, including
+the original cache-substitution and immutable-byte negative controls.
+
+This is one real upgrade path with one unchanged dependency. It does not prove
+closure discovery for affected dependents, same-version rebuild upgrades,
+concurrent external mutations, or crash recovery. Product execution remains off.

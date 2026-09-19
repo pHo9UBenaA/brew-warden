@@ -90,7 +90,7 @@ plan.each do |name, (version, _rebuild, runtime_deps, build_deps)|
     raise "runtime graph mismatch" unless f.deps.reject(&:build?).map(&:name).sort == runtime_deps
     raise "build graph mismatch" unless f.deps.select(&:build?).map(&:name).sort == build_deps
   end
-  if mode != "after"
+  if !%w[after upgrade-after].include?(mode)
     formula.fetch_bottle_tab
     manifest_deps = formula.bottle_tab_attributes.fetch("runtime_dependencies")
     expected_deps = runtime_deps.map { |dep| [dep, plan.fetch(dep).first, 0] }
@@ -99,8 +99,9 @@ plan.each do |name, (version, _rebuild, runtime_deps, build_deps)|
   end
   raise "cache digest mismatch" unless Digest::SHA256.file(formula.bottle.cached_download).hexdigest == artifact.fetch(:sha256)
   cached_paths << formula.bottle.cached_download.realpath.to_s
-  if mode == "after"
-    raise "unexpected installed version" unless (HOMEBREW_CELLAR/name).children.map { |p| p.basename.to_s } == [version]
+  if %w[after upgrade-after].include?(mode)
+    expected_versions = mode == "upgrade-after" && name == "jq" ? ["1.8.1", version] : [version]
+    raise "unexpected installed version" unless (HOMEBREW_CELLAR/name).children.map { |p| p.basename.to_s }.sort == expected_versions.sort
     raise "installed recipe differs" unless (formula.prefix/".brew/#{name}.rb").read == embedded
     receipt = JSON.parse((formula.prefix/"INSTALL_RECEIPT.json").read)
     raise "source fallback" unless receipt.fetch("poured_from_bottle") == true
@@ -113,19 +114,48 @@ end
 
 if %w[before inspect].include?(mode)
   raise "prefix is not empty" unless !HOMEBREW_CELLAR.exist? || HOMEBREW_CELLAR.children.empty?
-  # Freeze every existing cache input before installation can re-resolve it.
+  # Freeze cache bytes before installation can re-resolve them. Native fetch
+  # recreates convenience symlinks; those aliases are outputs, not input bytes.
   # The recipes and bottles are immutable too; no online fallback is possible.
   cache_inputs = Dir.glob((HOMEBREW_CACHE/"**/*").to_s).select { |p| File.file?(p) || File.symlink?(p) }
   File.open(root/"sandbox.sb", "a") do |profile|
     cache_inputs.each do |path|
       raise "unsafe cache input path" unless path.match?(%r{\A/[-a-zA-Z0-9_./]+\z}) && File.realpath(path).start_with?(root.to_s + "/")
-      profile.puts "(deny file-write* (literal #{path.to_json}))" if mode == "before"
+      profile.puts "(deny file-write* (literal #{path.to_json}))" if mode == "before" && !File.symlink?(path)
     end
   end
   (root/"cached-bottle-path").write(cached_paths.last)
-elsif mode == "after"
+elsif mode == "upgrade-before"
+  raise "unsupported upgrade scenario" unless scenario == "jq"
+  raise "unexpected existing closure" unless HOMEBREW_CELLAR.children.map { |p| p.basename.to_s }.sort == plan.keys.sort
+  raise "unexpected existing target" unless (HOMEBREW_CELLAR/"jq").children.map { |p| p.basename.to_s } == ["1.8.1"]
+  raise "unexpected existing dependency" unless (HOMEBREW_CELLAR/"oniguruma").children.map { |p| p.basename.to_s } == ["6.9.10"]
+  receipt = JSON.parse((HOMEBREW_CELLAR/"jq/1.8.1/INSTALL_RECEIPT.json").read)
+  raise "initial state is not bottled" unless receipt.fetch("poured_from_bottle") == true
+  raise "old dependency graph mismatch" unless receipt.fetch("runtime_dependencies").map { |d| [d.fetch("full_name"), d.fetch("version"), d.fetch("revision")] } == [["oniguruma", "6.9.10", 0]]
+elsif %w[after upgrade-after].include?(mode)
   raise "unexpected installed closure" unless HOMEBREW_CELLAR.children.map { |p| p.basename.to_s }.sort == plan.keys.sort
 else
   raise "unknown phase"
+end
+if %w[upgrade-before upgrade-after].include?(mode)
+  dependency_root = HOMEBREW_CELLAR/"oniguruma/6.9.10"
+  snapshot = Dir.glob((dependency_root/"**/*").to_s, File::FNM_DOTMATCH).sort.reject { |path| [".", ".."].include?(File.basename(path)) }.map do |path|
+    stat = File.lstat(path)
+    content = if stat.symlink?
+      File.readlink(path)
+    elsif stat.file?
+      Digest::SHA256.file(path).hexdigest
+    else
+      "directory"
+    end
+    [Pathname(path).relative_path_from(dependency_root).to_s, stat.mode, content]
+  end
+  state = root/"existing-dependency.json"
+  if mode == "upgrade-before"
+    state.write(JSON.generate(snapshot))
+  else
+    raise "existing dependency changed" unless JSON.parse(state.read) == snapshot
+  end
 end
 puts JSON.pretty_generate({ phase: mode, target: scenario, closure: records })

@@ -46,8 +46,9 @@ The developer-only [isolated probe and current evidence](../scripts/homebrew-pro
 reproduce missing-bottle verification, dependency re-resolution, and advisory
 cache/coverage boundaries with pinned upstream source. Frozen-input real installs
 of `hello` and the `jq`/`oniguruma` closure now succeed in empty temporary prefixes.
-These bounded probes do not establish a general installation-binding mechanism
-for existing prefixes and upgrades. No Homebrew version is currently supported
+A disposable macOS VM also demonstrates the jq closure at the standard prefix
+and a real jq upgrade with an unchanged oniguruma dependency. These bounded probes
+do not establish general upgrade closure, affected dependents or concurrency. No Homebrew version is currently supported
 for product execution.
 
 The [manual](https://docs.brew.sh/Manpage) documents install/upgrade `--dry-run`
