@@ -41,7 +41,9 @@ cases or other adapters. Share a real semantic contract inward, or compose
 separate adapters outside, instead of creating an adapter utility bucket.
 
 The initial product packages are the two entrypoints, composition, and the
-diagnostic-only CLI. There is no executor or Homebrew pass-through. Create other
+diagnostic-only CLI, and a pure domain evidence evaluator. There is no executor
+or Homebrew pass-through. Domain acceptance tests live under `tests` and provide
+explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.
 

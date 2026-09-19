@@ -1,7 +1,8 @@
 # Product design
 
 Status: proposed design, updated 2026-09-19. The development harness and initial
-diagnostic-only CLI exist; policy evaluation and installation enforcement do not.
+diagnostic-only CLI and pure evidence eligibility evaluation exist. Evidence
+collection, durable exception consumption and installation enforcement do not.
 
 ## Purpose and scope
 
@@ -212,6 +213,12 @@ no I/O. Do not interpret external prose as execution instructions.
 
 Zero and unrecognized values must never mean allow. Keep stable reason codes
 alongside explanations. Deserialized `authorized: true` is not authorization.
+
+The initial domain evaluator accepts explicit time, complete reachable dependency
+graphs, exact artifact subjects and attributed evidence. An eligibility `Allow`
+is not an execution permit. Callers must derive binding digests from the actual
+plan, policy, graph and environment and obtain prior-attempt state from a durable
+journal. No product execution path is connected to this evaluator yet.
 
 State flow: draft -> evidence collected -> allow/hold/deny -> revalidated ->
 executing -> succeeded/partial/failed/unknown. An emergency reevaluates only the

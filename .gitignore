@@ -47,6 +47,10 @@
 !/internal/cli/run_test.go
 !/internal/composition/main.go
 !/tests/cli_test.go
+!/internal/domain/policy.go
+!/internal/domain/evidence.go
+!/internal/domain/decision.go
+!/tests/policy_test.go
 
 # Development tooling. Add new source files explicitly when introducing them.
 !/tools/repo-check/architecture.go

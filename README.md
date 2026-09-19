@@ -8,7 +8,8 @@ plans, emergency updates, and evidence history.
 
 **Installation is disabled.** The initial CLI provides local help and a `doctor`
 diagnostic that reports the unresolved execution-binding gate. It does not launch
-Homebrew. Policy evaluation and installation enforcement are not implemented.
+Homebrew. Pure evidence eligibility rules exist, but live evidence collection
+and installation enforcement are not implemented.
 The intended interface prefixes supported commands:
 
 ```sh
