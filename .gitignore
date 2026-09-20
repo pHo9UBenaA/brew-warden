@@ -94,3 +94,9 @@
 !/scripts/macos-vm.md
 !/scripts/probe-homebrew-command.sh
 !/scripts/probe-homebrew-upgrade.sh
+!/internal/domain/attempt.go
+!/internal/ports/execution.go
+!/internal/application/execute.go
+!/internal/adapters/localstate/attempts.go
+!/internal/adapters/localstate/attempts_test.go
+!/tests/execution_test.go

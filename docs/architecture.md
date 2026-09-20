@@ -40,9 +40,12 @@ a clock port belongs to the application boundary. Adapters do not import use
 cases or other adapters. Share a real semantic contract inward, or compose
 separate adapters outside, instead of creating an adapter utility bucket.
 
-The initial product packages are the two entrypoints, composition, and the
-diagnostic-only CLI, and a pure domain evidence evaluator. There is no executor
-or Homebrew pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
+The product packages include the two entrypoints, composition, diagnostic CLI,
+pure domain evaluator, and an application execution workflow. The workflow
+revalidates a bound session, evaluates policy, durably consumes an attempt before
+launch and records actual exit/state facts. The local-state attempt journal
+provides immutable transitions and replay rejection. No Homebrew executor is
+registered in composition yet; there is no unchecked pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
 the adapter owning local JSON schemas and filesystem access. Domain acceptance tests live under `tests` and provide
 explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder

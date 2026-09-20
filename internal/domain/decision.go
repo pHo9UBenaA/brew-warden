@@ -40,7 +40,7 @@ type Binding struct {
 	Attempt     Digest
 }
 
-func (b Binding) valid() bool {
+func (b Binding) Valid() bool {
 	return b.Plan.Valid() && b.Policy.Valid() && b.Graph.Valid() && b.Environment.Valid() && b.Attempt.Valid()
 }
 
@@ -80,7 +80,7 @@ func Evaluate(a Assessment) Decision {
 		}
 		d.Reasons = append(d.Reasons, Reason{code, artifact, claim})
 	}
-	if !a.Policy.Valid() || a.Now <= 0 || !a.Binding.valid() || a.AttemptAlreadyStarted {
+	if !a.Policy.Valid() || a.Now <= 0 || !a.Binding.Valid() || a.AttemptAlreadyStarted {
 		add(Hold, "assessment_invalid_or_replayed", Artifact{}, 0)
 		return d
 	}

@@ -31,6 +31,8 @@ status=0
 docker run --rm --platform=linux/arm64 --read-only --network=none \
   --cap-drop=ALL --security-opt=no-new-privileges --pids-limit=256 \
   --memory=4g --cpus=2 --tmpfs=/tmp:rw,exec,nosuid,nodev,size=2g \
+  --tmpfs=/full:rw,noexec,nosuid,nodev,size=64k,mode=0700,uid=10001,gid=10001 \
+  --env BREWWARDEN_TEST_FULL_DISK=/full \
   "$image_id" > "$probe_root/check.stdout" 2> "$probe_root/check.stderr" || status=$?
 printf '%s\n' "$status" > "$probe_root/check.status"
 cat "$probe_root/check.stdout"

@@ -3,8 +3,9 @@
 Status: proposed design, updated 2026-09-19. The development harness and initial
 diagnostic-only CLI and pure evidence eligibility evaluation exist. A narrowly
 mapped GitHub upstream-publication collector is implemented and tested separately.
-Authenticated Homebrew candidate planning, durable exception consumption and
-product installation enforcement are not wired.
+The execution workflow and durable attempt/exception consumption are implemented
+and boundary-tested, but authenticated Homebrew candidate planning and product
+installation enforcement are not wired.
 Strict user configuration and immutable pre-execution refusal history are also
 implemented. Refusal history is not the execution-attempt journal.
 
@@ -306,11 +307,33 @@ a nonblocking single-writer lock, file synchronization, same-directory rename,
 and directory synchronization. Reads revalidate schema and content digests.
 History remains readable with invalid policy configuration. A history failure is
 reported and never enables execution. Uncommitted `.pending-*` refusal files are
-ignored; they cannot represent an executing attempt. This store does not yet
-consume emergency exceptions or reconcile interrupted installations. The directory
+ignored; they cannot represent an executing attempt. This refusal store does not consume emergency exceptions or reconcile interrupted
+installations; the separate attempt journal owns those transitions. The directory
 inventory is bounded to 10,000 entries and rejects an oversized/corrupt inventory
-rather than dropping old records. Full-disk and abrupt-process termination
-acceptance testing remain required for a future execution journal.
+rather than dropping old records. The separate attempt journal has real full-filesystem (isolated Linux tmpfs) and
+abrupt-process termination tests. Its contract is documented below.
+
+### Execution attempt journal
+
+The application revalidates an execution session and its original binding, policy,
+before-state and expiry. It reevaluates evidence using an explicit clock both
+before durable reservation and immediately before launch. A failed start write
+never permits execution. A cancellation or expiry after reservation consumes the
+attempt as `not_started`, without inventing a child exit status.
+
+The journal stores immutable, hash-linked start and outcome documents in a
+separate private directory. A nonblocking OS lock covers validation plus append;
+reads take a shared lock. Strict schemas, content digests, chain continuity and
+one-time attempt/exception identity are checked on every access. Unknown or
+unfinished attempts prevent new execution. Reconciliation appends observed state
+and permits a fresh plan; it never marks a lost process successful or restores an
+exception. Old records cannot be overwritten, and inventory exhaustion fails.
+
+Exit status, actual state and policy eligibility remain separate. A zero exit
+with an unexpected state is unknown. A nonzero exit with changed state is partial.
+Outcome persistence failure leaves an unresolved attempt requiring reconciliation.
+These application and storage contracts do not establish Homebrew binding and
+are not yet registered as a mutating CLI workflow.
 
 ## Implementation and acceptance
 

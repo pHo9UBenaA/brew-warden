@@ -52,6 +52,8 @@ case "$1" in
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     go test ./internal/adapters/localstate -run='^$' -fuzz='^FuzzConfig$' \
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+    go test ./internal/adapters/localstate -run='^$' -fuzz='^FuzzAttemptRecord$' \
+      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     go test ./internal/adapters/githubrelease -run='^$' -fuzz='^FuzzPublication$' \
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     ;;
