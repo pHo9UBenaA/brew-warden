@@ -102,3 +102,7 @@
 !/tests/execution_test.go
 !/internal/adapters/githubrelease/source.go
 !/internal/adapters/githubrelease/source_test.go
+!/internal/adapters/osv/collect.go
+!/internal/adapters/osv/json.go
+!/internal/adapters/osv/collect_test.go
+!/internal/adapters/osv/README.md

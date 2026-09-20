@@ -56,6 +56,10 @@ requests, release-response validation and upstream publication observations.
 It returns typed evidence plus the exact raw bytes for eventual durable storage.
 The diagnostic CLI does not instantiate it or treat it as execution permission.
 
+The `osv` adapter owns mapped candidate advisory queries, pagination, exact-tag
+applicability, coverage controls and retained raw observations. Its transport
+and schema validation remain outside policy; unavailable coverage is never clean.
+
 ## Homebrew boundary
 
 Keep Homebrew command/environment construction, output decoding, and version

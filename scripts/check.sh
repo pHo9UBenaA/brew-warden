@@ -56,6 +56,8 @@ case "$1" in
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     go test ./internal/adapters/githubrelease -run='^$' -fuzz='^FuzzPublication$' \
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+    go test ./internal/adapters/osv -run='^$' -fuzz='^FuzzAdvisoryRecord$' \
+      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     ;;
   lint)
     require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"

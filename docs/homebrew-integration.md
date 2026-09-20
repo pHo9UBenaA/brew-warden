@@ -79,6 +79,11 @@ the authenticated recipe, with unchanged asset identity across a metadata rechec
 Missing publication binding remains unknown. It does not date bottle rebuilds
 or enable product execution.
 
+The [OSV candidate adapter](../internal/adapters/osv/README.md) supplies bounded,
+revision-aware lookups for explicitly unmodified mapped sources, with exact-tag
+findings and a positive project coverage control. Missing or incomplete coverage
+remains unknown. This does not enable product execution.
+
 ## Code and evidence ownership
 
 Organize the Homebrew adapter by capability so command construction, parsing,
