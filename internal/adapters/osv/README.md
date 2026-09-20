@@ -2,7 +2,7 @@
 
 Capability: `osv.git-candidate.v1`. The collector supplies vulnerability evidence
 for authenticated, explicitly unmodified revision-zero jq and oniguruma sources.
-It is not yet connected to product execution. Unknown mappings, patches, revisions
+Composition connects it to the complete candidate collector and execution workflow. Unknown mappings, patches, revisions
 and incomplete responses hold; they never fall back to a clean result.
 
 ## Delegation and supplement

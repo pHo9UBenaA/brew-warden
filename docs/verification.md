@@ -16,7 +16,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
-| `sh scripts/build-product.sh darwin/arm64` (or `darwin/amd64`) | Two forced rebuilds from a clean committed source; compare bytes and retain build metadata/digests in a unique `.cache` directory | None required |
+| `./scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE NATIVE_NOTICES` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 | `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
 

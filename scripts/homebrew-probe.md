@@ -69,7 +69,7 @@ responses; the additional probes below address parts of those boundaries. The ch
 fixture bytes and an explicit expected digest, not a downloaded official bottle.
 
 The optional metadata probe calls the private upstream verifier only as a test;
-it is not yet a supported product adapter. The tested official document came from
+it is separate from the product adapter and cannot authorize execution. The tested official document came from
 `https://formulae.brew.sh/api/formula.jws.json`, with SHA-256
 `611a287a2b6a0c98218fe51cebf62e96810a0cd66002ee1396fcb8aa2e87cc71`.
 It contained 8,608 formulae. The authenticated `wget` sample was version 1.25.0,
