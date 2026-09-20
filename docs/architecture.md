@@ -40,7 +40,7 @@ a clock port belongs to the application boundary. Adapters do not import use
 cases or other adapters. Share a real semantic contract inward, or compose
 separate adapters outside, instead of creating an adapter utility bucket.
 
-The product packages include the two entrypoints, composition, diagnostic CLI,
+The product packages include the two entrypoints, composition, execution/diagnostic CLI,
 pure domain evaluator, and an application execution workflow. The workflow
 revalidates a bound session, evaluates policy, durably consumes an attempt before
 launch and records actual exit/state facts. The local-state attempt journal
@@ -54,7 +54,7 @@ applications would not strengthen the design.
 
 The `githubrelease` adapter owns exact publisher mappings, bounded public HTTP
 requests, release-response validation and upstream publication observations.
-It returns typed evidence plus the exact raw bytes for eventual durable storage.
+It returns typed evidence plus the exact raw bytes retained by the candidate collector.
 Composition supplies it to the candidate collector; its claim alone is never execution permission.
 
 The `osv` adapter owns mapped candidate advisory queries, pagination, exact-tag
@@ -76,7 +76,8 @@ in the core. Follow [Homebrew integration](homebrew-integration.md) for the requ
 capability records and contract tests. Do not create placeholder abstractions.
 
 The `homebrew` adapter owns the native runtime inventory, signed-metadata bridge,
-private process environment and candidate inspection. `ports.SourceCandidate`
+private process environment, candidate inspection, bound execution session and
+recovery snapshots. `ports.SourceCandidate`
 connects authenticated source identity to independent publication and advisory
 collectors; providers remain outside policy and do not import one another.
 `tools/runtime-pack` is an explicit build-only native dependency packager, not

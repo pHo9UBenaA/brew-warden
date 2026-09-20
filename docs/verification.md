@@ -64,16 +64,17 @@ The [Go security guidance](https://go.dev/doc/security/best-practices) covers
 vulnerability scans, supported toolchains, fuzzing, races, vet, and release notices.
 Staticcheck is an additional analysis tool, not a Go security certification.
 
-The baseline tests both CLI binaries against a tripwire `brew` executable and
-checks refusal of mutations and nested operations. Upstream probes are explicit,
-separate from the baseline. Their optional official-bottle scenarios perform
-real installs only in newly created isolated prefixes; see their scoped evidence.
-Product installation enforcement, native artifact distribution and release signing remain
-unimplemented; the development harness does not establish those guarantees.
-The development build script checks repeatability of development artifacts
-without a publisher signature; Go may add a linker ad-hoc signature on macOS.
-It does not publish, tag, apply a publisher signature or notarize a release, establish
-provenance of the compiler, or attest a supported installation capability.
+The baseline tests development CLI binaries against a tripwire `brew` executable
+and checks refusal without a trusted runtime. Distribution builds additionally
+wire the real execution engine. Their native acceptance tests are explicit and
+separate from the baseline; see Native product acceptance below.
+
+The distribution build checks repeatability of both binaries and complete native
+runtime/license archives. Product installation enforcement and distribution
+packaging are implemented for the supported scope. Public release signing and
+notarization have not been performed. Go may add a linker ad-hoc signature on
+macOS; this is not publisher authentication. Building does not publish, tag,
+notarize, or establish provenance of the compiler.
 
 ## Disposable Linux container
 

@@ -13,17 +13,17 @@ a final check does not, by itself, bind preflight results to installation.
 
 ## Capability records
 
-Maintain this inventory as implementation progresses. These are investigation
-candidates, not currently supported capabilities or proven guarantees.
+The implemented capabilities below apply to the initial supported official-bottle
+scope. Exact upstream pins, options and boundary tests live beside each adapter.
 
-| Requirement | Homebrew candidate | Boundary to establish; BrewWarden responsibility |
+| Requirement | Delegated guarantee and BrewWarden boundary | Owning contract |
 | --- | --- | --- |
-| Artifact integrity | Native checksum verification | Authenticate expected metadata; bind results to actual bytes and the complete execution closure |
-| Metadata authenticity | Signed API metadata handling | Establish which input was verified and whether settings can bypass it |
-| Bottle provenance | `HOMEBREW_VERIFY_ATTESTATIONS=1` | Test covered paths, identities, cache behavior, exclusions, authentication, and gh bootstrap |
-| Minimum release age | Metadata/API fields and any native age controls available in the supported version | Bind publication evidence to the candidate and enforce the requested duration where upstream does not |
-| Known vulnerabilities | Native vulnerability commands and supported advisory interfaces | Establish revision-aware coverage, freshness, unknowns, dependency coverage, and refusal rules |
-| Execution binding | Native resolution, fetch, and install controls | Prove verified targets are consumed; an unrestricted install after preflight is insufficient |
+| Artifact integrity | Native checksum verification plus authenticated digest, frozen bottle inputs and complete closure binding | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Metadata authenticity | Pinned Homebrew JWS verification before recipe selection; strict metadata and recipe identity checks | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Bottle provenance | Maintained attestation-only verifier; exact subject, signer and workflow checks without native gh bootstrap | [Attestation](../internal/adapters/attestation/README.md) |
+| Minimum release age | Supplemental publisher evidence bound to source bytes; pure policy enforces upstream publication age | [Publication](../internal/adapters/githubrelease/README.md) |
+| Known vulnerabilities | Supplemental revision-aware candidate mapping, freshness and positive advisory coverage controls; unknown is held | [OSV](../internal/adapters/osv/README.md) |
+| Execution binding | Pinned native install APIs, frozen inputs, retained formula locks, installer guards and reconstructed installed payload checks | [Homebrew](../internal/adapters/homebrew/README.md) |
 
 For each implemented row, link to its owning adapter and contract tests, and record:
 
@@ -42,59 +42,24 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 
 ## Preflight investigation
 
-The developer-only [isolated probe and current evidence](../scripts/homebrew-probe.md)
-reproduce missing-bottle verification, dependency re-resolution, and advisory
-cache/coverage boundaries with pinned upstream source. Frozen-input real installs
-of `hello` and the `jq`/`oniguruma` closure now succeed in empty temporary prefixes.
-A disposable macOS VM also demonstrates the jq closure at the standard prefix
-and a real jq upgrade with an unchanged oniguruma dependency. These bounded probes
-do not establish general upgrade closure, affected dependents or concurrency. No Homebrew version is currently supported
-for product execution.
+The supported product path has demonstrated native install, upgrade with an
+unchanged dependency, age exceptions, changed-input refusal, affected-dependent
+refusal, lock contention, partial failure and stopped-session reconciliation in
+a disposable macOS VM. The [native adapter](../internal/adapters/homebrew/README.md)
+owns the guarantees and exact supported pins; [verification](verification.md)
+describes the repeatable acceptance entrypoints.
 
-The [manual](https://docs.brew.sh/Manpage) documents install/upgrade `--dry-run`
-previews and `brew verify --deps --json` for fetching bottles and checking their
-attestations. These are candidates for planning and preflight evidence, not an
-established execution contract. Do not equate a preview with artifact verification,
-an immutable executable plan, or absence of helper/bootstrap side effects.
+Before expanding support, inspect the selected upstream revision and test both
+successful and skipped verification paths. A native preview or zero exit code
+does not establish coverage of every planned artifact. Likewise, enabling native
+attestation checks does not by itself constrain helper bootstrap, credentials,
+signer identity or later dependency resolution. Reuse only the guarantees actually
+established, and supplement missing claims through the owning adapters above.
 
-Source inspected at `2f1c682db046d37c4b6c09aa43837be6ff270c39`:
-
-- [Install preview](https://github.com/Homebrew/brew/blob/2f1c682db046d37c4b6c09aa43837be6ff270c39/Library/Homebrew/install.rb#L370-L397)
-  prints planned actions and returns before installation.
-- [Bottle verification](https://github.com/Homebrew/brew/blob/2f1c682db046d37c4b6c09aa43837be6ff270c39/Library/Homebrew/dev-cmd/verify.rb#L40-L85)
-  expands recursive dependencies and returns attestation results, but a missing
-  platform bottle follows a warning path without setting `verification_failed`.
-  Match evidence against every expected subject; exit zero alone is insufficient.
-
-These observations are source inspection, not isolated runtime validation. Before
-enabling mutations, prove that the verified closure includes every package the
-actual operation may change, including affected dependents, and that execution
-consumes the verified metadata and bytes. Supplement native checks where needed;
-do not treat a second verifier as a substitute for this binding.
-
-The [GitHub publication adapter](../internal/adapters/githubrelease/README.md)
-now implements a limited supplemental upstream-source publication claim. It
-requires an exact publisher asset digest or an actual publisher download matching
-the authenticated recipe, with unchanged asset identity across a metadata recheck.
-Missing publication binding remains unknown. It does not date bottle rebuilds
-or enable product execution.
-
-The [OSV candidate adapter](../internal/adapters/osv/README.md) supplies bounded,
-revision-aware lookups for explicitly unmodified mapped sources, with exact-tag
-findings and a positive project coverage control. Missing or incomplete coverage
-remains unknown. This does not enable product execution.
-
-The [provenance adapter](../internal/adapters/attestation/README.md) verifies each
-exact bottle with a pinned, maintained upstream verifier and checks its returned
-subject and signer identity. The separate runtime dependency and build inventory
-are explicit; native helper installation is not delegated to an unchecked brew.
-
-The [native Homebrew adapter](../internal/adapters/homebrew/README.md) now owns
-private runtime materialization, native metadata authentication and strict
-candidate/recipe/OCI closure inspection. Collection creates download locks only
-inside its private prefix. The native session executes the frozen closure under retained Homebrew locks.
-Distribution builds wire this demonstrated path through the durable application
-workflow; builds without a trusted runtime digest remain diagnostic-only.
+Publication claims do not date bottle rebuilds. Empty advisory responses without
+established coverage are not clean results. Neither provider's claim alone grants
+execution. The native session binds the complete evaluated closure to actual
+installation; builds without a trusted runtime digest remain diagnostic-only.
 
 ## Code and evidence ownership
 

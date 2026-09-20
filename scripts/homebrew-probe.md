@@ -1,10 +1,11 @@
 # Homebrew integration probes
 
-Status: frozen-input installations of a dependency-free official bottle and
-a two-package dependency closure are demonstrated in empty isolated prefixes. General execution binding remains
-unverified. No Homebrew version is supported for product execution.
-The probe is development tooling; the CLI never calls it. Capability ownership
-will move to the Homebrew adapter when that adapter has real behavior.
+This document describes developer probe reproduction and observations from the
+staged integration investigation. Each result establishes only that probe's
+stated scope; it is not the current product support matrix. Current execution
+capabilities and pins are owned by the
+[native adapter](../internal/adapters/homebrew/README.md). The product CLI never
+calls these probe scripts.
 
 ## Reproduce
 
@@ -18,8 +19,8 @@ Requires macOS with working `/usr/bin/sandbox-exec`, Git, tar, cp, shasum, and a
 existing portable Ruby matching the version pinned in the script. It archives
 the exact upstream Git commit, never runs the source checkout's `brew`, and
 copies the existing Ruby runtime. It neither downloads nor bootstraps tools.
-Ruby is a development runtime dependency, not a product dependency; the copied
-runtime is not independently authenticated by this probe. No credentials are
+This probe uses a development copy of Ruby that it does not independently
+authenticate. The product separately bundles and validates its pinned Ruby runtime. No credentials are
 passed. A revision pin identifies inspected source, not publisher authentication.
 
 Every run retains its own `/private/tmp/brewwarden-probe.*` directory with source,
@@ -146,9 +147,8 @@ Nonstandard-prefix and denied clang xcrun-cache warnings remain in stderr.
 
 This does not establish arbitrary dependency graphs, affected dependents,
 existing installed helpers, upgrades, normal-prefix behavior, concurrent external
-Homebrew operations, or crash/cancellation reconciliation. Product execution stays
-disabled. The earlier claim that no successful installation was demonstrated is
-superseded only for the narrowly defined probe above.
+Homebrew operations, or crash/cancellation reconciliation. Those limitations
+describe this probe alone; product acceptance is documented by the native adapter.
 
 ## Dependency-bearing installation
 
@@ -200,8 +200,8 @@ regular-expression smoke test runs successfully against its installed dependency
 These `:any` bottles require relocation: unlike the `hello` `:any_skip_relocation`
 binary, their installed binaries are not claimed byte-identical to the archive.
 The exact consumed bottle archives are authenticated, rehashed, and frozen before
-native relocation. General relocation correctness, existing-prefix upgrades,
-affected dependents and external concurrency remain separate acceptance work.
+native relocation. This early probe alone does not establish relocation
+correctness, existing-prefix upgrades, affected dependents or external concurrency.
 
 ## Advisory and publication boundaries
 

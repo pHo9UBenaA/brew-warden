@@ -32,7 +32,7 @@ Run it with `--no-graphics --no-audio --no-clipboard`, without directory sharing
 or attached host disks. Default NAT permits evidence acquisition; the probe's
 own sandbox separately denies network access during native installation.
 
-## Guest preparation and evidence
+## Legacy probe preparation and evidence
 
 Use `tart exec` through the image's guest agent. Before any prefix changes,
 check `sw_vers`, `uname -m`, `sysctl -n hw.model`, the user, existing prefix and
@@ -65,5 +65,21 @@ base, unrelated VMs or evidence as part of verification.
 
 The first successful standard-prefix run is recorded in the owning
 [Homebrew capability record](homebrew-probe.md#standard-prefix-macos-vm-acceptance).
-The same record also documents the tested jq upgrade continuation. General
-upgrade closure, concurrency, vulnerability and product readiness remain open.
+The same record also documents the tested jq upgrade continuation. These legacy
+probes are narrower than the current product acceptance described below.
+
+## Current product acceptance
+
+For product tests, transfer the pinned runtime and the arm64 test binary built
+from `./tests`, or transfer the complete archive from the distribution build.
+The old full gh executable above is a legacy probe dependency, not the product
+verifier. Product collection uses its bundled attestation-only helper and real
+publication/advisory providers.
+
+Run the explicit VM cases in [verification](../docs/verification.md), including
+failure/recovery cases, then exercise the packaged CLI. Verify archive checksums,
+`doctor`, install/upgrade, unchanged dependencies, `status` and `history`. Keep
+fixtures confined to the disposable guest, preserve evidence and stop the clone
+when finished. Consult the [native adapter](../internal/adapters/homebrew/README.md)
+for current supported scope; a probe's older limitations do not describe the
+current product as unimplemented.

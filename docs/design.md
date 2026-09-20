@@ -227,7 +227,8 @@ The initial domain evaluator accepts explicit time, complete reachable dependenc
 graphs, exact artifact subjects and attributed evidence. An eligibility `Allow`
 is not an execution permit. Callers must derive binding digests from the actual
 plan, policy, graph and environment and obtain prior-attempt state from a durable
-journal. No product execution path is connected to this evaluator yet.
+journal. Distribution builds connect this evaluator through the application
+execution workflow and the native bound session.
 
 State flow: draft -> evidence collected -> allow/hold/deny -> revalidated ->
 executing -> succeeded/partial/failed/unknown. An emergency reevaluates only the
@@ -235,9 +236,12 @@ age condition; it cannot jump from deny directly to executing.
 
 ## Binding verification to execution
 
-This is the largest unresolved feasibility issue. Disabling Homebrew auto-update
-and checking just before execution do not alone eliminate concurrent changes or
-re-resolution. A lock held by this CLI does not lock every other brew process.
+The supported official-bottle path freezes authenticated inputs, retains native
+Homebrew formula locks through installation and state verification, and rejects
+source fallback or unplanned installers. See the owning
+[adapter contract](../internal/adapters/homebrew/README.md) for tested guarantees.
+Disabling auto-update or holding only a wrapper lock would not establish this
+binding. New execution paths must independently satisfy the same release gate.
 
 For supported brew versions, demonstrate an execution path that consumes the
 verified metadata, artifact digests, and complete dependency plan. Include cache
@@ -245,9 +249,9 @@ handling, source-build fallback rejection, concurrent changes, and attestation
 exceptions. Passing a local bottle alone does not prove dependencies are fixed.
 `--force-bottle` is not assumed to universally prohibit source builds.
 
-Possible approaches include a constrained immutable-metadata execution path or
-an upstream-supported pre-execution integration. Do not generate executable Ruby
-recipes as an unexamined shortcut. If binding cannot be demonstrated, ship
+The implementation uses pinned native APIs and authenticated original recipes.
+Do not generate executable Ruby recipes as an unexamined shortcut. If binding
+cannot be demonstrated for a new path, ship
 inspection while explicitly rejecting mutation commands. This is a release gate,
 not a retreat from the all-in-one product goal.
 
@@ -303,8 +307,10 @@ If an execution record cannot be persisted, do not begin a mutation. Read-only
 reconciliation diagnostics should remain available.
 
 The `history` command lists execution attempts and legacy pre-execution refusals.
-Supported install/upgrade request shapes produce immutable refusal records under
-`history` beside the default user configuration; changing `--config` does not
+In builds without a trusted runtime, supported install/upgrade request shapes
+produce immutable refusal records under `history` beside the default user
+configuration. Distribution builds record execution attempts separately; policy
+holds before reservation do not create an attempt. Changing `--config` does not
 redirect history. Other unsupported arguments are not logged. Records use random
 event IDs, SHA-256 IDs over exact stored bytes, mode 0600 files in a 0700 directory,
 a nonblocking single-writer lock, file synchronization, same-directory rename,
