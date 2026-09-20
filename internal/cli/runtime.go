@@ -27,7 +27,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 				return 1
 			}
 		} else {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: official jq and oniguruma bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
 			if err != nil {
 				return 1
 			}
@@ -104,7 +104,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 			_, _ = fmt.Fprintln(errOut, "runtime_unavailable: "+err.Error())
 			return 1
 		}
-		_, err := fmt.Fprintf(out, "Runtime integrity and supported platform verified.\nSupported candidates: jq, oniguruma; official arm64_tahoe bottles.\nMinimum release age: %d seconds.\nMetadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n", policy.MinimumAgeSeconds())
+		_, err := fmt.Fprintf(out, "Runtime integrity and supported platform verified.\nCandidate eligibility: verified official arm64_tahoe bottles with complete required evidence.\nMinimum release age: %d seconds.\nMetadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n", policy.MinimumAgeSeconds())
 		if err != nil {
 			return 1
 		}

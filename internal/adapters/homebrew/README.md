@@ -49,15 +49,21 @@ resources, optional/test dependencies, migrations and conflicts. The selected
 native bottle digest, tag and rebuild must match the authenticated candidate.
 Cache files must resolve inside the private workspace and match the actual digest.
 
-An empty patch list alone is not an unmodified-source claim. For the mapped jq
-and oniguruma sources, `source.rb` compares the current and embedded install
-methods with explicitly reviewed build methods using Ruby's maintained Ripper
-parser. Only token source coordinates are removed; instructions, arguments and
-conditions remain part of the digest. Additional instance-method overrides or
-unrecognized build logic make source assessment unknown. A future version can
-reuse the reviewed build procedure, but a changed patch/build method requires
-review. This is a narrow recognition rule, not a general analyzer of arbitrary
-Ruby or protection against compromised Homebrew (outside the threat model).
+An empty patch list alone is not an unmodified-source claim. `source.rb` uses
+Ruby's maintained Ripper parser to recognize standard Autotools/Make and CMake
+build procedures in both current and embedded recipes, without formula-name or
+method-hash registries. It permits literal arguments, bounded local argument
+arrays, native standard argument helpers and path interpolation. Only stable
+specifications are eligible, so an explicitly head-only branch is inactive.
+
+Shell evaluation, source rewriting, arbitrary Ruby calls, custom methods,
+reassigned variables, make evaluation options, CMake script/copy modes and custom
+compiler/include hooks are unsupported. Unknown syntax holds rather than being
+evaluated. Native patch/resource and method-override checks remain separate.
+This is recognition of ordinary build procedures, not proof about arbitrary Ruby,
+build-system internals or protection against compromised Homebrew. The native
+build tools and authenticated upstream source remain trusted under the threat
+model; bottle execution still requires complete evidence and bound native inputs.
 
 ## Tested boundaries
 
@@ -93,10 +99,15 @@ creator, plus the selected bottle's supplement. All remaining SBOM bytes must
 match. An observed creator is not provenance evidence. Absolute symlinks requiring
 build-prefix relocation are unsupported. Reconstruction redirects a pinned Keg
 instance's payload path while retaining its native identity and relocation code;
-this private API requires renewed acceptance on Homebrew upgrades.
+this private API requires renewed acceptance on Homebrew upgrades. Reconstruction
+is outside `HOMEBREW_TEMP`: native Mach-O repair strips rpaths resolved inside
+that build directory, even when they are valid relative paths in a private copy.
+The product rejects reconstruction inside that directory instead of relaxing
+byte comparison or replacing native binary editing.
 
 The developer-only `scripts/probe-homebrew-payload.rb` requires a disposable
-VirtualMac at the standard prefix. In the existing acceptance VM, both jq and
+VirtualMac at the standard prefix and explicit formula names after the workspace
+and payload-script arguments. In the existing acceptance VM, both jq and
 oniguruma match their verified, reconstructed payloads. For each package it
 rejects altered executable bytes, added/missing files, changed permissions,
 changed SBOM package identity and missing receipts, then verifies fixture
@@ -185,3 +196,15 @@ Explicit recovery has passed the native active-lock rejection and stopped-sessio
 snapshot tests. It does not mutate kegs or invent success. The normal distribution
 CLI has passed doctor, plan display, installation verification and durable history
 against the disposable standard-prefix VM.
+
+Generic build inspection is exercised by `TestLiveNativeBuildInspection` with
+five accepted build forms and thirty rejected forms, including source rewriting,
+dynamic calls, shell expansion, CMake script hooks and resource limits. The
+product path has also installed c-ares 1.34.8 and checked an unchanged second run
+in the disposable macOS 26.6.2 VM. Its CMake-produced Mach-O rpaths reproduce the
+build-temporary-directory regression described above; all installed payload bytes
+match after separating reconstruction from the build directory. A subsequent
+multi-target jq/c-ares operation installed the jq/oniguruma dependency graph and
+passed a second run with unchanged Cellar contents. The parameterized payload
+probe also rejected all six corruption cases for each of c-ares, jq and oniguruma
+and restored every fixture byte and mode.

@@ -6,11 +6,15 @@ the same CLI. Commands execute after checks pass without an additional prompt.
 
 ## Supported scope
 
-The initial distribution supports official **jq and oniguruma** bottles on
+The distribution evaluates official core bottles on
 **Apple Silicon macOS Tahoe (26.x)** with Homebrew at **`/opt/homebrew`**.
 It includes pinned Homebrew 7.0.4, portable Ruby 4.0.7 and an attestation-only
 verifier based on GitHub CLI 2.101.0. Go and a separate `gh` installation are not
-needed by users. Unsupported formulae, casks, third-party taps, source builds,
+needed by users. Eligibility comes from verified capabilities, not a package-name
+allowlist. The current source inspection recognizes bounded Autotools and CMake
+builds; publication and advisory evidence require a canonical GitHub release
+asset and established repository advisory coverage. Unsupported recipes, casks,
+third-party taps, source builds,
 services, post-install hooks and unverified affected dependents stop before
 installation. Plain `brew` commands are not intercepted.
 

@@ -72,7 +72,7 @@ class BrewWardenSession
       raise "pinned candidate" if formula.pinned?
       operation = if expected.directory?
         candidate.match_installed([name])
-        BrewWardenPayload.verify(formula, root/"tmp")
+        BrewWardenPayload.verify(formula, root)
         "keep"
       elsif active.symlink?
         old = active.realpath
@@ -145,7 +145,7 @@ class BrewWardenSession
       Homebrew::Install.install_formula(installer, upgrade: action[:operation] == "upgrade")
       raise "native installation failed" if Homebrew.failed?
       candidate.match_installed([name])
-      BrewWardenPayload.verify(formula, root/"tmp")
+      BrewWardenPayload.verify(formula, root)
       remaining.delete(name)
     end
   end
@@ -188,7 +188,7 @@ class BrewWardenSession
           code = 0
           matches = true
         rescue StandardError => error
-          warn "BrewWarden native execution stopped: #{error.class}"
+          warn "BrewWarden native execution stopped: #{error.class}: #{error.message.to_s.byteslice(0, 1024).scrub.dump}"
         end
         after = state[0] rescue ""
         emit(sequence, { schema: 1, exitCode: code, afterState: after, matchesPlan: matches })

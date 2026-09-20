@@ -2,9 +2,9 @@
 
 Status: initial official-bottle implementation, updated 2026-09-20. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
-native execution binding and durable attempts. Supported scope is jq/oniguruma
-on Apple Silicon macOS Tahoe with the standard prefix. Unsupported required
-capabilities hold execution. Builds without a trusted bundled runtime stay
+native execution binding and durable attempts. Official core bottle eligibility
+is determined by verified capabilities on Apple Silicon macOS Tahoe with the
+standard prefix. Unsupported required capabilities hold execution. Builds without a trusted bundled runtime stay
 read-only. See [distribution](distribution.md) for build and publication boundaries.
 
 ## Purpose and scope
@@ -27,8 +27,8 @@ Go is the product language and is used by the harness. Follow the
 
 ## Completion criteria
 
-The goal is a general-purpose tool with a simple prefix interface. The current
-jq/oniguruma acceptance is a binding experiment, not completion of that goal.
+The goal is a general-purpose tool with a simple prefix interface. The original
+jq/oniguruma acceptance establishes a binding baseline, not completion of that goal.
 Official core bottle support must derive eligibility from verified capabilities
 and authenticated metadata, without formula-name allowlists or per-package build
 fingerprints. Required unsupported evidence still holds the entire operation.

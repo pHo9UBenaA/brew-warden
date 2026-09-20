@@ -60,6 +60,11 @@ module BrewWardenPayload
     before = inventory(actual)
     Dir.mktmpdir("payload-", workspace.to_s) do |directory|
       stage = Pathname(directory)
+      # Native linkage repair strips paths inside HOMEBREW_TEMP. Reconstruction
+      # must be outside that build directory, or valid @loader_path rpaths get
+      # removed merely because the verified copy is private.
+      temp = HOMEBREW_TEMP.realpath.to_s
+      raise "payload reconstruction inside build temporary directory" if stage.to_s == temp || stage.to_s.start_with?(temp + "/")
       snapshot = stage/"verified.bottle.tar.gz"
       FileUtils.copy_file(formula.bottle.cached_download, snapshot)
       formula.bottle.verify_download_integrity(snapshot)

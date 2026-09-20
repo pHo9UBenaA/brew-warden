@@ -6,7 +6,9 @@ require ARGV.fetch(1)
 root = Pathname(ARGV.fetch(0)).realpath
 raise "private VM workspace required" unless root.to_s.start_with?("/private/tmp/brewwarden-probe.")
 results = []
-%w[jq oniguruma].each do |name|
+names = ARGV.drop(2)
+raise "explicit formula targets required" if names.empty? || names.any? { |name| !name.match?(/\A[a-z0-9][a-z0-9+@_.-]*\z/) }
+names.each do |name|
   formula = Formulary.factory("homebrew/core/#{name}")
   formula.force_bottle = true
   formula.fetch_bottle_tab(quiet: true)
@@ -14,11 +16,13 @@ results = []
   before = BrewWardenPayload.inventory(prefix)
   digest = BrewWardenPayload.verify(formula, root)
   results << { name:, case: "unchanged payload", digest: }
+  executable = prefix.find.select { |path| path.file? && !path.symlink? && path.executable? }.sort.first
+  raise "executable fixture required" unless executable
   cases = {
-    "modified executable" => [prefix/"bin"/(name == "jq" ? "jq" : "onig-config"), :bytes],
+    "modified executable" => [executable, :bytes],
     "unexpected file" => [prefix/"unexpected-payload", :extra],
     "missing file" => [prefix/".brew/#{name}.rb", :missing],
-    "changed permissions" => [prefix/"bin"/(name == "jq" ? "jq" : "onig-config"), :mode],
+    "changed permissions" => [executable, :mode],
     "changed SBOM package" => [prefix/"sbom.spdx.json", :sbom],
     "missing receipt" => [prefix/"INSTALL_RECEIPT.json", :missing],
   }

@@ -132,3 +132,12 @@ The packaged CLI must also pass `doctor`, a real install/upgrade, `history` and
 `status` in that VM. Offline tests, Docker tests and payload-only probes cannot
 substitute for this native product-path acceptance. Signing/notarization and
 public release provenance are not implied by local test success.
+
+`TestLiveGeneralBottleExecution` in `tests/general_execution_test.go` accepts
+space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
+Provision absent targets to test fresh installation. It uses live authenticated
+metadata, release and advisory providers, provenance verification, the real native
+engine and durable journal. It checks the complete candidate closure, unchanged
+unrelated Cellar racks, then a second successful run with unchanged Cellar bytes.
+It does not reset fixtures implicitly. Retained workspaces include `native.log`
+for failed native operations.

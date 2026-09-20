@@ -45,6 +45,7 @@ class BrewWardenCandidate
       embedded = Formulary.factory(bottle.to_s)
       raise "embedded recipe fallback" unless embedded.local_bottle_path == bottle.realpath
       [formula, embedded].each do |candidate|
+        raise "unsupported non-stable build" unless candidate.active_spec_sym == :stable
         raise "candidate identity mismatch" unless candidate.name == name && candidate.version.to_s == item.fetch("version") && candidate.revision == item.fetch("revision")
         raise "source identity mismatch" unless candidate.stable.url == item.fetch("sourceURL") && candidate.stable.checksum.hexdigest == item.fetch("sourceSHA256")
         raise "unsupported requirements or options" unless candidate.requirements.empty? && candidate.options.empty?
@@ -65,7 +66,7 @@ class BrewWardenCandidate
       embedded_sha = Digest::SHA256.hexdigest(embedded_text)
       { name:, cachePath: cached.realpath.to_s, embeddedRecipeSHA256: embedded_sha,
         unmodifiedSource: [formula, embedded].all? { |f| (f.class.instance_methods(false) - %i[install test]).empty? } &&
-          BrewWardenSource.reviewed?(name, expected.read) && BrewWardenSource.reviewed?(name, embedded_text) }
+          BrewWardenSource.reviewed?(expected.read) && BrewWardenSource.reviewed?(embedded_text) }
     end
   end
 
