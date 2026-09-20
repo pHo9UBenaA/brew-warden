@@ -19,12 +19,17 @@ README or agent-context links. Do not add tests solely for prose changes.
 
 ## File inclusion
 
-The repository follows an explicit file allowlist in `.gitignore`, inspired by
-[Ignore everything by default](https://packagemain.tech/p/gitignore-everything-by-default).
-New files are ignored until their root-relative paths are added to that list.
-Directory traversal exceptions do not allow the files inside those directories.
-When adding source, tests, fixtures, documentation, or skills, update the allowlist
-in the same change. Avoid broad directory exceptions and `git add --force`.
+The repository ignores unlisted root entries with `/*`, then allows public root
+files and entire source, test, documentation and tooling directories. New files
+inside these directories are eligible for tracking without changing `.gitignore`.
+Only `.agents/skills/` is included from `.agents/`; other local agent configuration
+remains ignored. Generated root directories such as `.cache/`, `bin/` and `dist/`
+remain excluded by default.
+
+Update `.gitignore` when introducing a new public root entry, not for each source
+file. Keep generated artifacts and private local files outside the included trees,
+or add a targeted ignore rule when a tool must generate them there. Avoid
+`git add --force` as a substitute for correcting the inclusion rules.
 
 Use `git status --short --untracked-files=all` to inspect included files and
 `git check-ignore -v --no-index <path>` to inspect the matching rule for a path.

@@ -44,7 +44,7 @@ do not include code exercised in those separately built subprocesses.
 
 Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
 configuration, attempt records, publisher responses, template comments, and control-byte rejection. Preserve discovered regressions
-as seed cases or explicitly allowlisted corpus files. Add fuzz targets for actual
+as seed cases or reviewed corpus files under the test directories. Add fuzz targets for actual
 product parsers as they appear. Coverage has no arbitrary percentage gate; race
 and fuzz checks cover only exercised behavior. Do not treat a clean advisory
 result as proof that code is safe.
@@ -81,7 +81,7 @@ provenance of the compiler, or attest a supported installation capability.
 `tests/container/Dockerfile`. It requires a running Docker engine; it does not
 start one or change its global configuration. The default source is committed
 `HEAD`; pass a Git revision to reproduce another commit, or `--worktree` to test
-tracked and explicitly allowlisted untracked files. The current container harness
+tracked files and non-ignored untracked files. The current container harness
 is copied explicitly for pre-commit validation. Each run records its source archive,
 base revision, harness hashes, local image ID, stdout, stderr and exit status under
 a unique `.cache/container-probe.*` directory. Worktree runs also record status
