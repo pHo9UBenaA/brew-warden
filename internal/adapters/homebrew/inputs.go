@@ -1,7 +1,7 @@
 package homebrew
 
 import (
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"strconv"
 )
 

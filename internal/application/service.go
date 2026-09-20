@@ -1,10 +1,10 @@
 package application
 
 import (
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
 	"context"
 	"errors"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 // Service coordinates planning, durable execution and explicit reconciliation.

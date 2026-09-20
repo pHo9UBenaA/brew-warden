@@ -11,7 +11,7 @@ import (
 	"strings"
 	"syscall"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 // Journal stores append-only start/result records separately from refusals.

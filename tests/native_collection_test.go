@@ -10,12 +10,12 @@ import (
 	"testing"
 	"time"
 
-	"brewwarden/internal/adapters/attestation"
-	"brewwarden/internal/adapters/githubrelease"
-	"brewwarden/internal/adapters/homebrew"
-	"brewwarden/internal/adapters/osv"
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/githubrelease"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/osv"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 func TestLiveCandidateCollection(t *testing.T) {

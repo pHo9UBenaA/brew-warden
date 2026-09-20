@@ -1,8 +1,8 @@
 package homebrew
 
 import (
-	"brewwarden/internal/domain"
 	"encoding/json"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"strings"
 	"testing"
 )

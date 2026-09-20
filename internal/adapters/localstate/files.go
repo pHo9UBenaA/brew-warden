@@ -5,7 +5,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 type Files struct {

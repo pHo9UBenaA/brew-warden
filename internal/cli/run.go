@@ -1,4 +1,4 @@
-// Package cli exposes only local diagnostics until execution binding is proven.
+// Package cli parses wrapper invocations and presents execution evidence.
 package cli
 
 import (
@@ -8,11 +8,11 @@ import (
 	"strings"
 	"time"
 
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-const executionUnavailable = "execution_binding_unverified: Homebrew execution is disabled; verified artifacts and the complete dependency plan are not bound to installation."
+const executionUnavailable = "runtime_unavailable: this build has no trusted bundled execution runtime; use a verified distribution."
 
 // Version is set by the reproducible development build; it is not a release claim.
 var Version = "development"
@@ -35,7 +35,7 @@ func RunWithServices(args []string, stdout, stderr io.Writer, source ports.Confi
 		return 0
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nHomebrew commands are unavailable pending execution-binding verification."); err != nil {
+		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted bundled execution runtime."); err != nil {
 			return 1
 		}
 		return 0
@@ -65,7 +65,7 @@ func RunWithServices(args []string, stdout, stderr io.Writer, source ports.Confi
 	if len(rest) == 1 && rest[0] == "doctor" {
 		_, _ = fmt.Fprintln(stderr, "minimum_release_age_seconds: "+strconv.FormatInt(policy.MinimumAgeSeconds(), 10))
 		_, _ = fmt.Fprintln(stderr, executionUnavailable)
-		_, _ = fmt.Fprintln(stderr, "No live Homebrew checks were run. No brew version or installation path is supported for execution yet.")
+		_, _ = fmt.Fprintln(stderr, "No live Homebrew checks were run. This build cannot establish a trusted runtime.")
 		return 1
 	}
 	// Reject the entire invocation, including unsupported options, aliases,

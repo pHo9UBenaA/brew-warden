@@ -8,15 +8,15 @@ import (
 	"syscall"
 	"time"
 
-	"brewwarden/internal/adapters/attestation"
-	"brewwarden/internal/adapters/githubrelease"
-	"brewwarden/internal/adapters/homebrew"
-	"brewwarden/internal/adapters/localstate"
-	"brewwarden/internal/adapters/osv"
-	"brewwarden/internal/application"
-	"brewwarden/internal/cli"
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/githubrelease"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/osv"
+	"github.com/pHo9UBenaA/brew-warden/internal/application"
+	"github.com/pHo9UBenaA/brew-warden/internal/cli"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 // RuntimeSHA256 is set only by the distribution build after runtime validation.

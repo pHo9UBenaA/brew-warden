@@ -10,7 +10,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"

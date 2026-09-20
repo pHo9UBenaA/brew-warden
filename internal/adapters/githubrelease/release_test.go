@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const observed int64 = 1789862400 // 2026-09-20 UTC

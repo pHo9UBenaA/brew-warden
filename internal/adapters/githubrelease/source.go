@@ -10,7 +10,7 @@ import (
 	"net/http"
 	"strings"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const maxSourceBytes int64 = 32 * 1024 * 1024

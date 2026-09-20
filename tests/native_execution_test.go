@@ -14,14 +14,14 @@ import (
 	"testing"
 	"time"
 
-	"brewwarden/internal/adapters/attestation"
-	"brewwarden/internal/adapters/githubrelease"
-	"brewwarden/internal/adapters/homebrew"
-	"brewwarden/internal/adapters/localstate"
-	"brewwarden/internal/adapters/osv"
-	"brewwarden/internal/application"
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/githubrelease"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/osv"
+	"github.com/pHo9UBenaA/brew-warden/internal/application"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 type nativeClock struct{}
@@ -108,7 +108,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	}
 	fault := os.Getenv("BREWWARDEN_VM_FAULT")
 	switch fault {
-	case "", "age", "age-exception", "changed-input", "exception-changed-input", "affected-dependent", "recovery":
+	case "", "age", "age-exception", "changed-input", "exception-changed-input", "affected-dependent", "recovery", "link-conflict":
 	default:
 		t.Fatal("unsupported VM fault")
 	}
@@ -139,6 +139,25 @@ func TestLiveNativeExecution(t *testing.T) {
 		if err := os.WriteFile(filepath.Join(keg, "INSTALL_RECEIPT.json"), receipt, 0644); err != nil {
 			t.Fatal(err)
 		}
+	}
+	if fault == "link-conflict" {
+		if _, err := os.Lstat("/opt/homebrew/Cellar/jq"); !os.IsNotExist(err) {
+			t.Fatal("link-conflict test requires absent jq")
+		}
+		if _, err := os.Lstat("/opt/homebrew/Cellar/oniguruma"); !os.IsNotExist(err) {
+			t.Fatal("link-conflict test requires absent dependency")
+		}
+		file, err := os.OpenFile("/opt/homebrew/bin/jq", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if _, err := file.WriteString("owned acceptance conflict\n"); err != nil {
+			t.Fatal(err)
+		}
+		if err := file.Close(); err != nil {
+			t.Fatal(err)
+		}
+		defer os.Remove("/opt/homebrew/bin/jq")
 	}
 	var nativeErrors bytes.Buffer
 	completeBefore, err := kegSnapshot("/opt/homebrew/Cellar")
@@ -215,6 +234,24 @@ func TestLiveNativeExecution(t *testing.T) {
 		return
 	}
 	result, err := application.Execute(context.Background(), prepared, session, journal, nativeClock{})
+	if fault == "link-conflict" {
+		if err == nil || result.Outcome != domain.AttemptPartial || !result.ExitKnown || result.ExitCode == 0 {
+			t.Fatal("partial native failure was misclassified", result, err)
+		}
+		raw, readErr := os.ReadFile("/opt/homebrew/bin/jq")
+		if readErr != nil || string(raw) != "owned acceptance conflict\n" {
+			t.Fatal("existing shared file replaced", readErr)
+		}
+		records, readErr := journal.Attempts()
+		if readErr != nil || len(records) != 1 || records[0].Finish.Outcome != domain.AttemptPartial || !records[0].Finish.AfterState.Valid() {
+			t.Fatal(records, readErr)
+		}
+		if _, err := os.Stat("/opt/homebrew/Cellar/oniguruma/6.9.10"); err != nil {
+			t.Fatal("did not exercise partial dependency installation", err)
+		}
+		t.Log("partial installation retained, existing link conflict preserved, actual state recorded")
+		return
+	}
 	if fault == "changed-input" || fault == "exception-changed-input" || fault == "age" {
 		if err == nil {
 			t.Fatal("held request executed", fault)

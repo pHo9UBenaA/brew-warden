@@ -14,7 +14,7 @@ import (
 	"syscall"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const maxHistoryRecords = 10000
@@ -35,7 +35,7 @@ func (f Files) RecordRefusal(operation string, targets []string, policy domain.P
 	if _, err := rand.Read(nonce[:]); err != nil {
 		return "", err
 	}
-	r := domain.Refusal{EventID: domain.Digest(hex.EncodeToString(nonce[:])), OccurredAt: time.Now().Unix(), Operation: operation, Targets: append([]string{}, targets...), ReasonCode: "execution_binding_unverified", MinimumAgeSeconds: policy.MinimumAgeSeconds()}
+	r := domain.Refusal{EventID: domain.Digest(hex.EncodeToString(nonce[:])), OccurredAt: time.Now().Unix(), Operation: operation, Targets: append([]string{}, targets...), ReasonCode: "runtime_unavailable", MinimumAgeSeconds: policy.MinimumAgeSeconds()}
 	if !policy.Valid() || !r.Valid() {
 		return "", errors.New("invalid refusal record")
 	}

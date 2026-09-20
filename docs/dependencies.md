@@ -1,9 +1,8 @@
 # Dependencies and implementation
 
-Go is the product and harness language. Product feasibility is not yet demonstrated. Use a supported patched Go toolchain;
+Go is the product and harness language. Use a supported patched Go toolchain;
 the module's Go 1.24 directive is a compatibility floor, not a release pin.
-The local module path must be replaced with the actual public identity before
-publishing imports.
+The public module identity is `github.com/pHo9UBenaA/brew-warden`.
 
 ## Dependency policy
 

@@ -15,7 +15,7 @@ done
 go run ./tools/repo-check hygiene
 go run ./tools/repo-check architecture
 modules=$(go list -m all)
-if [ "$modules" != "brewwarden" ]; then
+if [ "$modules" != "github.com/pHo9UBenaA/brew-warden" ]; then
   printf 'Unexpected module dependencies:\n%s\n' "$modules" >&2
   exit 1
 fi

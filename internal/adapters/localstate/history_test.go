@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"testing"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 func TestHistoryIsImmutableAndNonOverwriting(t *testing.T) {
@@ -33,7 +33,7 @@ func TestHistoryIsImmutableAndNonOverwriting(t *testing.T) {
 		t.Fatal(records, err)
 	}
 	for _, r := range records {
-		if !r.Refusal.Valid() || r.Refusal.ReasonCode != "execution_binding_unverified" {
+		if !r.Refusal.Valid() || r.Refusal.ReasonCode != "runtime_unavailable" {
 			t.Fatal(r)
 		}
 	}

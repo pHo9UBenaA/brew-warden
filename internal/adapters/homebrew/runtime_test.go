@@ -1,9 +1,9 @@
 package homebrew
 
 import (
-	"brewwarden/internal/domain"
 	"context"
 	"encoding/json"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"os"
 	"path/filepath"
 	"runtime"

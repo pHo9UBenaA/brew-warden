@@ -1,13 +1,11 @@
 # Product design
 
-Status: proposed design, updated 2026-09-19. The development harness and initial
-diagnostic-only CLI and pure evidence eligibility evaluation exist. A narrowly
-mapped GitHub upstream-publication collector is implemented and tested separately.
-The execution workflow and durable attempt/exception consumption are implemented
-and boundary-tested, but authenticated Homebrew candidate planning and product
-installation enforcement are not wired.
-Strict user configuration and immutable pre-execution refusal history are also
-implemented. Refusal history is not the execution-attempt journal.
+Status: initial official-bottle implementation, updated 2026-09-20. Distribution
+builds connect authenticated candidate collection, full-closure policy evaluation,
+native execution binding and durable attempts. Supported scope is jq/oniguruma
+on Apple Silicon macOS Tahoe with the standard prefix. Unsupported required
+capabilities hold execution. Builds without a trusted bundled runtime stay
+read-only. See [distribution](distribution.md) for build and publication boundaries.
 
 ## Purpose and scope
 
@@ -29,17 +27,23 @@ Go is the product language and is used by the harness. Follow the
 
 ## User operations
 
-The project and repository name is `brewwarden` (BrewWarden). `bwd` is the short
-executable name; `brewwarden` exposes the identical interface. Only local help
-an execution-unavailable `doctor` diagnostic, and `history` are implemented. All Homebrew
-invocations are rejected without launching a child process.
+The product is BrewWarden; its repository is `pHo9UBenaA/brew-warden`.
+`bwd` and `brewwarden` expose the same interface:
 
 ```sh
-bwd brew install wget
-bwd brew upgrade openssl@3
+bwd brew install jq
+bwd brew upgrade jq
 bwd brew upgrade
-bwd --minimum-release-age 168h brew install wget
+bwd --minimum-release-age 168h brew install jq
+bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
+bwd doctor
+bwd history
+bwd status
+bwd reconcile ATTEMPT_ID
 ```
+
+Only age is waivable, separately for each named candidate. Reasons are bounded,
+printable UTF-8; artifact hashes and reasons are displayed before execution.
 
 Follow the prefix interaction documented by
 [Socket Firewall Free](https://docs.socket.dev/docs/socket-firewall-free): users
@@ -298,7 +302,7 @@ reading. A hash is not a signature or protection against the local administrator
 If an execution record cannot be persisted, do not begin a mutation. Read-only
 reconciliation diagnostics should remain available.
 
-The initial `history` command lists only requests refused before Homebrew starts.
+The `history` command lists execution attempts and legacy pre-execution refusals.
 Supported install/upgrade request shapes produce immutable refusal records under
 `history` beside the default user configuration; changing `--config` does not
 redirect history. Other unsupported arguments are not logged. Records use random
@@ -332,8 +336,9 @@ exception. Old records cannot be overwritten, and inventory exhaustion fails.
 Exit status, actual state and policy eligibility remain separate. A zero exit
 with an unexpected state is unknown. A nonzero exit with changed state is partial.
 Outcome persistence failure leaves an unresolved attempt requiring reconciliation.
-These application and storage contracts do not establish Homebrew binding and
-are not yet registered as a mutating CLI workflow.
+These contracts are wired to the native session in distribution builds. Native
+reconciliation reacquires the original candidate locks, retains observed state,
+and appends a reconciliation outcome without claiming a lost process succeeded.
 
 ## Implementation and acceptance
 
@@ -346,12 +351,11 @@ are not yet registered as a mutating CLI workflow.
 4. Add cask, third-party tap, and upstream-signature support by explicit capability.
 5. Improve presentation/performance and design optional automation separately.
 
-The first step is unresolved implementation work, not approval to assume feasible
-enforcement. Evaluate native previews and pre-install verification through the
-[integration contract](homebrew-integration.md#preflight-investigation). Establish
-the execution-binding mechanism, timestamp sources, revision-aware advisory
-mapping/freshness, and helper bootstrap behavior before claiming support. Continue
-independent pure-policy work while a probe is unresolved; keep mutations disabled.
+The initial supported path has passed native candidate, installation, upgrade,
+unchanged-dependency, exception and lock/recovery probes in a disposable macOS VM.
+The [integration contract](homebrew-integration.md#preflight-investigation)
+continues to apply whenever support expands. Future casks, taps, signatures and
+platforms are separate capabilities, never unchecked fallbacks.
 
 Acceptance must cover invalid signatures under emergency mode, expired/replayed
 exceptions, changed policy/digests, incomplete advisory responses, same-version
@@ -361,5 +365,5 @@ unsafe paths, full disks, and interrupted processes. Test real boundaries in an
 isolated environment; do not upgrade the maintainer's normal Homebrew prefix.
 
 Dependency inventory, supported brew/verifier versions, and reproducibility
-results belong to release evidence. The current harness does not establish
-product enforcement, verifier coverage, or release readiness.
+results belong to release evidence. Publication/signing is a separate authorized release action; local reproducibility
+and native acceptance are not publisher authentication.

@@ -1,8 +1,8 @@
 package ports
 
 import (
-	"brewwarden/internal/domain"
 	"context"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 // SourceCandidate is derived from authenticated metadata and an authenticated

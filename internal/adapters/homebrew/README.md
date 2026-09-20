@@ -1,7 +1,7 @@
 # Native Homebrew boundary
 
 Current capabilities: authenticated candidate collection and private runtime
-materialization. Product execution is not wired yet. The separate developer VM
+materialization. Distribution builds wire its bound execution session through the application. The separate developer VM
 probe has demonstrated same-process formula locks across real install/upgrade.
 
 ## Runtime and source identity
@@ -170,8 +170,7 @@ a separate native process, fresh jq/oniguruma installation, jq 1.8.1 -> 1.8.2
 upgrade with byte-for-byte unchanged oniguruma, and durable success records through
 the real application workflow. A too-young policy holds without any attempt start
 or installed-state change. An explicit per-artifact age exception still cannot
-execute a substituted bottle. The public CLI remains disabled until its wiring
-and remaining release/recovery boundaries are completed.
+execute a substituted bottle. The distribution CLI uses this same workflow, with a pinned bundled runtime.
 
 The application has also completed a real upgrade with per-artifact age waivers
 and an otherwise impossible age threshold. A VM fixture with an installed external
@@ -180,3 +179,8 @@ change. Source-build and unplanned-installer guards are exercised against the
 real native installer in an isolated read-only-host test. Before/after state
 snapshots are retained as content-addressed JSON; plans and observations are
 published only after file synchronization and atomic rename.
+
+Explicit recovery has passed the native active-lock rejection and stopped-session
+snapshot tests. It does not mutate kegs or invent success. The normal distribution
+CLI has passed doctor, plan display, installation verification and durable history
+against the disposable standard-prefix VM.

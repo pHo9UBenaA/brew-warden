@@ -1,8 +1,8 @@
 package attestation
 
 import (
-	"brewwarden/internal/domain"
 	"context"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"os"
 	"path/filepath"
 	"strings"

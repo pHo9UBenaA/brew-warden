@@ -12,8 +12,8 @@ import (
 	"strings"
 	"time"
 
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 // Collector owns acquisition in a fresh private workspace. Evidence eligibility

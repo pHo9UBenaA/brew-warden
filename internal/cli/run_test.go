@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 func TestRejectUnverifiedOperations(t *testing.T) {

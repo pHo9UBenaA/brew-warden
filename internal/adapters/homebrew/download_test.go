@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 type transportFunc func(*http.Request) (*http.Response, error)

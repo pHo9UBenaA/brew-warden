@@ -4,7 +4,7 @@ import (
 	"errors"
 	"io"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 type configDocument struct {

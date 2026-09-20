@@ -14,7 +14,7 @@ import (
 	"strconv"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const maxResponse = 8 * 1024 * 1024

@@ -16,8 +16,8 @@ import (
 	"strings"
 	"time"
 
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 const maxResponse = 2 * 1024 * 1024

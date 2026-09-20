@@ -11,7 +11,7 @@ import (
 	"testing"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 const now int64 = 1789900000

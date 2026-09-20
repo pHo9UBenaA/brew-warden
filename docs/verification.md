@@ -109,3 +109,25 @@ container suites kill a writer after a durable start and require reconciliation
 before any new attempt. Application tests use the real journal to verify launch
 ordering, replay rejection, stale evidence, cancellation, partial outcomes and
 unknown outcome durability. They do not substitute for native Homebrew execution.
+
+## Native product acceptance
+
+Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
+`BREWWARDEN_VM_RUNTIME` pointing to the pinned bundle. The test checks the hardware
+model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
+fixtures must provision an older target and the intended existing dependencies.
+The default path checks actual execution, native lock exclusion, candidate payload
+identity, durable outcomes and unchanged installed dependency bytes.
+
+`BREWWARDEN_VM_FAULT` selects `age`, `age-exception`, `changed-input`,
+`exception-changed-input`, `affected-dependent`, `recovery` or `link-conflict`.
+Recovery attempts reconciliation while the native locks are held, terminates the
+owned session, then requires a durable observed-state reconciliation with no keg
+changes. Link conflict requires absent jq/oniguruma and exercises a real partial
+installation while preserving an existing shared-prefix file. These tests never
+silently prepare or reset the host Homebrew installation.
+
+The packaged CLI must also pass `doctor`, a real install/upgrade, `history` and
+`status` in that VM. Offline tests, Docker tests and payload-only probes cannot
+substitute for this native product-path acceptance. Signing/notarization and
+public release provenance are not implied by local test success.

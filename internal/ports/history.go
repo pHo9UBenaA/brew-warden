@@ -1,6 +1,6 @@
 package ports
 
-import "brewwarden/internal/domain"
+import "github.com/pHo9UBenaA/brew-warden/internal/domain"
 
 type History interface {
 	RecordRefusal(operation string, targets []string, policy domain.Policy) (domain.Digest, error)

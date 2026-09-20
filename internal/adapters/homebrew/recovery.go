@@ -9,7 +9,7 @@ import (
 	"syscall"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 func (e Engine) Snapshot(ctx context.Context, binding domain.Binding) (domain.Digest, error) {

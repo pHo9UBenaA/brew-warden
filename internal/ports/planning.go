@@ -1,9 +1,9 @@
 package ports
 
 import (
-	"brewwarden/internal/domain"
 	"context"
 	"errors"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 var ErrNothingToDo = errors.New("no installed formulae to upgrade")

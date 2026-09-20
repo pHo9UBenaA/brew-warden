@@ -14,7 +14,7 @@ import (
 	"testing"
 	"time"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 func attemptFixture(letter string) domain.AttemptStart {

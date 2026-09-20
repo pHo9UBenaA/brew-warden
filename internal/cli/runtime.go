@@ -6,9 +6,9 @@ import (
 	"io"
 	"strings"
 
-	"brewwarden/internal/application"
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/application"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 // RunWithRuntime keeps wrapper options separate from literal Homebrew arguments.

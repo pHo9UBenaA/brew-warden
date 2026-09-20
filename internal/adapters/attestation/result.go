@@ -1,10 +1,10 @@
 package attestation
 
 import (
-	"brewwarden/internal/domain"
 	"bytes"
 	"encoding/json"
 	"errors"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"io"
 )
 

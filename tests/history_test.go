@@ -7,8 +7,8 @@ import (
 	"strings"
 	"testing"
 
-	"brewwarden/internal/adapters/localstate"
-	"brewwarden/internal/cli"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
+	"github.com/pHo9UBenaA/brew-warden/internal/cli"
 )
 
 func TestRefusalHistoryAndBrokenConfigRecovery(t *testing.T) {

@@ -9,7 +9,7 @@ import (
 	"testing"
 )
 
-// Exercise both shipped entrypoints with a tripwire brew executable. No host
+// Exercise both development entrypoints with a tripwire brew executable. No host
 // Homebrew is reachable through PATH and no installation is performed.
 func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 	root := t.TempDir()
@@ -40,7 +40,7 @@ func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 			if err := cmd.Run(); err == nil || cmd.ProcessState == nil || cmd.ProcessState.ExitCode() != 1 {
 				t.Fatalf("%s %v: expected exit 1, got %v", name, args, err)
 			}
-			if stdout.Len() != 0 || !strings.Contains(stderr.String(), "execution_binding_unverified:") {
+			if stdout.Len() != 0 || !strings.Contains(stderr.String(), "runtime_unavailable:") {
 				t.Fatalf("unexpected output: %q %q", &stdout, &stderr)
 			}
 		}

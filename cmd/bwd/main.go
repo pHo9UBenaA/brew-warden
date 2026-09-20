@@ -1,5 +1,5 @@
 package main
 
-import "brewwarden/internal/composition"
+import "github.com/pHo9UBenaA/brew-warden/internal/composition"
 
 func main() { composition.Main() }

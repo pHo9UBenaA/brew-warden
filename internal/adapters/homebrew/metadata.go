@@ -1,8 +1,8 @@
 package homebrew
 
 import (
-	"brewwarden/internal/domain"
 	"errors"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"path"
 	"slices"
 	"strings"

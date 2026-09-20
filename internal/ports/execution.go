@@ -3,7 +3,7 @@ package ports
 import (
 	"context"
 
-	"brewwarden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 type Attempts interface {

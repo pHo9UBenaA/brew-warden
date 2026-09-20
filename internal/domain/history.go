@@ -12,7 +12,7 @@ type Refusal struct {
 }
 
 func (r Refusal) Valid() bool {
-	if !r.EventID.Valid() || r.OccurredAt <= 0 || r.ReasonCode != "execution_binding_unverified" || !ValidRequest(r.Operation, r.Targets) {
+	if !r.EventID.Valid() || r.OccurredAt <= 0 || (r.ReasonCode != "execution_binding_unverified" && r.ReasonCode != "runtime_unavailable") || !ValidRequest(r.Operation, r.Targets) {
 		return false
 	}
 	if _, err := NewPolicy(r.MinimumAgeSeconds); err != nil {

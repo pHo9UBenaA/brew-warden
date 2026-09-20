@@ -9,11 +9,11 @@ import (
 	"strings"
 	"testing"
 
-	"brewwarden/internal/adapters/localstate"
-	"brewwarden/internal/application"
-	"brewwarden/internal/cli"
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
+	"github.com/pHo9UBenaA/brew-warden/internal/application"
+	"github.com/pHo9UBenaA/brew-warden/internal/cli"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 type servicePlanner struct {

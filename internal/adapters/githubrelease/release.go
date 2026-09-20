@@ -15,8 +15,8 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"brewwarden/internal/domain"
-	"brewwarden/internal/ports"
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
+	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 const maxResponseBytes = 1024 * 1024
