@@ -25,6 +25,21 @@ Go is the product language and is used by the harness. Follow the
 [architecture](architecture.md) for source boundaries and
 [threat model](threat-model.md) for trust assumptions.
 
+## Completion criteria
+
+The goal is a general-purpose tool with a simple prefix interface. The current
+jq/oniguruma acceptance is a binding experiment, not completion of that goal.
+Official core bottle support must derive eligibility from verified capabilities
+and authenticated metadata, without formula-name allowlists or per-package build
+fingerprints. Required unsupported evidence still holds the entire operation.
+Acceptance must exercise multiple unrelated source/release conventions, dependency
+graphs, installed states and install/upgrade operations in disposable environments.
+Keep detailed security records internally; ordinary use should require only the
+requested Homebrew command and an actionable explanation if it cannot proceed.
+Reduce duplicate execution paths and runtime dependencies where equivalent binding
+can be demonstrated. Casks, other taps and source builds remain separate explicit
+capabilities rather than unchecked fallbacks.
+
 ## User operations
 
 The product is BrewWarden; its repository is `pHo9UBenaA/brew-warden`.
@@ -43,7 +58,9 @@ bwd reconcile ATTEMPT_ID
 ```
 
 Only age is waivable, separately for each named candidate. Reasons are bounded,
-printable UTF-8; artifact hashes and reasons are displayed before execution.
+printable UTF-8; waived artifact hashes and reasons are displayed before execution.
+Normal output shows formula names and versions. Detailed binding identifiers stay
+in the journal and diagnostic history. `status` lists only unresolved attempts.
 
 Follow the prefix interaction documented by
 [Socket Firewall Free](https://docs.socket.dev/docs/socket-firewall-free): users

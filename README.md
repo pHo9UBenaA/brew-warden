@@ -59,7 +59,8 @@ plan and one attempt. Dependencies need their own reasons if their age is waived
 bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
 ```
 
-The exact bottle digests and exceptions are shown before execution. Signature,
+Formula names and versions are shown before execution. Age exceptions also show
+the exact bottle digest and reason. Signature,
 checksum, trust, advisory and dependency checks remain mandatory. Exceptions
 expire with the plan (at most ten minutes) and cannot be replayed.
 
@@ -72,11 +73,11 @@ Optional configuration is `~/Library/Application Support/brewwarden/config.json`
 ```
 
 Use `--config PATH` before `brew` for a different policy file. Configuration does
-not redirect state. Private `attempts/`, `history/` and `collections/` live beside
-the default configuration. Collections retain plans, exact observations, bottle
-inputs, runtime copies and before/after snapshots for inspection. They can be
-large; there is no automatic garbage collection. Preserve them while an attempt
-is unresolved. History remains readable if policy configuration is invalid.
+not redirect state. Verification records are retained privately beside the default
+configuration and remain readable if policy configuration is invalid. See
+[storage and history](docs/design.md#configuration-and-storage) for their layout.
+Collections can be large; automatic cleanup is not implemented. Preserve records
+while an attempt is unresolved.
 
 If execution is interrupted or its outcome cannot be durably established,
 `status` reports an unresolved attempt and new installations stop:

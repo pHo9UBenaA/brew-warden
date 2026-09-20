@@ -90,12 +90,12 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	run := *service
 	run.Present = func(p ports.Prepared) error {
-		if _, err := fmt.Fprintf(errOut, "Plan %s\nAttempt %s\n", p.Assessment.Binding.Plan, p.Assessment.Binding.Attempt); err != nil {
+		if _, err := fmt.Fprintln(errOut, "Checking requested formulae and dependencies:"); err != nil {
 			return err
 		}
 		for _, node := range p.Assessment.Nodes {
 			a := node.Artifact
-			if _, err := fmt.Fprintf(errOut, "  %s %s revision=%d rebuild=%d %s sha256:%s\n", a.Name, a.Version, a.Revision, a.Rebuild, a.BottleTag, a.SHA256); err != nil {
+			if _, err := fmt.Fprintf(errOut, "  %s %s\n", a.Name, a.Version); err != nil {
 				return err
 			}
 		}
@@ -111,7 +111,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	result, err := run.Run(ctx, ports.Request{Operation: rest[1], Targets: rest[2:]}, policy, overrides)
 	if err != nil {
 		for _, r := range result.Decision.Reasons {
-			_, _ = fmt.Fprintf(errOut, "policy: %s %s claim=%d\n", r.Code, r.Artifact.Name, r.Claim)
+			_, _ = fmt.Fprintf(errOut, "%s: %s (%s)\n", r.Artifact.Name, claimName(r.Claim), r.Code)
 		}
 		// Errors can contain local paths. Quoting prevents terminal control injection.
 		_, _ = fmt.Fprintf(errOut, "execution_stopped: %q; outcome=%s\n", err.Error(), result.Outcome)
@@ -123,7 +123,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	if result.NoChanges {
 		_, err = fmt.Fprintln(out, "No installed formulae to upgrade.")
 	} else {
-		_, err = fmt.Fprintln(out, "Installation verified; attempt recorded as succeeded.")
+		_, err = fmt.Fprintln(out, "Installation verified.")
 	}
 	if err != nil {
 		return 1
@@ -171,6 +171,9 @@ func showAttempts(out, errOut io.Writer, journal ports.Attempts, status bool) in
 		if a.Unresolved() {
 			unresolved++
 		}
+		if status && !a.Unresolved() {
+			continue
+		}
 		outcome := string(a.Finish.Outcome)
 		if outcome == "" {
 			outcome = "unfinished"
@@ -186,4 +189,21 @@ func showAttempts(out, errOut io.Writer, journal ports.Attempts, status bool) in
 		return 1
 	}
 	return 0
+}
+
+func claimName(claim domain.Claim) string {
+	switch claim {
+	case domain.Metadata:
+		return "metadata verification"
+	case domain.Checksum:
+		return "checksum verification"
+	case domain.Provenance:
+		return "provenance verification"
+	case domain.Publication:
+		return "release age verification"
+	case domain.Vulnerabilities:
+		return "vulnerability verification"
+	default:
+		return "execution verification"
+	}
 }

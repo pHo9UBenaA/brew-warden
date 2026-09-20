@@ -103,7 +103,7 @@ func TestRuntimeCLIRejectsChildWrapperOptionsAndPreservesExit(t *testing.T) {
 	s := application.Service{Planner: planner, Journal: localstate.Journal{Path: filepath.Join(t.TempDir(), "attempts")}, Clock: &executionClock{p.Assessment.Now}}
 	var out bytes.Buffer
 	code := cli.RunWithRuntime(context.Background(), []string{"--age-exception", "jq=\u7dca\u6025\u4fee\u6b63", "brew", "install", "jq"}, &out, &out, nil, nil, &s)
-	if code != 7 || !session.ran || len(planner.overrides) != 1 || planner.overrides[0].Reason != "\u7dca\u6025\u4fee\u6b63" || !strings.Contains(out.String(), "Plan ") {
+	if code != 7 || !session.ran || len(planner.overrides) != 1 || planner.overrides[0].Reason != "\u7dca\u6025\u4fee\u6b63" || !strings.Contains(out.String(), "Checking requested formulae and dependencies:") {
 		t.Fatal(code, out.String(), planner)
 	}
 }
