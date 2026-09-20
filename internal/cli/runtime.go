@@ -50,11 +50,11 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		return 1
 	}
 	if service == nil && len(rest) == 1 && rest[0] == "history" {
-		return showHistory(out, errOut, history)
+		return showHistory(out, errOut, history, true)
 	}
 	if service != nil && len(rest) == 1 && (rest[0] == "history" || rest[0] == "status") && len(overrides) == 0 {
 		if rest[0] == "history" && history != nil {
-			if showHistory(out, errOut, history) != 0 {
+			if showHistory(out, errOut, history, false) != 0 {
 				return 1
 			}
 		}

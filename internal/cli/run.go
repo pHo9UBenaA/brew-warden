@@ -45,7 +45,7 @@ func refuseUnavailable(rest []string, policy domain.Policy, stderr io.Writer, jo
 	return 1
 }
 
-func showHistory(stdout, stderr io.Writer, journal ports.History) int {
+func showHistory(stdout, stderr io.Writer, journal ports.History, showEmpty bool) int {
 	if journal == nil {
 		_, _ = fmt.Fprintln(stderr, "history_unavailable: no history source is configured.")
 		return 1
@@ -55,7 +55,7 @@ func showHistory(stdout, stderr io.Writer, journal ports.History) int {
 		_, _ = fmt.Fprintln(stderr, "history_unavailable: cannot validate the history records.")
 		return 1
 	}
-	if len(entries) == 0 {
+	if len(entries) == 0 && showEmpty {
 		if _, err := fmt.Fprintln(stdout, "No recorded requests."); err != nil {
 			return 1
 		}
