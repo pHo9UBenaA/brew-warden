@@ -33,7 +33,7 @@ type Candidate struct {
 type Collector struct{ client *http.Client }
 
 // New uses public GitHub REST without credentials, implicit helper installation,
-// retries, or cross-host redirects. Its timeout bounds the complete request.
+// retries, or API redirects. Source downloads permit only the explicit CDN hop.
 func New() *Collector {
 	return &Collector{client: &http.Client{
 		Timeout: 15 * time.Second,
@@ -43,41 +43,34 @@ func New() *Collector {
 	}}
 }
 
-// Collect returns both the typed claim and the exact response bytes whose hash
-// it records, so a caller can durably retain the observation before using it.
+// Collect returns the typed claim and exact observation bytes (API response or
+// source-verification envelope) for durable storage before using the claim.
 func (c *Collector) Collect(ctx context.Context, candidate Candidate, now int64) (domain.Evidence, []byte, error) {
 	api, tag, asset, err := mapping(candidate)
 	if c == nil || c.client == nil || ctx == nil || err != nil || now <= 0 || now > 1<<62 {
 		return domain.Evidence{}, nil, errors.New("publication candidate is unsupported")
 	}
-	req, err := http.NewRequestWithContext(ctx, http.MethodGet, api, nil)
-	if err != nil {
-		return domain.Evidence{}, nil, errors.New("cannot construct publication request")
-	}
-	req.Header.Set("Accept", "application/vnd.github+json")
-	req.Header.Set("X-GitHub-Api-Version", "2022-11-28")
-	req.Header.Set("Cache-Control", "no-cache")
-	req.Header.Set("User-Agent", "BrewWarden-publication-probe/1")
-	response, err := c.client.Do(req)
-	if err != nil {
-		return domain.Evidence{}, nil, errors.New("publication source unavailable")
-	}
-	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK {
-		return domain.Evidence{}, nil, errors.New("publication source returned an unsupported status")
-	}
-	data, err := io.ReadAll(io.LimitReader(response.Body, maxResponseBytes+1))
-	if err != nil {
-		return domain.Evidence{}, nil, errors.New("publication response incomplete")
-	}
-	published, err := publication(data, candidate, tag, asset, now)
+	ctx, cancel := context.WithTimeout(ctx, 45*time.Second)
+	defer cancel()
+	data, err := c.fetchRelease(ctx, api)
 	if err != nil {
 		return domain.Evidence{}, nil, err
 	}
+	binding, err := inspectPublication(data, candidate, tag, asset, now)
+	if err != nil {
+		return domain.Evidence{}, nil, err
+	}
+	if binding.Asset.Digest == "" {
+		data, err = c.bindDownloadedSource(ctx, api, candidate, tag, asset, now, binding, data)
+		if err != nil {
+			return domain.Evidence{}, nil, err
+		}
+	}
+	published := binding.Published
 	digest := sha256.Sum256(data)
 	evidence, err := domain.NewEvidence(domain.Evidence{
 		Claim: domain.Publication, Subject: candidate.Artifact, Status: domain.Verified,
-		Provider: domain.Supplement, Source: api, ProviderVersion: "github-rest-2022-11-28/publication-v1",
+		Provider: domain.Supplement, Source: api, ProviderVersion: "github-rest-2022-11-28/publication-v2",
 		RawSHA256: domain.Digest(hex.EncodeToString(digest[:])), ObservedAt: now,
 		ExpiresAt: now + freshnessSeconds, PublishedAt: published, Publication: domain.UpstreamPublication,
 	})
@@ -131,55 +124,74 @@ type assetDocument struct {
 	UpdatedAt string `json:"updated_at"`
 }
 
+type releaseBinding struct {
+	ReleaseID int64
+	Tag       string
+	Published int64
+	Asset     assetDocument
+}
+
+// A timestamp-only parser cannot establish a missing digest. Collect must fetch
+// the exact asset and recheck its publisher identity in that case.
 func publication(data []byte, candidate Candidate, tag, asset string, now int64) (int64, error) {
+	binding, err := inspectPublication(data, candidate, tag, asset, now)
+	if err != nil {
+		return 0, err
+	}
+	if binding.Asset.Digest == "" {
+		return 0, errors.New("publisher asset digest unavailable")
+	}
+	return binding.Published, nil
+}
+
+func inspectPublication(data []byte, candidate Candidate, tag, asset string, now int64) (releaseBinding, error) {
 	if len(data) > maxResponseBytes || !utf8.Valid(data) {
-		return 0, errors.New("publication response exceeds bounds")
+		return releaseBinding{}, errors.New("publication response exceeds bounds")
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.UseNumber()
 	if err := validateJSON(d, 0); err != nil {
-		return 0, err
+		return releaseBinding{}, err
 	}
 	if _, err := d.Token(); err != io.EOF {
-		return 0, errors.New("publication response has trailing values")
+		return releaseBinding{}, errors.New("publication response has trailing values")
 	}
 	var release releaseDocument
 	if err := exactObject(data, &release, "id", "tag_name", "draft", "prerelease", "published_at", "assets"); err != nil {
-		return 0, err
+		return releaseBinding{}, err
 	}
 	if release.ID <= 0 || release.Tag != tag || release.Draft == nil || *release.Draft || release.Prerelease == nil || *release.Prerelease {
-		return 0, errors.New("release is missing, unpublished or unsupported")
+		return releaseBinding{}, errors.New("release is missing, unpublished or unsupported")
 	}
 	published, err := timestamp(release.PublishedAt)
 	if err != nil || published > now {
-		return 0, errors.New("release publication time is unknown or future-dated")
+		return releaseBinding{}, errors.New("release publication time is unknown or future-dated")
 	}
 	matches := 0
+	var selected assetDocument
 	for _, raw := range release.Assets {
 		var a assetDocument
 		if err := exactObject(raw, &a, "id", "name", "browser_download_url", "digest", "state", "size", "created_at", "updated_at"); err != nil {
-			return 0, err
+			return releaseBinding{}, err
 		}
 		if a.Name != asset && a.URL != candidate.SourceURL {
 			continue
 		}
 		matches++
-		if a.Digest == "" {
-			return 0, errors.New("publisher asset digest unavailable")
+		if a.Digest != "" && a.Digest != "sha256:"+string(candidate.SourceSHA256) {
+			return releaseBinding{}, errors.New("publisher asset digest mismatch")
 		}
-		if a.Digest != "sha256:"+string(candidate.SourceSHA256) {
-			return 0, errors.New("publisher asset digest mismatch")
-		}
+		selected = a
 		created, e1 := timestamp(a.CreatedAt)
 		updated, e2 := timestamp(a.UpdatedAt)
 		if a.ID <= 0 || a.Name != asset || a.URL != candidate.SourceURL || a.State != "uploaded" || a.Size <= 0 || e1 != nil || e2 != nil || created > updated || updated > published {
-			return 0, errors.New("release asset identity, digest or publication binding is unresolved")
+			return releaseBinding{}, errors.New("release asset identity, digest or publication binding is unresolved")
 		}
 	}
 	if matches != 1 {
-		return 0, errors.New("release asset is missing or ambiguous")
+		return releaseBinding{}, errors.New("release asset is missing or ambiguous")
 	}
-	return published, nil
+	return releaseBinding{ReleaseID: release.ID, Tag: release.Tag, Published: published, Asset: selected}, nil
 }
 
 func timestamp(value string) (int64, error) {

@@ -100,3 +100,5 @@
 !/internal/adapters/localstate/attempts.go
 !/internal/adapters/localstate/attempts_test.go
 !/tests/execution_test.go
+!/internal/adapters/githubrelease/source.go
+!/internal/adapters/githubrelease/source_test.go

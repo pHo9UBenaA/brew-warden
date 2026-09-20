@@ -163,7 +163,9 @@ func TestLiveGitHubPublication(t *testing.T) {
 	missingDigest.Artifact.Rebuild = 0
 	missingDigest.SourceURL = "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
 	missingDigest.SourceSHA256 = "2a5cfc5ae259e4e97f86b68dfffc152cdaffe94e2060b770cb827238d769fc05"
-	if e, _, err := New().Collect(context.Background(), missingDigest, time.Now().Unix()); err == nil || err.Error() != "publisher asset digest unavailable" || e.Status != domain.Unassessed {
-		t.Fatalf("missing publisher asset digest must not verify: %+v %v", e, err)
+	if e, raw, err := New().Collect(context.Background(), missingDigest, time.Now().Unix()); err != nil || e.Status != domain.Verified || !strings.Contains(string(raw), "github-source-publication-v1") {
+		t.Fatalf("download-bound source publication failed: %+v %v", e, err)
+	} else {
+		t.Logf("verified downloaded source publication: source=%s published=%d raw_sha256=%s", e.Source, e.PublishedAt, e.RawSHA256)
 	}
 }

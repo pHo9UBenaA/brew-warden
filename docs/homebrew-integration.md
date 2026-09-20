@@ -74,8 +74,9 @@ do not treat a second verifier as a substitute for this binding.
 
 The [GitHub publication adapter](../internal/adapters/githubrelease/README.md)
 now implements a limited supplemental upstream-source publication claim. It
-requires an exact publisher asset digest matching the authenticated recipe;
-missing publication binding remains unknown. It does not date bottle rebuilds
+requires an exact publisher asset digest or an actual publisher download matching
+the authenticated recipe, with unchanged asset identity across a metadata recheck.
+Missing publication binding remains unknown. It does not date bottle rebuilds
 or enable product execution.
 
 ## Code and evidence ownership
