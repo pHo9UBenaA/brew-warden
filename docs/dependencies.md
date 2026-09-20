@@ -40,6 +40,15 @@ require strict validation. Use maintained parsers.
 Launch fixed executables with argument arrays, never shell-built commands.
 Constrain executable paths, options, environment, resource limits, and output.
 
+## Attestation runtime helper
+
+The [provenance adapter](../internal/adapters/attestation/README.md) delegates
+cryptography to a separately built, pinned upstream attestation command. Its
+module graph and native dependencies are part of the product trust surface even
+though the application module remains standard-library-only. The explicit build
+records checksums, module inventory, native links and repeatability. The helper
+is not silently installed, downloaded or updated during product execution.
+
 ## Release requirements
 
 Build fixed source with a supported pinned toolchain; record tool and dependency

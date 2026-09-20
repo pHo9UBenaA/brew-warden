@@ -41,7 +41,7 @@ touch "$probe_root/upgrade-started"
 run_brew remove-fixture-jq uninstall --formula jq
 run_brew install-old-jq install --formula --force-bottle "$probe_root/upgrade-inputs/$old_bottle"
 run_brew upgrade-before ruby "$probe_root/upgrade-acceptance.rb" "$probe_root" upgrade-before jq
-run_brew upgrade-frozen upgrade --formula --force-bottle homebrew/core/jq
+run_brew upgrade-frozen ruby "$probe_root/bound-probe.rb" "$probe_root" upgrade
 run_brew upgrade-after ruby "$probe_root/upgrade-acceptance.rb" "$probe_root" upgrade-after jq
 /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /usr/bin/env -i \
   "$probe_prefix/bin/jq" -n '"brewwarden" | test("^brew")' > "$probe_root/upgrade-smoke.stdout"

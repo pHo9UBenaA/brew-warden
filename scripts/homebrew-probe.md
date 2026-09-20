@@ -336,3 +336,21 @@ the original cache-substitution and immutable-byte negative controls.
 This is one real upgrade path with one unchanged dependency. It does not prove
 closure discovery for affected dependents, same-version rebuild upgrades,
 concurrent external mutations, or crash recovery. Product execution remains off.
+
+## Retained native locks
+
+The jq probe now runs verification and the native install/upgrade command in one
+Ruby process. `probe-homebrew-bound.rb` acquires the upstream formula locks in
+name order and registers them with `FormulaInstaller.locked`; native installers
+therefore reuse the session lock lifetime. No lock is released between candidate
+verification, installation and final state inspection. A separate real Homebrew
+Ruby process fails to acquire the target lock with `OperationInProgressError`.
+
+Verified in disposable VM acceptance-03 on 2026-09-20: both empty standard-prefix
+installation and jq 1.8.1 to 1.8.2 upgrade pass under retained locks, while the
+oniguruma file/mode/link snapshot remains unchanged. Evidence is retained under
+probe `brewwarden-probe.3mwiEaQB`. This is a pinned private-API contract for the
+previously identified Homebrew source, not a claim about arbitrary versions,
+unlocked package managers, affected dependents or the product CLI. Frozen inputs
+and offline installation remain required; holding formula locks alone does not
+freeze metadata or authenticate an artifact.

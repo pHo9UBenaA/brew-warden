@@ -60,6 +60,11 @@ The `osv` adapter owns mapped candidate advisory queries, pagination, exact-tag
 applicability, coverage controls and retained raw observations. Its transport
 and schema validation remain outside policy; unavailable coverage is never clean.
 
+The `attestation` adapter owns the pinned verifier process and exact subject /
+signer output contract. Its maintained cryptographic runtime is built separately
+and inventoried in [dependency rules](dependencies.md); it is not an exception
+allowing third-party imports into the pure policy or application layers.
+
 ## Homebrew boundary
 
 Keep Homebrew command/environment construction, output decoding, and version

@@ -183,12 +183,13 @@ if [ "$#" -gt 2 ]; then
     cp "$probe_root/inputs/$recipe.rb" "$core_dir/Formula/$letter/$recipe.rb"
   done
   cp "$script_dir/probe-homebrew-install.rb" "$probe_root/install-probe.rb"
+  cp "$script_dir/probe-homebrew-bound.rb" "$probe_root/bound-probe.rb"
   # Immutable inputs for the confined preflight and execution processes.
   cat >> "$probe_root/sandbox.sb" <<EOF
 (deny file-write* (subpath "$probe_root/inputs")
   (subpath "$probe_prefix/Library")
   (literal "$probe_root/formula.jws.json")
-  (literal "$probe_root/install-probe.rb"))
+  (literal "$probe_root/install-probe.rb") (literal "$probe_root/bound-probe.rb"))
 EOF
   if /usr/bin/sandbox-exec -f "$probe_root/sandbox.sb" /bin/sh -c 'echo changed >> "$1"' sh \
     "$probe_root/inputs/$bottle_name" 2> "$probe_root/immutable-input.stderr"; then
@@ -220,7 +221,11 @@ EOF
     printf 'Cache protection failed.\n' >&2
     exit 1
   fi
-  run_brew install-frozen install --formula --force-bottle "homebrew/core/$scenario"
+  if [ "$scenario" = jq ]; then
+    run_brew install-frozen ruby "$probe_root/bound-probe.rb" "$probe_root" install
+  else
+    run_brew install-frozen install --formula --force-bottle "homebrew/core/$scenario"
+  fi
   run_brew install-after ruby "$probe_root/install-probe.rb" "$probe_root" after "$scenario"
   if [ "$scenario" = hello ]; then
     bottle_name=hello--2.12.3.arm64_tahoe.bottle.1.tar.gz

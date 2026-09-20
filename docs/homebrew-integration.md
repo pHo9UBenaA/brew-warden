@@ -84,6 +84,11 @@ revision-aware lookups for explicitly unmodified mapped sources, with exact-tag
 findings and a positive project coverage control. Missing or incomplete coverage
 remains unknown. This does not enable product execution.
 
+The [provenance adapter](../internal/adapters/attestation/README.md) verifies each
+exact bottle with a pinned, maintained upstream verifier and checks its returned
+subject and signer identity. The separate runtime dependency and build inventory
+are explicit; native helper installation is not delegated to an unchecked brew.
+
 ## Code and evidence ownership
 
 Organize the Homebrew adapter by capability so command construction, parsing,

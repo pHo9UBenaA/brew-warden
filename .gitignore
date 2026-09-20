@@ -106,3 +106,11 @@
 !/internal/adapters/osv/json.go
 !/internal/adapters/osv/collect_test.go
 !/internal/adapters/osv/README.md
+!/scripts/probe-homebrew-bound.rb
+!/scripts/build-verifier.sh
+!/scripts/verifier-main.go.tmpl
+!/internal/adapters/attestation/verify.go
+!/internal/adapters/attestation/result.go
+!/internal/adapters/attestation/json.go
+!/internal/adapters/attestation/verify_test.go
+!/internal/adapters/attestation/README.md

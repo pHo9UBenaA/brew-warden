@@ -1,0 +1,19 @@
+package main
+import (
+ "fmt"
+ "net/http"
+ "os"
+ "time"
+ "github.com/cli/cli/v2/pkg/cmd/attestation/verify"
+ "github.com/cli/cli/v2/pkg/cmdutil"
+ "github.com/cli/cli/v2/pkg/iostreams"
+)
+func main() {
+ client := func() (*http.Client,error) { return &http.Client{Timeout:30*time.Second},nil }
+ factory := &cmdutil.Factory{IOStreams:iostreams.System(),HttpClient:client,ExternalHttpClient:client}
+ command := verify.NewVerifyCmd(factory,nil)
+ command.Version="BrewWarden verifier (GitHub CLI v2.101.0)"
+ command.SilenceUsage=true
+ command.SilenceErrors=true
+ if err := command.Execute();err!=nil {fmt.Fprintln(os.Stderr,err);os.Exit(1)}
+}
