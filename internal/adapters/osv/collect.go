@@ -29,7 +29,9 @@ type Candidate = ports.SourceCandidate
 type Collector struct{ client *http.Client }
 
 func New() *Collector {
-	return &Collector{client: &http.Client{Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("advisory redirects are unsupported") }}}
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
+	return &Collector{client: &http.Client{Transport: transport, Timeout: 15 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("advisory redirects are unsupported") }}}
 }
 
 type packageKey struct {

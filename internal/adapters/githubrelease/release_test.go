@@ -169,3 +169,9 @@ func TestLiveGitHubPublication(t *testing.T) {
 		t.Logf("verified downloaded source publication: source=%s published=%d raw_sha256=%s", e.Source, e.PublishedAt, e.RawSHA256)
 	}
 }
+
+func TestPublicCollectorDoesNotInheritProxy(t *testing.T) {
+	if New().client.Transport.(*http.Transport).Proxy != nil {
+		t.Fatal("ambient proxy inherited")
+	}
+}

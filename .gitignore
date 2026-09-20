@@ -132,3 +132,8 @@
 !/internal/adapters/homebrew/README.md
 !/internal/adapters/homebrew/payload.rb
 !/scripts/probe-homebrew-payload.rb
+!/internal/adapters/homebrew/download.go
+!/internal/adapters/homebrew/fetch.rb
+!/internal/adapters/homebrew/collect.go
+!/internal/adapters/homebrew/download_test.go
+!/tests/native_collection_test.go

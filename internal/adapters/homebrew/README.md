@@ -102,3 +102,29 @@ changed SBOM package identity and missing receipts, then verifies fixture
 restoration. Native candidate tests also reject declarative `post_install_steps`
 and service definitions before installation. Legacy `post_install` detection
 alone does not cover these native execution paths.
+
+## Live acquisition
+
+`Collector` now performs the complete acquisition sequence in a fresh private
+workspace: authenticate the signed API, fetch checksum-bound recipes at the exact
+tap commit, use native bottle fetching, copy and hash actual cached bytes, verify
+bundle subjects/signers, inspect native recipes/OCI closure, and collect publication
+and OSV claims. Provenance failure stops before embedded recipe evaluation.
+Every evidence item is checked against its candidate, claim, observation time,
+one-hour maximum validity and exact saved observation bytes.
+
+Metadata HTTP requests allow only explicit public origins, have bounded responses
+and deadlines, reject redirects and do not inherit proxy or credential settings.
+Attestation API envelopes reject duplicate/mis-cased duplicate fields; extracting a
+bundle is not verification. Native downloads remain in the private cache. The
+current product acquisition limit is 128 MiB per bottle. Required collection
+failures remain unavailable, including vulnerability lookup failures; a publication
+outage never becomes an invented date. Incomplete workspaces cannot create sessions.
+
+`TestLiveCandidateCollection` is explicitly enabled with
+`BREWWARDEN_LIVE_COLLECTION_RUNTIME`; it uses the concrete publication, OSV and
+provenance adapters against public endpoints. It has fetched the current jq and
+oniguruma closure and verified all five claims for each candidate without host
+Homebrew mutation. It retains its private workspace for examination. Normal tests
+remain offline and cover response bounds, forbidden destinations, ambiguous bundle
+envelopes, changed cached bytes and substituted saved observations.

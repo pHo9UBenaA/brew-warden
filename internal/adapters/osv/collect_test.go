@@ -236,3 +236,9 @@ func TestKnownFindingSurvivesIncompleteInventory(t *testing.T) {
 		t.Fatal(e, obs, err)
 	}
 }
+
+func TestPublicCollectorDoesNotInheritProxy(t *testing.T) {
+	if New().client.Transport.(*http.Transport).Proxy != nil {
+		t.Fatal("ambient proxy inherited")
+	}
+}

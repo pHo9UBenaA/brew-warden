@@ -32,8 +32,11 @@ type Collector struct{ client *http.Client }
 // New uses public GitHub REST without credentials, implicit helper installation,
 // retries, or API redirects. Source downloads permit only the explicit CDN hop.
 func New() *Collector {
+	transport := http.DefaultTransport.(*http.Transport).Clone()
+	transport.Proxy = nil
 	return &Collector{client: &http.Client{
-		Timeout: 15 * time.Second,
+		Timeout:   15 * time.Second,
+		Transport: transport,
 		CheckRedirect: func(*http.Request, []*http.Request) error {
 			return errors.New("publication redirects are unsupported")
 		},
