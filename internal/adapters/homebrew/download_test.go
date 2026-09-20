@@ -84,7 +84,7 @@ func TestDownloadedBytesAndObservationBinding(t *testing.T) {
 		t.Fatal(err)
 	}
 	file := filepath.Join(root, "cache/bottle")
-	original := []byte("verified bottle fixture")
+	original := bottleFixture(t)
 	if err := writeNew(file, original, 0600); err != nil {
 		t.Fatal(err)
 	}

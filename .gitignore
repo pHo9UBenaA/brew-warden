@@ -137,3 +137,10 @@
 !/internal/adapters/homebrew/collect.go
 !/internal/adapters/homebrew/download_test.go
 !/tests/native_collection_test.go
+!/internal/adapters/homebrew/session.go
+!/internal/adapters/homebrew/session.rb
+!/tests/native_execution_test.go
+!/internal/adapters/homebrew/session_test.go
+!/internal/adapters/homebrew/archive.go
+!/internal/adapters/homebrew/archive_test.go
+!/internal/adapters/homebrew/installer_guard.rb

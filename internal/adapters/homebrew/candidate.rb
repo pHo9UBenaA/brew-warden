@@ -71,24 +71,28 @@ class BrewWardenCandidate
 
   def validate_install_behavior(candidate)
     raise "unsupported post-install or service" if candidate.post_install_defined? || candidate.post_install_steps_defined? || candidate.class.service?
+    raise "unsupported shared link replacement" unless candidate.class.link_overwrite_paths.empty? && (candidate.link_overwrite_related_formula_names - [candidate.name, candidate.full_name]).empty?
     raise "unsupported patches or resources" unless candidate.patchlist.empty? && candidate.resources.empty?
   end
 
-  def match_installed
-    items.each do |name, item|
+  def match_installed(names = items.keys)
+    names.each do |name|
+      item = items.fetch(name)
       formula = formulae.fetch(name)
       prefix = HOMEBREW_CELLAR/name/formula.pkg_version.to_s
       raise "invalid candidate keg" unless prefix.directory? && !prefix.symlink? && prefix.realpath == prefix
       receipt = prefix/"INSTALL_RECEIPT.json"
       raise "candidate is not installed" unless receipt.file? && !receipt.symlink?
       tab = JSON.parse(receipt.read)
-      raise "source fallback detected" unless tab.fetch("poured_from_bottle") == true
+      raise "source fallback detected" unless tab.fetch("poured_from_bottle") == true && tab.fetch("built_as_bottle") == true
+      raise "installed source identity mismatch" unless tab.fetch("arch") == "arm64" && tab.fetch("used_options").empty? && tab.fetch("source").fetch("tap") == "homebrew/core" && tab.fetch("source").fetch("spec") == "stable" && tab.fetch("source").fetch("versions").fetch("stable") == item.fetch("version")
       dependencies = tab.fetch("runtime_dependencies").map { |dep| [dep.fetch("full_name"), dep.fetch("version"), dep.fetch("revision")] }.sort
       wanted = item.fetch("dependencies").map { |dep| [dep, items.fetch(dep).fetch("version"), items.fetch(dep).fetch("revision")] }.sort
       raise "installed runtime graph mismatch" unless dependencies == wanted
       embedded = Utils::Bottles.formula_contents(root/"inputs"/filename(item), name:)
       raise "installed recipe mismatch" unless (prefix/".brew/#{name}.rb").read == embedded
       raise "candidate not active" unless formula.opt_prefix.symlink? && formula.opt_prefix.realpath == prefix
+      raise "candidate is not linked" unless formula.keg_only? || formula.linked_keg.symlink? && formula.linked_keg.realpath == prefix
     end
     true
   end

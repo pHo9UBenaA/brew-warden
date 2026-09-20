@@ -146,6 +146,9 @@ func TestLiveNativeMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
+		if err := validateBottleArchive(data, candidate); err != nil {
+			t.Fatal(err)
+		}
 		if err := writeNew(filepath.Join(root, "inputs", filename), data, 0600); err != nil {
 			t.Fatal(err)
 		}
@@ -224,6 +227,31 @@ begin
   raise "service accepted"
 rescue RuntimeError => error
   raise unless error.message == "unsupported post-install or service"
+end
+formula.class.instance_variable_set(:@service_block, nil)
+formula.class.link_overwrite "bin/unplanned"
+begin
+  candidate.validate_install_behavior(formula)
+  raise "shared link replacement accepted"
+rescue RuntimeError => error
+  raise unless error.message == "unsupported shared link replacement"
+end
+require "formula_installer"
+require_relative "installer_guard"
+$brewwarden_session = Struct.new(:actions, :candidate).new([{name: "jq", operation: "install"}], candidate)
+FormulaInstaller.prepend(BrewWardenInstallerGuard)
+installer = FormulaInstaller.new(candidate.formulae.fetch("jq"), force_bottle: true)
+begin
+  installer.build
+  raise "source build guard bypassed"
+rescue RuntimeError => error
+  raise unless error.message == "native source fallback prohibited"
+end
+begin
+  FormulaInstaller.new(candidate.formulae.fetch("oniguruma"), force_bottle: true)
+  raise "unplanned dependency installer accepted"
+rescue RuntimeError => error
+  raise unless error.message == "unplanned native installer"
 end
 puts '{"sourceContract":"passed","installationHooks":"rejected"}'
 `

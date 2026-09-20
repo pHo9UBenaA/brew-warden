@@ -193,3 +193,24 @@ func writeNew(file string, data []byte, mode os.FileMode) error {
 	defer dir.Close()
 	return dir.Sync()
 }
+
+// A private workspace has one record writer. Publish complete bytes by rename;
+// readers never treat a pending file as a committed observation or plan.
+func writeRecord(file string, data []byte) error {
+	if _, err := os.Lstat(file); !errors.Is(err, os.ErrNotExist) {
+		return errors.New("record already exists or is inaccessible")
+	}
+	pending := file + ".pending"
+	if err := writeNew(pending, data, 0600); err != nil {
+		return err
+	}
+	if err := os.Rename(pending, file); err != nil {
+		return err
+	}
+	directory, err := os.Open(filepath.Dir(file))
+	if err != nil {
+		return err
+	}
+	defer directory.Close()
+	return directory.Sync()
+}

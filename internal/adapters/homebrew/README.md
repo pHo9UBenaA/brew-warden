@@ -128,3 +128,55 @@ oniguruma closure and verified all five claims for each candidate without host
 Homebrew mutation. It retains its private workspace for examination. Normal tests
 remain offline and cover response bounds, forbidden destinations, ambiguous bundle
 envelopes, changed cached bytes and substituted saved observations.
+
+## Retained native execution session
+
+The internal `Collection.Prepare` boundary now creates a session with upstream
+`FormulaLock` locks covering installed racks and every candidate. It snapshots
+candidate keg payloads, installed receipts and activation links. It refuses an
+unverified affected installed dependent before execution, unsupported installed
+identities, downgrades, pinned candidates and ambiguous/unlinked existing state.
+Existing candidate payloads must match native reconstruction; same-version
+replacement bottles therefore hold instead of being silently adopted.
+
+The persisted plan includes exact evidence, targets, dependency graph, actions,
+policy, runtime/environment, before-state, frozen inputs, expiry and attempt
+identity. Explicit age waivers bind to that complete plan and attempt. Collection
+inputs are inventoried when collection completes and compared again before
+planning. Every raw observation is included in the frozen inventory. The parent
+recomputes plan/input identities; the child revalidates input hashes, native
+candidates, expiry and installed state immediately before execution.
+
+Private atomic command/event files connect the Go workflow and the retained Ruby
+process. The child cannot modify its frozen recipes, bottles, observations, plan
+or seal, and installation has no network access. It expires while waiting for
+commands. Cancellation terminates the native process group; lost state events or
+missing durable result records remain unknown and require reconciliation.
+
+Execution calls the pinned `Homebrew::Install.install_formula` implementation in
+dependency order, retaining native dependency and installation checks. It does not
+invoke the broad install/upgrade command's opportunistic dependent scans. Required
+external dependent changes are held during planning. An installer guard rejects
+unplanned identities and source builds. Recipe checks reject service/post-install
+hooks, shared link replacement and unsupported dependency kinds. A bounded tar
+inventory additionally rejects paths/links outside the versioned keg, special or
+privileged files, duplicate entries and `.bottle` shared-prefix restoration.
+Native extraction, relocation, linking, receipts and SBOM generation remain
+Homebrew's implementation.
+
+`TestLiveNativeExecution` requires an explicit runtime in a disposable VirtualMac.
+It has demonstrated complete public evidence acquisition, lock exclusion against
+a separate native process, fresh jq/oniguruma installation, jq 1.8.1 -> 1.8.2
+upgrade with byte-for-byte unchanged oniguruma, and durable success records through
+the real application workflow. A too-young policy holds without any attempt start
+or installed-state change. An explicit per-artifact age exception still cannot
+execute a substituted bottle. The public CLI remains disabled until its wiring
+and remaining release/recovery boundaries are completed.
+
+The application has also completed a real upgrade with per-artifact age waivers
+and an otherwise impossible age threshold. A VM fixture with an installed external
+dependent confirms that the affected-dependent hold occurs before any package
+change. Source-build and unplanned-installer guards are exercised against the
+real native installer in an isolated read-only-host test. Before/after state
+snapshots are retained as content-addressed JSON; plans and observations are
+published only after file synchronization and atomic rename.

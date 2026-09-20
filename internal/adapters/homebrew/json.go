@@ -60,6 +60,9 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int) error {
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
 			name := strings.Split(f.Tag.Get("json"), ",")[0]
+			if name == "" && f.PkgPath == "" {
+				name = f.Name
+			}
 			if name != "" && name != "-" {
 				fields[name] = f.Type
 			}
@@ -87,7 +90,10 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int) error {
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
 			name := strings.Split(field.Tag.Get("json"), ",")[0]
-			if field.Tag.Get("required") == "true" && !seen[name] {
+			if name == "" && field.PkgPath == "" {
+				name = field.Name
+			}
+			if (field.Tag.Get("required") == "true" || field.Tag.Get("json") == "" && field.PkgPath == "") && !seen[name] {
 				return errors.New("missing required JSON field")
 			}
 		}

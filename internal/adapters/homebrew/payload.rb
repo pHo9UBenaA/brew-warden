@@ -11,6 +11,22 @@ module BrewWardenPayload
   MAX_FILES = 100_000
   MAX_BYTES = 2 * 1024 * 1024 * 1024
 
+  def self.store_snapshot(root, value)
+    data = JSON.generate(value)
+    raise "state snapshot exceeds limit" if data.bytesize > 8 * 1024 * 1024
+    digest = Digest::SHA256.hexdigest(data)
+    file = root/"states/#{digest}.json"
+    if file.exist? || file.symlink?
+      raise "saved state snapshot changed" unless file.file? && !file.symlink? && file.size == data.bytesize && file.binread == data
+    else
+      pending = Pathname("#{file}.pending")
+      pending.open(File::WRONLY | File::CREAT | File::EXCL, 0o600) { |output| output.write(data); output.fsync }
+      pending.rename(file)
+      file.dirname.open { |directory| directory.fsync }
+    end
+    digest
+  end
+
   def self.inventory(root)
     raise "invalid keg root" unless root.directory? && !root.symlink? && root.realpath == root
     rows = {}

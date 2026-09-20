@@ -32,6 +32,7 @@ type Collection struct {
 	nodes         []domain.Node
 	observedAt    int64
 	runtimeDigest domain.Digest
+	frozen        []frozenInput
 }
 type downloadEntry struct {
 	Name string `json:"name" required:"true"`
@@ -65,6 +66,10 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 	if err := c.collect(ctx, result, request); err != nil {
 		// Preserve incomplete inputs for diagnosis. They cannot become a session.
 		return nil, fmt.Errorf("candidate collection stopped: %w", err)
+	}
+	result.frozen, err = (workspace{result.root}).freezeInputs(result.inputs)
+	if err != nil {
+		return nil, err
 	}
 	return result, nil
 }
@@ -271,6 +276,9 @@ func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error
 		if digestBytes(data) != candidates[i].BottleSHA256 {
 			return errors.New("candidate bottle checksum mismatch")
 		}
+		if err := validateBottleArchive(data, candidates[i]); err != nil {
+			return err
+		}
 		if err := writeNew(filepath.Join(w.root, "inputs", nativeBottleName(candidates[i])), data, 0600); err != nil {
 			return err
 		}
@@ -295,7 +303,7 @@ func (w workspace) rawObservation(raw []byte) error {
 		}
 		return nil
 	}
-	return writeNew(file, raw, 0600)
+	return writeRecord(file, raw)
 }
 
 // Evidence returns a detached diagnostic view, never an execution permit.

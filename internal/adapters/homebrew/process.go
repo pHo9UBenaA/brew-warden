@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb fetch.rb
+//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb fetch.rb session.rb installer_guard.rb
 var nativeScripts embed.FS
 
 type workspace struct{ root string }
@@ -22,7 +22,7 @@ func (w workspace) environment() []string {
 	return []string{"HOME=" + filepath.Join(w.root, "home"), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TMPDIR=" + filepath.Join(w.root, "tmp"), "XDG_CONFIG_HOME=" + filepath.Join(w.root, "home/config"), "HOMEBREW_CACHE=" + filepath.Join(w.root, "cache"), "HOMEBREW_LOGS=" + filepath.Join(w.root, "logs"), "HOMEBREW_TEMP=" + filepath.Join(w.root, "tmp"), "HOMEBREW_NO_AUTO_UPDATE=1", "HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_INSTALL_FROM_API=1", "HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_COLOR=1", "HOMEBREW_DEVELOPER=1", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_AUTOREMOVE=1", "HOMEBREW_NO_BOOTSNAP=1", "TZ=UTC"}
 }
 func (w workspace) initialize() error {
-	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations"} {
+	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations", "states"} {
 		if err := os.Mkdir(filepath.Join(w.root, name), 0700); err != nil {
 			return err
 		}
