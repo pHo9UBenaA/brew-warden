@@ -78,7 +78,7 @@ claim live network coverage.
 Run the explicit real-service integration separately:
 
 ```sh
-BREWWARDEN_LIVE_GITHUB=1 go test -v ./internal/adapters/githubrelease -run '^TestLiveGitHubPublication$' -count=1
+BREWWARDEN_LIVE_GITHUB=1 go test -v ./internal/adapters/githubrelease -run '^TestLive' -count=1
 ```
 
 Observed: `jq 1.8.2` source digest
@@ -93,3 +93,8 @@ digests; only successful byte verification plus metadata revalidation supplies
 the additional evidence. Mismatched bytes, short/long downloads, changed assets,
 changed releases, source errors and failed rechecks are refusal cases. These observations do not establish clean advisory results or product
 execution readiness for either candidate.
+
+The additional publisher case verifies c-ares 1.34.8 against its exact source
+asset and checksum. Its live observation on 2026-09-20 established upstream
+publication time 1783440964. This exercises general source-URL mapping; native
+recipe eligibility and installation acceptance are separate checks.

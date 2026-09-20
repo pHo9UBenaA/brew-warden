@@ -170,6 +170,25 @@ func TestLiveGitHubPublication(t *testing.T) {
 	}
 }
 
+// Provider verification is independent of native recipe and execution eligibility.
+func TestLiveAdditionalPublisher(t *testing.T) {
+	if os.Getenv("BREWWARDEN_LIVE_GITHUB") != "1" {
+		t.Skip("requires explicit public-network integration run")
+	}
+	input := candidate()
+	input.Artifact.Name = "c-ares"
+	input.Artifact.Version = "1.34.8"
+	input.Artifact.Rebuild = 0
+	input.Artifact.SHA256 = "44bcc2e67b97daa265e168281875129161ddbbc964ab16ec0db1846c289cc376"
+	input.SourceURL = "https://github.com/c-ares/c-ares/releases/download/v1.34.8/c-ares-1.34.8.tar.gz"
+	input.SourceSHA256 = "c222b6d681096f9444d2c4863d2c1174019e27cacca0a4a5c114d36dd7d7bf78"
+	e, _, err := New().Collect(context.Background(), input, time.Now().Unix())
+	if err != nil || e.Status != domain.Verified || e.Subject != input.Artifact {
+		t.Fatal(e, err)
+	}
+	t.Logf("%s: publication=%d observation=%s", input.Artifact.Name, e.PublishedAt, e.RawSHA256)
+}
+
 func TestPublicCollectorDoesNotInheritProxy(t *testing.T) {
 	if New().client.Transport.(*http.Transport).Proxy != nil {
 		t.Fatal("ambient proxy inherited")
