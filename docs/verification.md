@@ -11,7 +11,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, attempt-record, publication-response, advisory-record and provenance-result parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, attempt-record, publication-response, advisory-record and provenance-result and native-metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |

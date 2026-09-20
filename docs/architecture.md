@@ -74,6 +74,13 @@ effects in separate adapters and compose them outside; keep additional pure rule
 in the core. Follow [Homebrew integration](homebrew-integration.md) for the required
 capability records and contract tests. Do not create placeholder abstractions.
 
+The `homebrew` adapter owns the native runtime inventory, signed-metadata bridge,
+private process environment and candidate inspection. `ports.SourceCandidate`
+connects authenticated source identity to independent publication and advisory
+collectors; providers remain outside policy and do not import one another.
+`tools/runtime-pack` is an explicit build-only native dependency packager, not
+a product bootstrap path or an exemption for external application imports.
+
 ## Enforcement
 
 `go run ./tools/repo-check architecture` parses every repository `.go` file,

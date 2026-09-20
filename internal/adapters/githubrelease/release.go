@@ -16,6 +16,7 @@ import (
 	"unicode/utf8"
 
 	"brewwarden/internal/domain"
+	"brewwarden/internal/ports"
 )
 
 const maxResponseBytes = 1024 * 1024
@@ -24,11 +25,7 @@ const freshnessSeconds int64 = 3600
 // Candidate must come from authenticated Homebrew metadata and its authenticated
 // recipe. This adapter does not establish that prerequisite, bottle integrity,
 // provenance, vulnerability eligibility, or permission to execute a plan.
-type Candidate struct {
-	Artifact     domain.Artifact
-	SourceURL    string
-	SourceSHA256 domain.Digest
-}
+type Candidate = ports.SourceCandidate
 
 type Collector struct{ client *http.Client }
 

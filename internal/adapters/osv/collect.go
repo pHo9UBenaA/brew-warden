@@ -17,21 +17,14 @@ import (
 	"time"
 
 	"brewwarden/internal/domain"
+	"brewwarden/internal/ports"
 )
 
 const maxResponse = 2 * 1024 * 1024
 const maxObservation = 16 * 1024 * 1024
 const maxFindings = 128
 
-type Candidate struct {
-	Artifact     domain.Artifact
-	SourceURL    string
-	SourceSHA256 domain.Digest
-	RecipeSHA256 domain.Digest
-	// Must be established from the authenticated recipe, not inferred from a
-	// missing patch response. False includes both patched and unassessed sources.
-	UnmodifiedSource bool
-}
+type Candidate = ports.SourceCandidate
 
 type Collector struct{ client *http.Client }
 

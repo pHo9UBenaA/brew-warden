@@ -60,6 +60,8 @@ case "$1" in
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     go test ./internal/adapters/attestation -run='^$' -fuzz='^FuzzVerifiedSubject$' \
       -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+    go test ./internal/adapters/homebrew -run='^$' -fuzz='^FuzzNativeMetadata$' \
+      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
     ;;
   lint)
     require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"

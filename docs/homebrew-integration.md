@@ -89,6 +89,11 @@ exact bottle with a pinned, maintained upstream verifier and checks its returned
 subject and signer identity. The separate runtime dependency and build inventory
 are explicit; native helper installation is not delegated to an unchecked brew.
 
+The [native Homebrew adapter](../internal/adapters/homebrew/README.md) now owns
+private runtime materialization, native metadata authentication and strict
+candidate/recipe/OCI closure inspection. Collection creates download locks only
+inside its private prefix. Product mutation wiring is still unavailable.
+
 ## Code and evidence ownership
 
 Organize the Homebrew adapter by capability so command construction, parsing,
