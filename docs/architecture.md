@@ -44,8 +44,9 @@ The product packages include the two entrypoints, composition, diagnostic CLI,
 pure domain evaluator, and an application execution workflow. The workflow
 revalidates a bound session, evaluates policy, durably consumes an attempt before
 launch and records actual exit/state facts. The local-state attempt journal
-provides immutable transitions and replay rejection. No Homebrew executor is
-registered in composition yet; there is no unchecked pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
+provides immutable transitions and replay rejection. Distribution builds register the concrete pinned Homebrew engine. Development
+builds without a trusted runtime digest remain diagnostic-only. There is no
+unchecked pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
 the adapter owning local JSON schemas and filesystem access. Domain acceptance tests live under `tests` and provide
 explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
@@ -54,7 +55,7 @@ applications would not strengthen the design.
 The `githubrelease` adapter owns exact publisher mappings, bounded public HTTP
 requests, release-response validation and upstream publication observations.
 It returns typed evidence plus the exact raw bytes for eventual durable storage.
-The diagnostic CLI does not instantiate it or treat it as execution permission.
+Composition supplies it to the candidate collector; its claim alone is never execution permission.
 
 The `osv` adapter owns mapped candidate advisory queries, pagination, exact-tag
 applicability, coverage controls and retained raw observations. Its transport
@@ -105,3 +106,11 @@ tests together. Tests must demonstrate valid wiring and forbidden reverse edges
 using existing target packages. Core tests use supplied evidence and ports;
 adapter tests separately exercise actual I/O contracts. Integration tests belong
 under tests when they need multiple concrete layers.
+
+The application service blocks planning while any attempt is unresolved, presents
+exact candidate identities before execution, and reconciles interrupted attempts
+through a separate observation port. The native recovery adapter acquires the
+original candidate locks before observing retained state; it cannot mark a lost
+process successful. CLI code owns argument parsing and presentation, including
+per-artifact age reasons. Composition selects the bundled runtime by a build-time
+digest and constructs all real providers, the journal and the clock.

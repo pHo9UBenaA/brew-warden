@@ -92,7 +92,9 @@ are explicit; native helper installation is not delegated to an unchecked brew.
 The [native Homebrew adapter](../internal/adapters/homebrew/README.md) now owns
 private runtime materialization, native metadata authentication and strict
 candidate/recipe/OCI closure inspection. Collection creates download locks only
-inside its private prefix. Product mutation wiring is still unavailable.
+inside its private prefix. The native session executes the frozen closure under retained Homebrew locks.
+Distribution builds wire this demonstrated path through the durable application
+workflow; builds without a trusted runtime digest remain diagnostic-only.
 
 ## Code and evidence ownership
 
@@ -124,3 +126,14 @@ versions must not silently produce successful evidence. Make unsupported
 capabilities visible through `doctor`; fail only operations requiring those
 capabilities. Retire redundant BrewWarden checks when an upstream improvement
 satisfies their complete contract and equivalent tests pass.
+
+### Reconciliation
+
+The pinned `FormulaLock` implementation provides nonblocking cross-process
+exclusion for each candidate formula. Reconciliation uses fresh trusted scripts
+and runtime bytes, reacquires every original candidate lock, inventories the
+actual candidate racks and activation links, and retains the snapshot by digest.
+An active original session prevents observation. This records current state only;
+it does not rerun installers, signal remembered process IDs, infer an exit code,
+restore exceptions, or roll back installed packages. The application appends a
+`reconciled` journal transition and requires a new plan for further mutations.

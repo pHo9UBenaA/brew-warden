@@ -10,6 +10,7 @@ import (
 )
 
 type Execution struct {
+	NoChanges bool
 	Decision  domain.Decision
 	Outcome   domain.AttemptOutcome
 	ExitKnown bool

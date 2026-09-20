@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb fetch.rb session.rb installer_guard.rb
+//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb fetch.rb session.rb installer_guard.rb reconcile.rb
 var nativeScripts embed.FS
 
 type workspace struct{ root string }

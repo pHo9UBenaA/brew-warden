@@ -96,7 +96,7 @@ func Evaluate(a Assessment) Decision {
 			return d
 		}
 		for _, w := range e.Waivers {
-			if !validLabel(w.Reason) || waivers[w.Artifact] || !slices.ContainsFunc(a.Nodes, func(n Node) bool { return n.Artifact == w.Artifact }) {
+			if !ValidAgeReason(w.Reason) || waivers[w.Artifact] || !slices.ContainsFunc(a.Nodes, func(n Node) bool { return n.Artifact == w.Artifact }) {
 				add(Hold, "age_exception_invalid", w.Artifact, Publication)
 				return d
 			}

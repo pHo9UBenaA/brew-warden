@@ -144,3 +144,14 @@
 !/internal/adapters/homebrew/archive.go
 !/internal/adapters/homebrew/archive_test.go
 !/internal/adapters/homebrew/installer_guard.rb
+!/internal/ports/planning.go
+!/internal/application/service.go
+!/internal/adapters/homebrew/engine.go
+!/internal/adapters/homebrew/recovery.go
+!/internal/adapters/homebrew/reconcile.rb
+!/internal/cli/runtime.go
+!/tests/service_test.go
+!/tools/release-pack/
+!/tools/release-pack/main.go
+!/LICENSE
+!/tools/release-pack/main_test.go

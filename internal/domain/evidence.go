@@ -4,6 +4,8 @@ import (
 	"errors"
 	"regexp"
 	"strings"
+	"unicode"
+	"unicode/utf8"
 )
 
 type Digest string
@@ -118,6 +120,19 @@ func validLabel(s string) bool {
 	}
 	for _, c := range s {
 		if c < 32 || c > 126 {
+			return false
+		}
+	}
+	return true
+}
+
+// ValidAgeReason permits human explanations without terminal control characters.
+func ValidAgeReason(s string) bool {
+	if len(s) > 512 || !utf8.ValidString(s) || strings.TrimSpace(s) == "" {
+		return false
+	}
+	for _, r := range s {
+		if !unicode.IsPrint(r) {
 			return false
 		}
 	}

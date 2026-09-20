@@ -108,7 +108,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	}
 	fault := os.Getenv("BREWWARDEN_VM_FAULT")
 	switch fault {
-	case "", "age", "age-exception", "changed-input", "exception-changed-input", "affected-dependent":
+	case "", "age", "age-exception", "changed-input", "exception-changed-input", "affected-dependent", "recovery":
 	default:
 		t.Fatal("unsupported VM fault")
 	}
@@ -188,6 +188,32 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 	}
 	journal := localstate.Journal{Path: filepath.Join(directory, "attempts")}
+	if fault == "recovery" {
+		if err := journal.StartAttempt(domain.AttemptStart{Binding: prepared.Assessment.Binding, BeforeState: prepared.BeforeState, StartedAt: time.Now().Unix()}); err != nil {
+			t.Fatal(err)
+		}
+		engine := homebrew.Engine{Collector: &collector}
+		service := application.Service{Journal: journal, Recovery: engine, Clock: nativeClock{}}
+		if err := service.Reconcile(context.Background(), prepared.Assessment.Binding.Attempt); err == nil {
+			t.Fatal("reconciled while original session still held native locks")
+		}
+		if err := session.Close(); err != nil {
+			t.Fatal(err)
+		}
+		if err := service.Reconcile(context.Background(), prepared.Assessment.Binding.Attempt); err != nil {
+			t.Fatal(err)
+		}
+		records, err := journal.Attempts()
+		if err != nil || len(records) != 1 || records[0].Unresolved() || records[0].Finish.Outcome != domain.AttemptReconciled || records[0].Finish.ExitKnown {
+			t.Fatal(records, err)
+		}
+		after, err := kegSnapshot("/opt/homebrew/Cellar")
+		if err != nil || after != completeBefore {
+			t.Fatal("recovery changed packages", err)
+		}
+		t.Log("native active-lock refusal and stopped-session reconciliation verified")
+		return
+	}
 	result, err := application.Execute(context.Background(), prepared, session, journal, nativeClock{})
 	if fault == "changed-input" || fault == "exception-changed-input" || fault == "age" {
 		if err == nil {
