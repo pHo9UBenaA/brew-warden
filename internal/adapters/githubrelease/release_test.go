@@ -97,13 +97,13 @@ func TestUnsupportedCandidateNeverRequests(t *testing.T) {
 		return nil, errors.New("unexpected request")
 	})
 	for _, mutate := range []func(*Candidate){
-		func(c *Candidate) { c.Artifact.Name = "unknown" },
+		func(c *Candidate) { c.Artifact.Name = "../invalid" },
 		func(c *Candidate) { c.SourceURL += "?redirect=attacker" },
 		func(c *Candidate) {
-			c.SourceURL = "https://github.com/attacker/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
+			c.SourceURL = "https://github.com.attacker.example/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz"
 		},
 		func(c *Candidate) { c.SourceSHA256 = "" },
-		func(c *Candidate) { c.Artifact.Version = "1:2" },
+		func(c *Candidate) { c.SourceURL = strings.Replace(c.SourceURL, "jq-1.8.2/", "%2e%2e/", 1) },
 	} {
 		input := candidate()
 		mutate(&input)
@@ -173,5 +173,45 @@ func TestLiveGitHubPublication(t *testing.T) {
 func TestPublicCollectorDoesNotInheritProxy(t *testing.T) {
 	if New().client.Transport.(*http.Transport).Proxy != nil {
 		t.Fatal("ambient proxy inherited")
+	}
+}
+
+// A formula need not share its publisher's repository name or tag convention.
+func TestPublicationUsesAuthenticatedSourceIdentity(t *testing.T) {
+	input := candidate()
+	input.Artifact.Name = "different-formula"
+	input.Artifact.Version = "2026.09"
+	input.SourceURL = "https://github.com/Publisher/Project/releases/download/release-2026.09/source.tar.gz"
+	document := strings.NewReplacer(candidate().SourceURL, input.SourceURL, "jq-1.8.2.tar.gz", "source.tar.gz", "jq-1.8.2", "release-2026.09").Replace(validRelease)
+	c := New()
+	c.client.Transport = roundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.URL.String() != "https://api.github.com/repos/Publisher/Project/releases/tags/release-2026.09" {
+			t.Fatalf("wrong publisher endpoint: %s", r.URL)
+		}
+		return &http.Response{StatusCode: 200, Body: io.NopCloser(strings.NewReader(document)), Header: make(http.Header)}, nil
+	})
+	e, _, err := c.Collect(context.Background(), input, observed)
+	if err != nil || e.Status != domain.Verified || e.Subject != input.Artifact {
+		t.Fatalf("general source identity rejected: %+v %v", e, err)
+	}
+}
+
+func TestPublicationRejectsAmbiguousSourceURLs(t *testing.T) {
+	for _, source := range []string{
+		"http://github.com/o/r/releases/download/v1/a.tar.gz",
+		"https://github.com:443/o/r/releases/download/v1/a.tar.gz",
+		"https://user@github.com/o/r/releases/download/v1/a.tar.gz",
+		"https://github.com/o/r/releases/download/../a.tar.gz",
+		"https://github.com/o/r/releases/download/v1/a.tar.gz#fragment",
+		"https://github.com/o/r/releases/download/v1/a%2ftar.gz",
+		"https://github.com/o/r/releases/download/v1/a.tar.gz/extra",
+		"https://github.com/o/r/archive/refs/tags/v1.tar.gz",
+		"https://github.com//r/releases/download/v1/a.tar.gz",
+	} {
+		input := candidate()
+		input.SourceURL = source
+		if _, _, _, err := mapping(input); err == nil {
+			t.Errorf("ambiguous source accepted: %s", source)
+		}
 	}
 }

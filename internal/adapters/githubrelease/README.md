@@ -3,7 +3,7 @@
 Capability: `github.release.source-publication.v2`. This adapter supplies only
 upstream publication evidence. It does not verify Homebrew metadata or bottles,
 query vulnerabilities, establish execution binding, or permit installation. The
-product CLI does not call it yet; mutations remain unavailable.
+distribution CLI consumes this claim as one part of complete-plan verification.
 
 ## Delegation and scope
 
@@ -17,10 +17,12 @@ contracts. The request explicitly selects API version `2022-11-28`, which was
 verified against the live service on 2026-09-20.
 
 Candidate identity, source URL and source checksum must come from authenticated
-Homebrew metadata and its authenticated recipe. Currently only the exact
-`jq` → `jqlang/jq` and `oniguruma` → `kkos/oniguruma` source-release mappings are
-recognized. Unsupported names, URLs, version formats, API redirects and repository
-moves fail. A source download may follow exactly one HTTPS redirect to the
+Homebrew metadata and its authenticated recipe. The canonical source URL identifies the owner, repository, tag and asset; no
+formula-name registry or assumed version-to-tag convention is used. Only HTTPS
+`github.com/OWNER/REPO/releases/download/TAG/ASSET` paths with nonempty ASCII
+letters, digits, dots, underscores, hyphens or plus signs in each component are
+supported. Dot traversal, encoded components, credentials, ports, queries,
+fragments, API redirects and repository moves fail. A source download may follow exactly one HTTPS redirect to the
 GitHub release-asset CDN and its release-asset path class. Other hosts, ports,
 credentials, protocols, paths and additional redirects are refused. No fuzzy repository search, HTML parsing, credentials, gh installation,
 or process execution occurs. Transport and JSON parsing use the Go standard
@@ -41,7 +43,7 @@ Unrelated new API fields remain compatible.
 
 ## Trust and evidence
 
-The claim relies on the explicitly mapped publisher, GitHub's release/asset
+The claim relies on the publisher identified by the authenticated recipe, GitHub's release/asset
 metadata, HTTPS and the OS trust roots. It is not a cryptographic signature over
 the publication date or proof against a compromised publisher/GitHub. The exact
 source checksum links the dated source asset to the authenticated recipe; separate
@@ -68,7 +70,8 @@ claim is not authorization. No fallback cache or silent retry is implemented.
 
 Unit/transport-contract tests cover exact requests, digest/URL mismatches,
 unpublished/future/replaced assets, malformed and ambiguous JSON, redirects,
-HTTP errors, cancellation and unsupported mappings. The public-response parser
+HTTP errors, cancellation and unsupported URL forms. A transport test covers a formula whose name, version,
+repository, tag and asset follow different conventions. The public-response parser
 also has an active fuzz target. Transport substitution in unit tests does not
 claim live network coverage.
 

@@ -84,24 +84,23 @@ func mapping(c Candidate) (api, tag, asset string, err error) {
 	if !c.Artifact.Valid() || !c.SourceSHA256.Valid() {
 		return "", "", "", errors.New("invalid candidate")
 	}
-	var repository string
-	switch c.Artifact.Name {
-	case "jq":
-		repository, tag, asset = "jqlang/jq", "jq-"+c.Artifact.Version, "jq-"+c.Artifact.Version+".tar.gz"
-	case "oniguruma":
-		repository, tag, asset = "kkos/oniguruma", "v"+c.Artifact.Version, "onig-"+c.Artifact.Version+".tar.gz"
-	default:
-		return "", "", "", errors.New("unsupported publisher mapping")
+	// The authenticated recipe, not the formula name, identifies its publisher.
+	// Accept canonical release-asset URLs only. Keeping path components literal
+	// avoids encoded separators, dot traversal and endpoint/query injection.
+	const prefix = "https://github.com/"
+	if !strings.HasPrefix(c.SourceURL, prefix) || len(c.SourceURL) > 2048 {
+		return "", "", "", errors.New("unsupported publisher source")
 	}
-	// Versions used in URL paths are deliberately narrower than Artifact's
-	// generic version grammar. No escaping, repository inference or fuzzy match.
-	if strings.Trim(c.Artifact.Version, "0123456789.") != "" || len(strings.Split(c.Artifact.Version, ".")) != 3 || strings.HasPrefix(c.Artifact.Version, ".") || strings.HasSuffix(c.Artifact.Version, ".") || strings.Contains(c.Artifact.Version, "..") {
-		return "", "", "", errors.New("unsupported publication version")
+	parts := strings.Split(strings.TrimPrefix(c.SourceURL, prefix), "/")
+	if len(parts) != 6 || parts[2] != "releases" || parts[3] != "download" {
+		return "", "", "", errors.New("unsupported release asset path")
 	}
-	if c.SourceURL != "https://github.com/"+repository+"/releases/download/"+tag+"/"+asset {
-		return "", "", "", errors.New("publisher source mismatch")
+	for _, part := range []string{parts[0], parts[1], parts[4], parts[5]} {
+		if part == "" || part == "." || part == ".." || strings.Trim(part, "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789._-+") != "" {
+			return "", "", "", errors.New("unsupported release asset component")
+		}
 	}
-	return "https://api.github.com/repos/" + repository + "/releases/tags/" + tag, tag, asset, nil
+	return "https://api.github.com/repos/" + parts[0] + "/" + parts[1] + "/releases/tags/" + parts[4], parts[4], parts[5], nil
 }
 
 type releaseDocument struct {
