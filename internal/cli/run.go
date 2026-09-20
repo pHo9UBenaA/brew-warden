@@ -2,9 +2,9 @@
 package cli
 
 import (
+	"context"
 	"fmt"
 	"io"
-	"strconv"
 	"strings"
 	"time"
 
@@ -28,49 +28,12 @@ func RunWithConfig(args []string, stdout, stderr io.Writer, source ports.ConfigS
 }
 
 func RunWithServices(args []string, stdout, stderr io.Writer, source ports.ConfigSource, journal ports.History) int {
-	if len(args) == 1 && args[0] == "--version" {
-		if _, err := fmt.Fprintln(stdout, "BrewWarden "+Version); err != nil {
-			return 1
-		}
-		return 0
-	}
-	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		if _, err := fmt.Fprintln(stdout, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted bundled execution runtime."); err != nil {
-			return 1
-		}
-		return 0
-	}
-	location, override, rest, err := options(args)
-	if err != nil {
-		_, _ = fmt.Fprintln(stderr, "invocation_invalid: "+err.Error())
-		return 1
-	}
-	// History must remain available even when policy configuration is invalid.
-	if len(rest) == 1 && rest[0] == "history" {
-		return showHistory(stdout, stderr, journal)
-	}
-	policy := domain.DefaultPolicy()
-	if source != nil {
-		policy, err = source.LoadConfig(location)
-	} else if location != "" {
-		err = fmt.Errorf("configuration source is unavailable")
-	}
-	if err == nil && override != nil {
-		policy, err = domain.NewPolicy(*override)
-	}
-	if err != nil || !policy.Valid() {
-		_, _ = fmt.Fprintln(stderr, "configuration_invalid: cannot load a valid policy; check the configuration schema, permissions and values.")
-		return 1
-	}
-	if len(rest) == 1 && rest[0] == "doctor" {
-		_, _ = fmt.Fprintln(stderr, "minimum_release_age_seconds: "+strconv.FormatInt(policy.MinimumAgeSeconds(), 10))
-		_, _ = fmt.Fprintln(stderr, executionUnavailable)
-		_, _ = fmt.Fprintln(stderr, "No live Homebrew checks were run. This build cannot establish a trusted runtime.")
-		return 1
-	}
-	// Reject the entire invocation, including unsupported options, aliases,
-	// nested commands and apparently read-only brew operations. Do not echo
-	// untrusted tokens into the terminal or consume a child's --help.
+	return RunWithRuntime(context.Background(), args, stdout, stderr, source, journal, nil)
+}
+
+// A missing runtime is a capability failure within the common CLI, never a
+// fallback to a native process. Keep legacy refusal records readable/writable.
+func refuseUnavailable(rest []string, policy domain.Policy, stderr io.Writer, journal ports.History) int {
 	_, _ = fmt.Fprintln(stderr, executionUnavailable)
 	if journal != nil && len(rest) >= 2 && rest[0] == "brew" && domain.ValidRequest(rest[1], rest[2:]) {
 		if id, err := journal.RecordRefusal(rest[1], rest[2:], policy); err != nil {

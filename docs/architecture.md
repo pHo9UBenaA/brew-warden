@@ -40,8 +40,10 @@ a clock port belongs to the application boundary. Adapters do not import use
 cases or other adapters. Share a real semantic contract inward, or compose
 separate adapters outside, instead of creating an adapter utility bucket.
 
-The product packages include the two entrypoints, composition, execution/diagnostic CLI,
-pure domain evaluator, and an application execution workflow. The workflow
+The two entrypoints share one CLI routing and configuration path through
+composition. A missing trusted runtime disables execution within that path; it
+does not select a separate command parser. Pure domain decisions and application
+workflows remain independent of CLI presentation. The workflow
 revalidates a bound session, evaluates policy, durably consumes an attempt before
 launch and records actual exit/state facts. The local-state attempt journal
 provides immutable transitions and replay rejection. Distribution builds register the concrete pinned Homebrew engine. Development

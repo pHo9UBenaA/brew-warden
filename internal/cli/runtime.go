@@ -14,30 +14,45 @@ import (
 // RunWithRuntime keeps wrapper options separate from literal Homebrew arguments.
 // A missing trusted distribution continues to use the diagnostic-only interface.
 func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, history ports.History, service *application.Service) int {
-	if service == nil {
-		return RunWithServices(args, out, errOut, source, history)
-	}
-	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: official jq and oniguruma bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
-		if err != nil {
+	if len(args) == 1 && args[0] == "--version" {
+		if _, err := fmt.Fprintln(out, "BrewWarden "+Version); err != nil {
 			return 1
 		}
 		return 0
 	}
-	if len(args) == 1 && args[0] == "--version" {
-		return RunWithServices(args, out, errOut, source, history)
+	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
+		if service == nil {
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted bundled execution runtime.")
+			if err != nil {
+				return 1
+			}
+		} else {
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: official jq and oniguruma bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
+			if err != nil {
+				return 1
+			}
+		}
+		return 0
 	}
-	filtered, overrides, err := ageOptions(args)
-	if err != nil {
-		_, _ = fmt.Fprintln(errOut, "invocation_invalid: invalid or duplicate age exception.")
-		return 1
+	filtered := args
+	var overrides []ports.AgeOverride
+	var err error
+	if service != nil {
+		filtered, overrides, err = ageOptions(args)
+		if err != nil {
+			_, _ = fmt.Fprintln(errOut, "invocation_invalid: invalid or duplicate age exception.")
+			return 1
+		}
 	}
 	location, age, rest, err := options(filtered)
 	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "invocation_invalid: "+err.Error())
 		return 1
 	}
-	if len(rest) == 1 && (rest[0] == "history" || rest[0] == "status") && len(overrides) == 0 {
+	if service == nil && len(rest) == 1 && rest[0] == "history" {
+		return showHistory(out, errOut, history)
+	}
+	if service != nil && len(rest) == 1 && (rest[0] == "history" || rest[0] == "status") && len(overrides) == 0 {
 		if rest[0] == "history" && history != nil {
 			if showHistory(out, errOut, history) != 0 {
 				return 1
@@ -45,7 +60,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		}
 		return showAttempts(out, errOut, service.Journal, rest[0] == "status")
 	}
-	if (len(rest) == 1 || len(rest) == 2) && rest[0] == "reconcile" && len(overrides) == 0 {
+	if service != nil && (len(rest) == 1 || len(rest) == 2) && rest[0] == "reconcile" && len(overrides) == 0 {
 		var id domain.Digest
 		if len(rest) == 2 {
 			id = domain.Digest(rest[1])
@@ -72,6 +87,13 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	if err != nil || !policy.Valid() {
 		_, _ = fmt.Fprintln(errOut, "configuration_invalid: cannot load a valid policy.")
 		return 1
+	}
+	if service == nil {
+		if len(rest) == 1 && rest[0] == "doctor" {
+			_, _ = fmt.Fprintf(errOut, "minimum_release_age_seconds: %d\n%s\nNo live Homebrew checks were run. This build cannot establish a trusted runtime.\n", policy.MinimumAgeSeconds(), executionUnavailable)
+			return 1
+		}
+		return refuseUnavailable(rest, policy, errOut, history)
 	}
 	if len(rest) == 1 && rest[0] == "doctor" && len(overrides) == 0 {
 		if service.Diagnostics == nil {
