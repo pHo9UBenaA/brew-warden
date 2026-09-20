@@ -13,7 +13,8 @@ Apple Silicon, and the pinned [attestation helper](../attestation/README.md).
 verifier archive/file digests, and inventories all regular files and symlinks.
 It refuses unsafe archive paths, hard links, symlink parents and duplicate files.
 This is an explicit build tool, never an implicit product download or host brew
-installation. Runtime licensing and distribution packaging remain release work.
+installation. The distribution packager retains licenses, inventories linked helper modules,
+and reproduces the complete archive; publication/signing remains a separate action.
 
 The distribution selects the runtime-manifest SHA-256. Materialization validates
 its exact schema, version, path inventory and file hashes, rejects extra inputs,
