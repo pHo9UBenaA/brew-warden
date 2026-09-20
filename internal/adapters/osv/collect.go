@@ -23,6 +23,8 @@ import (
 const maxResponse = 2 * 1024 * 1024
 const maxObservation = 16 * 1024 * 1024
 const maxFindings = 128
+const maxCoverageReferences = 1024
+const maxCoverageRecords = 8
 
 type Candidate = ports.SourceCandidate
 
@@ -40,7 +42,7 @@ type packageKey struct {
 }
 type query struct {
 	Package   packageKey `json:"package"`
-	Version   string     `json:"version"`
+	Version   string     `json:"version,omitempty"`
 	PageToken string     `json:"page_token,omitempty"`
 }
 type reference struct {
@@ -67,51 +69,41 @@ type observation struct {
 var identifier = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9._:-]{0,127}$`)
 var version = regexp.MustCompile(`^(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)$`)
 
-func mapping(c Candidate) (repo, tag, witnessTag, witnessID string, err error) {
-	if !c.Artifact.Valid() || c.Artifact.Revision != 0 || !c.UnmodifiedSource || !c.SourceSHA256.Valid() || !c.RecipeSHA256.Valid() || !version.MatchString(c.Artifact.Version) {
-		return "", "", "", "", errors.New("candidate source or revision mapping is unsupported")
+// Source identity comes from the authenticated recipe, never a name search.
+var sourceRelease = regexp.MustCompile(`^https://github\.com/([A-Za-z0-9_.+-]+)/([A-Za-z0-9_.+-]+)/releases/download/([A-Za-z0-9_.+-]+)/([A-Za-z0-9_.+-]+)$`)
+
+func mapping(c Candidate) (repo, tag string, err error) {
+	if !c.Artifact.Valid() || c.Artifact.Revision != 0 || !c.UnmodifiedSource || !c.SourceSHA256.Valid() || !c.RecipeSHA256.Valid() || len(c.SourceURL) > 2048 {
+		return "", "", errors.New("candidate source or revision mapping is unsupported")
 	}
-	var asset string
-	switch c.Artifact.Name {
-	case "jq":
-		repo, tag, asset, witnessTag, witnessID = "https://github.com/jqlang/jq", "jq-"+c.Artifact.Version, "jq-"+c.Artifact.Version+".tar.gz", "jq-1.7.1", "CVE-2024-23337"
-	case "oniguruma":
-		repo, tag, asset, witnessTag, witnessID = "https://github.com/kkos/oniguruma", "v"+c.Artifact.Version, "onig-"+c.Artifact.Version+".tar.gz", "v6.9.2", "CVE-2019-13224"
-	default:
-		return "", "", "", "", errors.New("unsupported advisory source mapping")
+	parts := sourceRelease.FindStringSubmatch(c.SourceURL)
+	if len(parts) != 5 {
+		return "", "", errors.New("unsupported advisory source mapping")
 	}
-	if c.SourceURL != repo+"/releases/download/"+tag+"/"+asset {
-		return "", "", "", "", errors.New("advisory source identity mismatch")
+	for _, part := range parts[1:] {
+		if part == "." || part == ".." {
+			return "", "", errors.New("ambiguous advisory source identity")
+		}
 	}
-	return repo, tag, witnessTag, witnessID, nil
+	return "https://github.com/" + parts[1] + "/" + parts[2], parts[3], nil
 }
 
 func (c *Collector) Collect(ctx context.Context, candidate Candidate, now int64) (domain.Evidence, []byte, error) {
-	repo, tag, witnessTag, witnessID, err := mapping(candidate)
+	repo, tag, err := mapping(candidate)
 	if c == nil || c.client == nil || ctx == nil || err != nil || now <= 0 || now > 1<<62 {
 		return domain.Evidence{}, nil, errors.New("advisory candidate is unsupported")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 60*time.Second)
 	defer cancel()
-	obs := observation{Schema: "osv-git-candidate-v1", SourceSHA256: candidate.SourceSHA256, RecipeSHA256: candidate.RecipeSHA256, Queries: []exchange{}, Records: []json.RawMessage{}}
-	queries := []query{{Package: packageKey{repo, "GIT"}, Version: tag}, {Package: packageKey{repo, "GIT"}, Version: witnessTag}}
+	obs := observation{Schema: "osv-git-candidate-v2", SourceSHA256: candidate.SourceSHA256, RecipeSHA256: candidate.RecipeSHA256, Queries: []exchange{}, Records: []json.RawMessage{}}
+	queries := []query{{Package: packageKey{repo, "GIT"}, Version: tag}, {Package: packageKey{repo, "GIT"}}}
 	refs, err := c.queryAll(ctx, queries, &obs, now)
 	if err != nil {
 		return domain.Evidence{}, nil, err
 	}
-	witness, ok := refs[1][witnessID]
-	if !ok {
-		return domain.Evidence{}, nil, errors.New("advisory project coverage control is unavailable")
-	}
-	witnessData, err := c.request(ctx, http.MethodGet, "https://api.osv.dev/v1/vulns/"+witnessID, nil)
-	if err != nil {
+	if err := c.verifyCoverage(ctx, refs[1], repo, &obs, now); err != nil {
 		return domain.Evidence{}, nil, err
 	}
-	affected, withdrawn, err := record(witnessData, witness, repo, witnessTag, now)
-	if err != nil || !affected || withdrawn {
-		return domain.Evidence{}, nil, errors.New("advisory project coverage control is unverified")
-	}
-	obs.Records = append(obs.Records, json.RawMessage(witnessData))
 	applicability := domain.NoKnownApplicableFindings
 	ids := make([]string, 0, len(refs[0]))
 	for id := range refs[0] {
@@ -147,8 +139,37 @@ func (c *Collector) Collect(ctx context.Context, candidate Candidate, now int64)
 		return domain.Evidence{}, nil, errors.New("cannot retain complete advisory observation")
 	}
 	sum := sha256.Sum256(data)
-	evidence, err := domain.NewEvidence(domain.Evidence{Claim: domain.Vulnerabilities, Subject: candidate.Artifact, Status: domain.Verified, Provider: domain.Supplement, Source: "https://api.osv.dev/v1/querybatch", ProviderVersion: "osv-v1/git-candidate-v1", RawSHA256: domain.Digest(hex.EncodeToString(sum[:])), ObservedAt: now, ExpiresAt: now + 3600, Applicability: applicability})
+	evidence, err := domain.NewEvidence(domain.Evidence{Claim: domain.Vulnerabilities, Subject: candidate.Artifact, Status: domain.Verified, Provider: domain.Supplement, Source: "https://api.osv.dev/v1/querybatch", ProviderVersion: "osv-v1/git-candidate-v2", RawSHA256: domain.Digest(hex.EncodeToString(sum[:])), ObservedAt: now, ExpiresAt: now + 3600, Applicability: applicability})
 	return evidence, data, err
+}
+
+// A complete versionless repository query discovers a positive coverage control.
+// One valid non-withdrawn record with explicit affected tags proves that the
+// provider covers this repository. It does not prove database completeness.
+func (c *Collector) verifyCoverage(ctx context.Context, refs map[string]reference, repo string, obs *observation, now int64) error {
+	ids := make([]string, 0, len(refs))
+	for id := range refs {
+		ids = append(ids, id)
+	}
+	slices.Sort(ids)
+	if len(ids) > maxCoverageRecords {
+		ids = ids[:maxCoverageRecords]
+	}
+	for _, id := range ids {
+		data, err := c.request(ctx, http.MethodGet, "https://api.osv.dev/v1/vulns/"+id, nil)
+		if err != nil {
+			return err
+		}
+		obs.Records = append(obs.Records, json.RawMessage(data))
+		if observationSize(*obs) > maxObservation {
+			return errors.New("advisory observation exceeds limit")
+		}
+		covered, withdrawn, err := record(data, refs[id], repo, "", now)
+		if err == nil && covered && !withdrawn {
+			return nil
+		}
+	}
+	return errors.New("advisory project coverage is unverified")
 }
 
 func observationSize(o observation) int {
@@ -221,7 +242,11 @@ func (c *Collector) queryAll(ctx context.Context, queries []query, obs *observat
 					return nil, errors.New("advisory changed during pagination")
 				}
 				results[index][ref.ID] = ref
-				if len(results[index]) > maxFindings {
+				limit := maxFindings
+				if queries[index].Version == "" {
+					limit = maxCoverageReferences
+				}
+				if len(results[index]) > limit {
 					return nil, errors.New("advisory inventory exceeds limit")
 				}
 			}
@@ -333,11 +358,12 @@ func record(data []byte, ref reference, repo, tag string, now int64) (affected, 
 			if !introduced {
 				return false, false, errors.New("incomplete advisory range")
 			}
-			// Only explicit affected tags establish applicability. GIT event
+			// An empty requested tag is used only to establish project coverage.
+			// Only explicit affected tags establish candidate applicability. GIT event
 			// order is not necessarily linear (for example, cherry-picked fixes).
 			// Never infer that a tag is unaffected from these ranges.
 			matched = true
-			if slices.Contains(a.Versions, tag) {
+			if slices.Contains(a.Versions, tag) && tag != "" || tag == "" && slices.ContainsFunc(a.Versions, func(v string) bool { return v != "" }) {
 				affected = true
 			}
 		}

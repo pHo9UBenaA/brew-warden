@@ -45,7 +45,7 @@ func collectorFixture(t *testing.T, candidateRefs string, candidateRecord string
 			var body struct {
 				Queries []query `json:"queries"`
 			}
-			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Queries) != 2 || body.Queries[0].Package.Name != "https://github.com/jqlang/jq" || body.Queries[0].Version != "jq-1.8.2" || body.Queries[1].Version != "jq-1.7.1" {
+			if err := json.NewDecoder(r.Body).Decode(&body); err != nil || len(body.Queries) != 2 || body.Queries[0].Package.Name != "https://github.com/jqlang/jq" || body.Queries[0].Version != "jq-1.8.2" || body.Queries[1].Version != "" {
 				t.Fatal("wrong query identity", body, err)
 			}
 			return response(`{"results":[` + candidateRefs + `,{"vulns":[` + referenceJSON("CVE-2024-23337") + `]}]}`), nil
@@ -146,7 +146,9 @@ func TestPaginationMustFinishForEachQuery(t *testing.T) {
 }
 
 func TestUnsupportedMappingAndSourceFailures(t *testing.T) {
-	for _, mutate := range []func(*Candidate){func(c *Candidate) { c.Artifact.Revision = 1 }, func(c *Candidate) { c.UnmodifiedSource = false }, func(c *Candidate) { c.SourceURL += "?redirect=elsewhere" }, func(c *Candidate) { c.RecipeSHA256 = "" }, func(c *Candidate) { c.Artifact.Version = "01.8.2" }, func(c *Candidate) { c.Artifact.Name = "unmapped" }} {
+	for _, mutate := range []func(*Candidate){func(c *Candidate) { c.Artifact.Revision = 1 }, func(c *Candidate) { c.UnmodifiedSource = false }, func(c *Candidate) { c.SourceURL += "?redirect=elsewhere" }, func(c *Candidate) { c.RecipeSHA256 = "" }, func(c *Candidate) { c.SourceURL = strings.Replace(c.SourceURL, "jq-1.8.2/", "../", 1) }, func(c *Candidate) {
+		c.SourceURL = strings.Replace(c.SourceURL, "github.com/", "github.com.attacker/", 1)
+	}} {
 		input := candidateFixture()
 		mutate(&input)
 		c := New()
@@ -198,7 +200,17 @@ func TestLiveOSVCandidates(t *testing.T) {
 	onig.SourceURL = "https://github.com/kkos/oniguruma/releases/download/v6.9.10/onig-6.9.10.tar.gz"
 	onig.SourceSHA256 = "2a5cfc5ae259e4e97f86b68dfffc152cdaffe94e2060b770cb827238d769fc05"
 	onig.RecipeSHA256 = "2656eda555be128035d8dcf82bb04d094f96b06b7f5dd1b65f967bc76aa0b1c3"
-	for _, candidate := range []Candidate{jq, onig} {
+	cares := jq
+	cares.Artifact.Name = "c-ares"
+	cares.Artifact.Version = "1.34.8"
+	cares.Artifact.Rebuild = 0
+	cares.Artifact.SHA256 = "44bcc2e67b97daa265e168281875129161ddbbc964ab16ec0db1846c289cc376"
+	cares.SourceURL = "https://github.com/c-ares/c-ares/releases/download/v1.34.8/c-ares-1.34.8.tar.gz"
+	cares.SourceSHA256 = "c222b6d681096f9444d2c4863d2c1174019e27cacca0a4a5c114d36dd7d7bf78"
+	cares.RecipeSHA256 = "fdcab3038af1e615e42157bcda8145db6581e4d24cde38e2de2c3901300bc4d4"
+	// Provider-boundary fixtures assert the caller's source precondition.
+	// This test alone does not validate recipes or enable native execution.
+	for _, candidate := range []Candidate{jq, onig, cares} {
 		e, _, err := New().Collect(context.Background(), candidate, time.Now().Unix())
 		if err != nil || e.Status != domain.Verified || e.Applicability != domain.NoKnownApplicableFindings {
 			t.Fatal(candidate.Artifact.Name, e, err)
@@ -240,5 +252,55 @@ func TestKnownFindingSurvivesIncompleteInventory(t *testing.T) {
 func TestPublicCollectorDoesNotInheritProxy(t *testing.T) {
 	if New().client.Transport.(*http.Transport).Proxy != nil {
 		t.Fatal("ambient proxy inherited")
+	}
+}
+
+func TestCoverageUsesAuthenticatedRepositoryWithoutFormulaRegistry(t *testing.T) {
+	input := candidateFixture()
+	input.Artifact.Name = "another-formula"
+	input.Artifact.Version = "2026.09"
+	input.SourceURL = "https://github.com/example/project/releases/download/release-2026.09/source.tar.gz"
+	c := New()
+	c.client.Transport = roundTrip(func(r *http.Request) (*http.Response, error) {
+		if r.Method == http.MethodPost {
+			data, _ := io.ReadAll(r.Body)
+			var body struct {
+				Queries []query `json:"queries"`
+			}
+			if err := json.Unmarshal(data, &body); err != nil || len(body.Queries) != 2 || body.Queries[0].Package.Name != "https://github.com/example/project" || body.Queries[0].Version != "release-2026.09" || body.Queries[1].Package != body.Queries[0].Package || body.Queries[1].Version != "" {
+				t.Fatalf("incorrect generic identity: %s", data)
+			}
+			if strings.Count(string(data), `"version"`) != 1 {
+				t.Fatal("coverage query sent an empty version")
+			}
+			return response(`{"results":[{},{"vulns":[` + referenceJSON("CVE-2026-EXAMPLE") + `]}]}`), nil
+		}
+		return response(strings.ReplaceAll(recordJSON("CVE-2026-EXAMPLE", "old-release"), "jqlang/jq", "example/project")), nil
+	})
+	e, _, err := c.Collect(context.Background(), input, now)
+	if err != nil || e.Applicability != domain.NoKnownApplicableFindings || e.Subject != input.Artifact {
+		t.Fatal(e, err)
+	}
+}
+
+func TestCoverageRequiresPositiveRepositoryRecord(t *testing.T) {
+	valid := recordJSON("CVE-2024-23337", "jq-1.7.1")
+	for _, data := range []string{
+		strings.Replace(valid, "jqlang/jq", "other/project", 1),
+		strings.Replace(valid, `"jq-1.7.1"`, `""`, 1),
+		strings.Replace(valid, `"affected":`, `"withdrawn":"2026-08-11T00:00:00Z","affected":`, 1),
+		strings.Replace(valid, modified, "2026-08-13T00:00:00Z", 1),
+	} {
+		c := collectorFixture(t, `{}`, "")
+		base := c.client.Transport
+		c.client.Transport = roundTrip(func(r *http.Request) (*http.Response, error) {
+			if r.Method == http.MethodGet {
+				return response(data), nil
+			}
+			return base.RoundTrip(r)
+		})
+		if e, _, err := c.Collect(context.Background(), candidateFixture(), now); err == nil || e.Status == domain.Verified {
+			t.Fatal("invalid coverage became clean", e, err)
+		}
 	}
 }

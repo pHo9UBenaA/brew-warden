@@ -1,7 +1,9 @@
 # Candidate advisory observations
 
-Capability: `osv.git-candidate.v1`. The collector supplies vulnerability evidence
-for authenticated, explicitly unmodified revision-zero jq and oniguruma sources.
+Capability: `osv.git-candidate.v2`. The collector supplies vulnerability evidence
+for authenticated, explicitly unmodified revision-zero sources distributed as
+canonical GitHub release assets. The authenticated source URL supplies the
+repository and tag, independently of the formula name or version convention.
 Composition connects it to the complete candidate collector and execution workflow. Unknown mappings, patches, revisions
 and incomplete responses hold; they never fall back to a clean result.
 
@@ -28,9 +30,13 @@ both a last-known affected commit and a later fix; explicit affected tags still
 establish positive findings. Ranges are structurally checked, not used to prove
 absence of a vulnerability. Unsupported schema major versions hold.
 
-A second query for a known affected project tag must return its expected advisory
-and a matching, non-withdrawn full record. This positive control detects absent
-project coverage. It does not prove database completeness or that every newly
+A second, versionless query discovers the repository's advisory references.
+After completing pagination, the collector checks at most eight records in
+lexical ID order for a structurally valid, non-withdrawn Git range for the exact
+repository with at least one explicit affected tag. No built-in formula, tag or
+advisory-ID registry is required. Missing coverage, exhausted discovery bounds
+or failed requests hold; an empty candidate response alone never passes. This
+positive control detects absent project coverage. It does not prove database completeness or that every newly
 published vulnerability has been ingested. A complete supported candidate lookup
 with no findings means only `NoKnownApplicableFindings`, never that code is safe.
 A known finding remains affected even if another record is unavailable; its raw
@@ -46,7 +52,7 @@ cannot be future-dated or newer than the record modification. Unknown/corrupt
 fields used for decisions, duplicate keys, ambiguous casing and invalid JSON fail.
 
 Each response is bounded to 2 MiB, the retained observation to 16 MiB, each query
-to 128 records and eight pages. Pagination retains query-slot identity and rejects
+to 128 candidate references or 1,024 coverage references and eight pages. Pagination retains query-slot identity and rejects
 repeated tokens. Requests have 15-second deadlines under a 60-second total budget.
 The one-hour evidence validity window bounds reuse, not database ingestion delay.
 The observation retains requests, responses, full records, candidate checksums
@@ -55,7 +61,9 @@ and completeness, and its exact bytes are hashed for durable storage by the call
 Tests cover pagination, incomplete/ambiguous records, source mapping, patched
 revisions, withdrawals, HTTP failures, limits and fuzzed parser inputs. Explicit
 live checks use `BREWWARDEN_LIVE_OSV=1 go test -v ./internal/adapters/osv -run
-'^TestLiveOSVCandidates$' -count=1`. On 2026-09-20, jq 1.8.2 and oniguruma 6.9.10
-both returned complete supported lookups with no known applicable findings and
+'^TestLiveOSVCandidates$' -count=1`. On 2026-09-20, jq 1.8.2, oniguruma 6.9.10 and c-ares 1.34.8
+returned complete supported lookups with no known applicable findings and
 verified positive project controls. This result is time-dependent and does not
-establish execution permission by itself.
+establish execution permission by itself. The c-ares provider fixture asserts the
+source-inspection precondition; it does not establish native recipe eligibility
+or installation acceptance.
