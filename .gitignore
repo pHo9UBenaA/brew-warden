@@ -130,3 +130,5 @@
 !/internal/adapters/homebrew/metadata_test.go
 !/internal/adapters/homebrew/source.rb
 !/internal/adapters/homebrew/README.md
+!/internal/adapters/homebrew/payload.rb
+!/scripts/probe-homebrew-payload.rb

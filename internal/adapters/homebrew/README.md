@@ -73,3 +73,32 @@ standard prefix while retaining private source paths. A disposable VM has verifi
 that private source can upgrade the standard prefix under retained native locks.
 The product must additionally bind persisted evidence, the complete action plan,
 state and attempt lifecycle before exposing that path as a CLI command.
+
+## Existing keg payload binding
+
+`payload.rb` reconstructs a verified bottle in a private directory using native
+checksum verification, extraction, placeholder relocation and Mach-O fixing. It
+compares every actual file, directory mode and symlink against that reconstruction,
+including additional or missing entries. Inspection uses the exact versioned
+Cellar directory: Homebrew's `Formula#prefix` may instead return an `opt` symlink,
+which filesystem traversal would not follow. Candidate activation must resolve
+to the expected versioned directory.
+
+Homebrew generates the receipt and changes SBOM creation metadata at installation.
+The receipt requires separate candidate identity/dependency checks; it is never
+used as proof of payload bytes. SBOM reconstruction delegates to native
+`SBOM.update_pour_metadata` with the observed, bounded installation timestamp and
+creator, plus the selected bottle's supplement. All remaining SBOM bytes must
+match. An observed creator is not provenance evidence. Absolute symlinks requiring
+build-prefix relocation are unsupported. Reconstruction redirects a pinned Keg
+instance's payload path while retaining its native identity and relocation code;
+this private API requires renewed acceptance on Homebrew upgrades.
+
+The developer-only `scripts/probe-homebrew-payload.rb` requires a disposable
+VirtualMac at the standard prefix. In the existing acceptance VM, both jq and
+oniguruma match their verified, reconstructed payloads. For each package it
+rejects altered executable bytes, added/missing files, changed permissions,
+changed SBOM package identity and missing receipts, then verifies fixture
+restoration. Native candidate tests also reject declarative `post_install_steps`
+and service definitions before installation. Legacy `post_install` detection
+alone does not cover these native execution paths.

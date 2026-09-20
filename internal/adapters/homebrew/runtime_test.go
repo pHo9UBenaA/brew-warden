@@ -196,6 +196,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	}
 	t.Log("inspected authenticated current and embedded recipes with exact OCI closure", digestBytes(inspected))
 	contract := `require_relative "source"
+require_relative "candidate"
 root = Pathname(ARGV.fetch(0))
 text = (root/"runtime/brew/Library/Taps/homebrew/homebrew-core/Formula/j/jq.rb").read
 raise "baseline unrecognized" unless BrewWardenSource.reviewed?("jq", text)
@@ -205,7 +206,26 @@ raise "build transformation accepted" if BrewWardenSource.reviewed?("jq", text.s
 raise "new arguments accepted" if BrewWardenSource.reviewed?("jq", text.sub('"--disable-maintainer-mode"', '"--enable-maintainer-mode"'))
 raise "ambiguous method accepted" if BrewWardenSource.reviewed?("jq", text + "\nclass Other; def install; end; end\n")
 raise "invalid syntax accepted" if BrewWardenSource.reviewed?("jq", text + "\ndef")
-puts '{"sourceContract":"passed"}'
+candidate = BrewWardenCandidate.new(root)
+formula = candidate.formulae.fetch("jq")
+candidate.validate_install_behavior(formula)
+formula = Class.new(formula.class).allocate
+formula.class.post_install_steps { mkdir_p "brewwarden-must-not-run", base: :var }
+begin
+  candidate.validate_install_behavior(formula)
+  raise "declarative post-install accepted"
+rescue RuntimeError => error
+  raise unless error.message == "unsupported post-install or service"
+end
+formula.class.instance_variable_set(:@post_install_steps_defined, false)
+formula.class.service { run ["/usr/bin/false"] }
+begin
+  candidate.validate_install_behavior(formula)
+  raise "service accepted"
+rescue RuntimeError => error
+  raise unless error.message == "unsupported post-install or service"
+end
+puts '{"sourceContract":"passed","installationHooks":"rejected"}'
 `
 	if err := writeNew(filepath.Join(root, "source-contract.rb"), []byte(contract), 0600); err != nil {
 		t.Fatal(err)

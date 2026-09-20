@@ -48,7 +48,7 @@ class BrewWardenCandidate
         raise "candidate identity mismatch" unless candidate.name == name && candidate.version.to_s == item.fetch("version") && candidate.revision == item.fetch("revision")
         raise "source identity mismatch" unless candidate.stable.url == item.fetch("sourceURL") && candidate.stable.checksum.hexdigest == item.fetch("sourceSHA256")
         raise "unsupported requirements or options" unless candidate.requirements.empty? && candidate.options.empty?
-        raise "unsupported post-install or patches" if candidate.post_install_defined? || !candidate.patchlist.empty? || !candidate.resources.empty?
+        validate_install_behavior(candidate)
         raise "unsupported migration or conflict" unless candidate.oldnames.empty? && candidate.conflicts.empty?
         raise "unsupported dependency kind" if candidate.deps.any? { |dep| dep.test? || dep.optional? || dep.recommended? }
         raise "runtime graph changed" unless candidate.deps.reject(&:build?).map(&:name).sort == item.fetch("dependencies").sort
@@ -69,10 +69,17 @@ class BrewWardenCandidate
     end
   end
 
+  def validate_install_behavior(candidate)
+    raise "unsupported post-install or service" if candidate.post_install_defined? || candidate.post_install_steps_defined? || candidate.class.service?
+    raise "unsupported patches or resources" unless candidate.patchlist.empty? && candidate.resources.empty?
+  end
+
   def match_installed
     items.each do |name, item|
       formula = formulae.fetch(name)
-      receipt = formula.prefix/"INSTALL_RECEIPT.json"
+      prefix = HOMEBREW_CELLAR/name/formula.pkg_version.to_s
+      raise "invalid candidate keg" unless prefix.directory? && !prefix.symlink? && prefix.realpath == prefix
+      receipt = prefix/"INSTALL_RECEIPT.json"
       raise "candidate is not installed" unless receipt.file? && !receipt.symlink?
       tab = JSON.parse(receipt.read)
       raise "source fallback detected" unless tab.fetch("poured_from_bottle") == true
@@ -80,8 +87,8 @@ class BrewWardenCandidate
       wanted = item.fetch("dependencies").map { |dep| [dep, items.fetch(dep).fetch("version"), items.fetch(dep).fetch("revision")] }.sort
       raise "installed runtime graph mismatch" unless dependencies == wanted
       embedded = Utils::Bottles.formula_contents(root/"inputs"/filename(item), name:)
-      raise "installed recipe mismatch" unless (formula.prefix/".brew/#{name}.rb").read == embedded
-      raise "candidate not active" unless formula.opt_prefix.realpath == formula.prefix.realpath
+      raise "installed recipe mismatch" unless (prefix/".brew/#{name}.rb").read == embedded
+      raise "candidate not active" unless formula.opt_prefix.symlink? && formula.opt_prefix.realpath == prefix
     end
     true
   end
