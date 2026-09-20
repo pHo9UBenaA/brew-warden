@@ -83,12 +83,13 @@ If execution is interrupted or its outcome cannot be durably established,
 `status` reports an unresolved attempt and new installations stop:
 
 ```sh
-bwd reconcile ATTEMPT_ID
+bwd reconcile
 bwd status
 ```
 
-Reconciliation reacquires native candidate locks and records observed state. It
-cannot run while the original session holds those locks. It neither claims the
+The command selects the sole unresolved attempt. An explicit `ATTEMPT_ID` remains
+accepted for diagnostics. Reconciliation reacquires native candidate locks and
+records observed state. It cannot run while the original session holds those locks. It neither claims the
 lost process succeeded nor undoes installation. A fresh command creates a new
 plan; partially installed or inconsistent packages may require manual Homebrew
 repair before they can pass verification. Never delete the journal to retry.

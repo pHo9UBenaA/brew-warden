@@ -28,7 +28,7 @@ func (s Service) Run(ctx context.Context, request ports.Request, policy domain.P
 	}
 	for _, record := range records {
 		if !record.Valid() || record.Unresolved() {
-			return Execution{}, errors.New("unresolved execution requires explicit reconciliation")
+			return Execution{}, errors.New("unresolved execution; run bwd reconcile before starting another command")
 		}
 	}
 	prepared, session, err := s.Planner.Prepare(ctx, request, policy, overrides, s.Clock.Now())
@@ -49,29 +49,39 @@ func (s Service) Run(ctx context.Context, request ports.Request, policy domain.P
 	}
 	return Execute(ctx, prepared, session, s.Journal, s.Clock)
 }
+
+// An omitted ID selects the sole unresolved attempt. Selection never resumes
+// execution: the existing recovery adapter must establish stopped native locks.
 func (s Service) Reconcile(ctx context.Context, id domain.Digest) error {
-	if !id.Valid() || s.Journal == nil || s.Recovery == nil || s.Clock == nil {
+	if (id != "" && !id.Valid()) || s.Journal == nil || s.Recovery == nil || s.Clock == nil {
 		return errors.New("reconciliation services or identity unavailable")
 	}
 	records, err := s.Journal.Attempts()
 	if err != nil {
 		return errors.New("attempt journal unavailable")
 	}
+	var selected domain.Attempt
 	for _, record := range records {
 		if !record.Valid() {
 			return errors.New("invalid attempt journal")
 		}
-		if record.Start.Binding.Attempt != id {
+		if id != "" && record.Start.Binding.Attempt != id || id == "" && !record.Unresolved() {
 			continue
 		}
-		if !record.Unresolved() {
-			return errors.New("attempt does not require reconciliation")
+		if selected.Start.Binding.Attempt != "" {
+			return errors.New("multiple attempts require selection; use bwd status and reconcile ATTEMPT_ID")
 		}
-		observed, err := s.Recovery.Snapshot(ctx, record.Start.Binding)
-		if err != nil || !observed.Valid() {
-			return errors.New("cannot establish stopped execution and observed state")
-		}
-		return s.Journal.FinishAttempt(domain.AttemptFinish{Attempt: id, FinishedAt: max(s.Clock.Now(), record.Start.StartedAt), Outcome: domain.AttemptReconciled, AfterState: observed})
+		selected = record
 	}
-	return errors.New("attempt was not found")
+	if selected.Start.Binding.Attempt == "" {
+		return errors.New("no matching attempt requires reconciliation")
+	}
+	if !selected.Unresolved() {
+		return errors.New("attempt does not require reconciliation")
+	}
+	observed, err := s.Recovery.Snapshot(ctx, selected.Start.Binding)
+	if err != nil || !observed.Valid() {
+		return errors.New("cannot establish stopped execution and observed state")
+	}
+	return s.Journal.FinishAttempt(domain.AttemptFinish{Attempt: selected.Start.Binding.Attempt, FinishedAt: max(s.Clock.Now(), selected.Start.StartedAt), Outcome: domain.AttemptReconciled, AfterState: observed})
 }

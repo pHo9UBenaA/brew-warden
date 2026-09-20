@@ -54,7 +54,7 @@ bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
 bwd doctor
 bwd history
 bwd status
-bwd reconcile ATTEMPT_ID
+bwd reconcile
 ```
 
 Only age is waivable, separately for each named candidate. Reasons are bounded,
@@ -352,7 +352,10 @@ The journal stores immutable, hash-linked start and outcome documents in a
 separate private directory. A nonblocking OS lock covers validation plus append;
 reads take a shared lock. Strict schemas, content digests, chain continuity and
 one-time attempt/exception identity are checked on every access. Unknown or
-unfinished attempts prevent new execution. Reconciliation appends observed state
+unfinished attempts prevent new execution. Explicit `bwd reconcile` selects the
+sole unresolved attempt; an optional attempt ID remains available when selection
+is needed. It does not run automatically on
+install or upgrade. Reconciliation appends observed state
 and permits a fresh plan; it never marks a lost process successful or restores an
 exception. Old records cannot be overwritten, and inventory exhaustion fails.
 

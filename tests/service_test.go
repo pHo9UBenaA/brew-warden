@@ -117,3 +117,61 @@ func TestAgeReasonRejectsControlsAndInvisibleText(t *testing.T) {
 		t.Fatal("rejected printable reason")
 	}
 }
+
+func TestRuntimeCLIReconcilesSoleUnresolvedAttemptWithoutID(t *testing.T) {
+	p := preparedExecution()
+	journal := localstate.Journal{Path: filepath.Join(t.TempDir(), "attempts")}
+	if err := journal.StartAttempt(domain.AttemptStart{Binding: p.Assessment.Binding, BeforeState: p.BeforeState, StartedAt: p.Assessment.Now}); err != nil {
+		t.Fatal(err)
+	}
+	recovery := &serviceRecovery{state: p.BeforeState, err: errors.New("native lock held")}
+	planner := &servicePlanner{}
+	service := application.Service{Planner: planner, Journal: journal, Recovery: recovery, Clock: &executionClock{p.Assessment.Now}}
+	var output bytes.Buffer
+	if cli.RunWithRuntime(context.Background(), []string{"reconcile"}, &output, &output, nil, nil, &service) == 0 {
+		t.Fatal("active session reconciled")
+	}
+	records, err := journal.Attempts()
+	if err != nil || len(records) != 1 || !records[0].Unresolved() {
+		t.Fatal(records, err)
+	}
+	recovery.err = nil
+	if cli.RunWithRuntime(context.Background(), []string{"reconcile"}, &output, &output, nil, nil, &service) != 0 {
+		t.Fatal(output.String())
+	}
+	records, err = journal.Attempts()
+	if err != nil || records[0].Finish.Outcome != domain.AttemptReconciled || records[0].Finish.ExitKnown || planner.calls != 0 {
+		t.Fatal(records, err, planner.calls)
+	}
+	calls := recovery.calls
+	if cli.RunWithRuntime(context.Background(), []string{"reconcile"}, &output, &output, nil, nil, &service) == 0 || recovery.calls != calls {
+		t.Fatal("completed attempt was reconciled again")
+	}
+}
+
+// A corrupt or future journal implementation must not cause implicit selection
+// of one among multiple unfinished operations.
+type unresolvedAttempts struct {
+	records []domain.Attempt
+}
+
+func (unresolvedAttempts) StartAttempt(domain.AttemptStart) error {
+	return errors.New("unexpected journal write")
+}
+func (unresolvedAttempts) FinishAttempt(domain.AttemptFinish) error {
+	return errors.New("unexpected journal write")
+}
+func (j unresolvedAttempts) Attempts() ([]domain.Attempt, error) { return j.records, nil }
+func TestReconcileWithoutIDRejectsAmbiguousOrInvalidHistory(t *testing.T) {
+	p := preparedExecution()
+	first := domain.Attempt{Start: domain.AttemptStart{Binding: p.Assessment.Binding, BeforeState: p.BeforeState, StartedAt: p.Assessment.Now}}
+	second := first
+	second.Start.Binding.Attempt = domain.Digest(strings.Repeat("f", 64))
+	for _, records := range [][]domain.Attempt{{first, second}, {first, {}}, {}} {
+		recovery := &serviceRecovery{state: p.BeforeState}
+		service := application.Service{Journal: unresolvedAttempts{records: records}, Recovery: recovery, Clock: &executionClock{p.Assessment.Now}}
+		if err := service.Reconcile(context.Background(), ""); err == nil || recovery.calls != 0 {
+			t.Fatal("unresolved selection reached native recovery", err, recovery.calls)
+		}
+	}
+}

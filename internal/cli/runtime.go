@@ -18,7 +18,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		return RunWithServices(args, out, errOut, source, history)
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile ATTEMPT_ID\nSupported: official jq and oniguruma bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
+		_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: official jq and oniguruma bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
 		if err != nil {
 			return 1
 		}
@@ -45,12 +45,16 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		}
 		return showAttempts(out, errOut, service.Journal, rest[0] == "status")
 	}
-	if len(rest) == 2 && rest[0] == "reconcile" && len(overrides) == 0 {
-		if err := service.Reconcile(ctx, domain.Digest(rest[1])); err != nil {
+	if (len(rest) == 1 || len(rest) == 2) && rest[0] == "reconcile" && len(overrides) == 0 {
+		var id domain.Digest
+		if len(rest) == 2 {
+			id = domain.Digest(rest[1])
+		}
+		if err := service.Reconcile(ctx, id); err != nil {
 			_, _ = fmt.Fprintln(errOut, "reconciliation_failed: "+err.Error())
 			return 1
 		}
-		_, err := fmt.Fprintln(out, "Reconciled observed state. The previous attempt and any age exception remain consumed; use a fresh command for a new plan.")
+		_, err := fmt.Fprintln(out, "Current state recorded. Retry with a new install or upgrade command.")
 		if err != nil {
 			return 1
 		}
