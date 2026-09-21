@@ -407,3 +407,36 @@ pcre2 10.48 and ripgrep 15.2.0, preserved unrelated installed packages, and pass
 a fully revalidated unchanged rerun (148.36 seconds). This exercises the retained
 native execution path, not the proposed public-command replacement. The separate
 public CLI fresh-install/corruption/missing-cache probe also passed in this VM.
+
+## Public CLI installed-dependency drift reproducer
+
+`scripts/probe-homebrew-dependency-drift.sh` reproduced a concrete limitation
+without modifying Homebrew code or calling private methods. After establishing
+a pcre2 10.48 bottle dependency, an ordinary external command ran
+`brew reinstall --formula --build-from-source --debug-symbols pcre2`.
+The subsequent `brew install --formula --force-bottle homebrew/core/ripgrep`
+used fixed API/cache inputs with network access denied, returned zero, installed
+the selected ripgrep bottle, and retained the changed pcre2 library.
+
+The verified bottle's `libpcre2-8.0.dylib` SHA-256 was
+`6b698ffc744550e149829d94045912448b8ac4b692cb267dce9fc2f3ed60659d`;
+the external rebuild and the library consumed after installation both had
+`b8a76923fb5d3722f51b0610afaa92a04ff134b342554a479f94ec1b93f0aec1`.
+This demonstrates a preflight-to-launch gap, not an exploit or a compromised
+Homebrew. The reproducer's zero exit means the limitation was reproduced; it is
+not a passing execution-binding acceptance.
+
+An earlier source build without debug symbols produced identical library bytes
+and correctly failed the reproducer's fixture check. An oniguruma source-build
+attempt failed in autoreconf after installing build dependencies, so it was not
+used as evidence of dependency substitution. All operations were guest-only.
+
+The user has been asked whether concurrent independent Homebrew mutations may
+be excluded from the supported usage contract in favor of the public CLI design.
+This is a pending decision, not permission to weaken the current guarantee.
+Keep the new public mutation path unavailable until the decision and remaining
+binding acceptance are resolved. A retained parent lock also cannot simply be
+handed to the ordinary CLI, as the earlier real-command lock test demonstrated.
+These findings do not establish that every possible public design is impossible.
+The retained VM evidence archive SHA-256 is
+`0c0f5446ca57684635d3e87293f9fb082a9014fe772919265a5669dbea0f9bfa`.
