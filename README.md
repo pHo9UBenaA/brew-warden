@@ -31,7 +31,9 @@ notarized releases.
 Official core bottles are eligible when their complete dependency plan has the
 required evidence. There is no package-name allowlist. Casks, third-party taps,
 source builds and unsupported evidence are held. An empty advisory result means
-no known applicable findings, not proof that the package is harmless.
+no known applicable findings, not proof that the package is harmless. Homebrew's
+scanner does not cover every formula; an unsupported dependency also holds its
+parent. `doctor` checks the environment, not individual package eligibility.
 
 Do not run another command that changes the same Homebrew installation while
 BrewWarden is running. BrewWarden does not monitor or intercept ordinary `brew`

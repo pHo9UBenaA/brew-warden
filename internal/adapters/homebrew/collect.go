@@ -201,7 +201,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 			raw, _ = json.Marshal(struct {
 				Schema int
 				Status string
-			}{1, "bottle registration unavailable"})
+			}{1, "bottle registration unavailable: " + err.Error()})
 			e = domain.Evidence{Claim: domain.Publication, Subject: f.artifact(), Status: domain.Unavailable, Provider: domain.Homebrew, Source: "Homebrew bottle registration history", ProviderVersion: "github-commits-2022-11-28", RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600}
 		}
 		if err := checkClaim(e, f.artifact(), domain.Publication, result.observedAt); err != nil {

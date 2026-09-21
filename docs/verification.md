@@ -155,3 +155,9 @@ use actual execution acceptance for supported representative packages.
 to an extracted `bwd`. Provision absent xz in the VirtualMac. It kills that parent
 after the actual install starts, requires unfinished status, waits for safe
 reconciliation and checks that history does not invent success or replay work.
+
+When GitHub's anonymous quota is exhausted, the public-command and distribution
+crash fixtures can set `BREWWARDEN_VM_EVIDENCE_CACHE` to a retained VM collection
+store. Only immutable attestation/registration cache files are copied. The real
+product revalidates their identity and signatures and queries current advisories;
+this is a cache-hit acceptance case, not fresh-provider availability evidence.

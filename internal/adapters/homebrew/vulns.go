@@ -3,10 +3,12 @@ package homebrew
 import (
 	"context"
 	"errors"
+	"fmt"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"slices"
+	"strings"
 	"time"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
@@ -49,7 +51,15 @@ func parsePublicVulns(raw []byte, status int, candidates []formulaMetadata) (pub
 		return publicVulnsReport{}, err
 	}
 	if len(report.Skipped) != 0 {
-		return publicVulnsReport{}, errors.New("homebrew skipped required advisory subjects")
+		if len(report.Skipped) > len(candidates) {
+			return publicVulnsReport{}, errors.New("invalid skipped advisory inventory")
+		}
+		for _, name := range report.Skipped {
+			if expected[name] == "" {
+				return publicVulnsReport{}, errors.New("unknown skipped advisory subject")
+			}
+		}
+		return publicVulnsReport{}, fmt.Errorf("homebrew skipped required advisory subjects: %s", strings.Join(report.Skipped, ", "))
 	}
 	seen := map[string]bool{}
 	hasOpen := false
@@ -171,6 +181,9 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 		return fail(errors.New("homebrew advisory output exceeded limit"))
 	}
 	if err := writeNew(filepath.Join(w.root, "advisory-scan.stderr"), stderr.Bytes(), 0600); err != nil {
+		return fail(err)
+	}
+	if err := writeNew(filepath.Join(w.root, "advisory-scan.stdout"), out.Bytes(), 0600); err != nil {
 		return fail(err)
 	}
 	report, err := parsePublicVulns(out.Bytes(), status, candidates)

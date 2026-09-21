@@ -44,6 +44,11 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if output, err := newCommand("doctor").CombinedOutput(); err != nil {
 		t.Fatal(string(output), err)
 	}
+	cache := filepath.Join(home, "Library/Application Support/brewwarden/collections")
+	if err := os.MkdirAll(cache, 0700); err != nil {
+		t.Fatal(err)
+	}
+	seedVMEvidenceCache(t, cache)
 	command := newCommand("brew", "install", "xz")
 	trigger := &killOnInstall{destination: os.Stdout, kill: func() error { return command.Process.Kill() }}
 	command.Stdout, command.Stderr = trigger, trigger

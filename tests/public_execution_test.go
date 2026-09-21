@@ -40,6 +40,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log("retained public execution", directory)
+	seedVMEvidenceCache(t, directory)
 	sum := sha256.Sum256(manifest)
 	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, Verifier: func(path string, digest domain.Digest) ports.ProvenanceVerifier {
 		return attestation.Verifier{Path: path, SHA256: digest}
@@ -69,6 +70,18 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			t.Fatal(err)
 		}
 		defer session.Close()
+		if pass == 0 {
+			profiles, err := filepath.Glob(filepath.Join(directory, "collection-*", "public-execution.sb"))
+			if err != nil || len(profiles) != 1 {
+				t.Fatal("execution profile missing", err)
+			}
+			for _, protected := range []string{profiles[0], filepath.Join(filepath.Dir(profiles[0]), "process-0.json")} {
+				command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-f", profiles[0], "/bin/sh", "-c", `printf changed >> "$1"`, "protection-test", protected)
+				if output, err := command.CombinedOutput(); err == nil || !strings.Contains(string(output), "Operation not permitted") {
+					t.Fatal("installer could rewrite execution controls", string(output), err)
+				}
+			}
+		}
 		prepared.Assessment.Now = time.Now().Unix()
 		if decision := domain.Evaluate(prepared.Assessment); decision.Outcome != domain.Allow {
 			t.Fatal(decision)

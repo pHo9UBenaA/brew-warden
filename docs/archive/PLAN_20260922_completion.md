@@ -605,3 +605,28 @@ macOS but not Linux. A small platform-specific syscall adapter fixes that build;
 Linux baseline, race and full-filesystem failure acceptance now pass. No dependency
 was added. Repeated full checks and final distribution acceptance follow these
 corrections before the completion gate is closed.
+
+
+### Final review correction and diagnostics
+
+Installer descendants must not rewrite the sandbox profile used by a later
+command or the recorded process identities used for crash recovery. Protect the
+profile and the bounded 128 possible process-record paths inside the existing
+sandbox. The VM acceptance test attempts both writes using the actual profile
+and requires permission denial before executing a normal verified installation.
+This adds no new lock service, Ruby API or external-operation interception.
+
+Retain failed public scanner output and identify canonical skipped formula names
+in errors. Retain the underlying registration failure in the unavailable-evidence
+record. The final broad survey establishes real scanner limitations rather than
+adapter corruption: ca-certificates and its parent OpenSSL cannot currently obtain
+complete public-scanner coverage; Git, curl and Python closures also encounter
+skipped subjects. zstd's lz4 dependency was registered less than seven days ago.
+None of those holds is a successful install or justification to weaken policy.
+
+The final CLI acceptance initially stopped before tree installation when anonymous
+GitHub core quota reached zero. Verified immutable caches from earlier runs in the
+same VM were copied into its test HOME; product validation still checked exact
+artifact/recipe identity, signatures and current advisories. This exercises normal
+cache reuse, not a quota bypass or evidence waiver. Original cold-cache survey
+results and both accepted and held outcomes are retained.

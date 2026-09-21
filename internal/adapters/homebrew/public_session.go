@@ -300,7 +300,12 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if err != nil {
 		return fail(err)
 	}
-	immutable := []string{filepath.Join(s.w.root, "runtime"), filepath.Join(s.w.root, "cache/api"), filepath.Join(s.w.root, "cache/downloads"), filepath.Join(s.w.root, "plan.json")}
+	immutable := []string{filepath.Join(s.w.root, "public-execution.sb"), filepath.Join(s.w.root, "runtime"), filepath.Join(s.w.root, "cache/api"), filepath.Join(s.w.root, "cache/downloads"), filepath.Join(s.w.root, "plan.json")}
+	// Installer descendants must not rewrite the confinement of later commands
+	// or the durable process identities used after a wrapper crash.
+	for i := 0; i < 128; i++ {
+		immutable = append(immutable, filepath.Join(s.w.root, fmt.Sprintf("process-%d.json", i)))
+	}
 	for _, file := range files {
 		immutable = append(immutable, filepath.Join(s.w.root, file.Path))
 	}
