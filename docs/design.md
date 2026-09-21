@@ -109,6 +109,14 @@ reversible, and subject to separate integration tests. Do not replace Homebrew's
 executable or silently edit shell startup files. Direct Homebrew paths, a different
 PATH, and other clients remain outside the wrapper's coverage.
 
+Keep verification and installation as separate phases: finish required checks for
+all targets and dependencies before starting any installation. Do not run another
+Homebrew mutation against the same prefix during a BrewWarden operation. This is
+a usage condition, not a claim that BrewWarden blocks external commands. Prefer
+public CLI execution without machinery added solely to prevent independent brew
+operations. Checks binding the wrapper's own artifacts and dependency plan remain
+required. Removing native mechanisms still requires replacement acceptance.
+
 ## Artifact and signature evidence
 
 - Hash actual downloaded bytes and compare them with authenticated metadata.

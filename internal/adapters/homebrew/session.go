@@ -161,7 +161,7 @@ func (s *nativeSession) prepare(ctx context.Context, c *Collection, policy domai
 }
 func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	policy, err := domain.NewPolicy(p.MinimumAge)
-	if err != nil || p.Schema != 1 || !p.Attempt.Valid() || !p.BeforeState.Valid() || p.IssuedAt <= 0 || p.ExpiresAt <= p.IssuedAt || p.ExpiresAt > p.IssuedAt+600 {
+	if err != nil || (p.Schema != 1 && p.Schema != 2) || !p.Attempt.Valid() || !p.BeforeState.Valid() || p.IssuedAt <= 0 || p.ExpiresAt <= p.IssuedAt || p.ExpiresAt > p.IssuedAt+600 {
 		return ports.Prepared{}, errors.New("invalid persisted execution plan")
 	}
 	if !p.Environment.Runtime.Valid() || p.Environment.Prefix != "/opt/homebrew" || !strings.HasPrefix(p.Environment.OSVersion, "26.") || len(p.Environment.OSVersion) > 16 || strings.Trim(p.Environment.OSVersion, "0123456789.") != "" || len(p.Nodes) == 0 || len(p.Nodes) > 128 || len(p.Actions) != len(p.Nodes) || len(p.Inputs) == 0 || len(p.Inputs) > 10000 {
@@ -272,8 +272,11 @@ func (w workspace) freezeInputs(inputs nativeInputs) ([]frozenInput, error) {
 	return result, nil
 }
 func (s *nativeSession) readPrepared() (ports.Prepared, error) {
-	raw, err := readRegular(filepath.Join(s.w.root, "plan.json"), maxManifest)
-	if err != nil || digestBytes(raw) != s.prepared.Assessment.Binding.Plan {
+	return s.w.readPrepared(s.prepared.Assessment.Binding.Plan)
+}
+func (w workspace) readPrepared(expected domain.Digest) (ports.Prepared, error) {
+	raw, err := readRegular(filepath.Join(w.root, "plan.json"), maxManifest)
+	if err != nil || digestBytes(raw) != expected {
 		return ports.Prepared{}, errors.New("saved plan changed")
 	}
 	var plan executionPlan
@@ -284,12 +287,12 @@ func (s *nativeSession) readPrepared() (ports.Prepared, error) {
 		if !safeRelative(file.Path) || !file.SHA256.Valid() {
 			return ports.Prepared{}, errors.New("invalid frozen input")
 		}
-		raw, err := readRegular(filepath.Join(s.w.root, file.Path), 128*1024*1024)
+		raw, err := readRegular(filepath.Join(w.root, file.Path), 128*1024*1024)
 		if err != nil || digestBytes(raw) != file.SHA256 {
 			return ports.Prepared{}, errors.New("frozen input changed")
 		}
 	}
-	snapshot, err := readRegular(filepath.Join(s.w.root, "states", string(plan.BeforeState)+".json"), maxManifest)
+	snapshot, err := readRegular(filepath.Join(w.root, "states", string(plan.BeforeState)+".json"), maxManifest)
 	if err != nil || digestBytes(snapshot) != plan.BeforeState {
 		return ports.Prepared{}, errors.New("saved before-state unavailable")
 	}

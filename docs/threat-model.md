@@ -28,9 +28,13 @@ Only operations routed through BrewWarden are in scope. A proposed PATH shim
 can be bypassed by direct Homebrew paths or a different environment; installing
 the binary alone does not intercept commands.
 
-Own-process locking does not lock Homebrew launched elsewhere. Rechecking before
-execution is not a proof against all time-of-check/time-of-use changes. Product
-mutation execution remains unavailable until the relevant execution path is demonstrated.
+Do not run an independent Homebrew mutation against the same prefix while a
+BrewWarden operation is in progress. The wrapper does not monitor, intercept or
+prevent operations the user deliberately runs outside it. A preflight recheck
+does not establish exclusion against those operations. Do not add private API
+hooks or installed-prefix locking solely to enforce this usage condition.
+Product mutation execution remains unavailable until the relevant execution path
+is demonstrated under this condition.
 Post-install inspection cannot prevent code that already ran during installation.
 
 Do not test updates in a maintainer's normal Homebrew prefix. Use fixtures and

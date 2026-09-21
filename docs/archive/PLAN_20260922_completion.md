@@ -440,3 +440,77 @@ handed to the ordinary CLI, as the earlier real-command lock test demonstrated.
 These findings do not establish that every possible public design is impossible.
 The retained VM evidence archive SHA-256 is
 `0c0f5446ca57684635d3e87293f9fb082a9014fe772919265a5669dbea0f9bfa`.
+
+## Accepted concurrency scope and next execution increment
+
+The user approved a no-concurrent-independent-mutation usage condition. They
+explicitly prefer avoiding growth to interfere with operations deliberately run
+outside BrewWarden. This does not authorize overlapping the wrapper's verification
+and installation phases: all required verification must finish first. Do not add
+monitoring, interception or private locking solely for independent brew commands.
+
+Proceed with public CLI execution under that condition. Prove fixed metadata and
+verified cache binding, installed-dependency selection, source-fallback refusal,
+multiple targets, upgrade and interruption. Recheck the wrapper's own inputs;
+retain durable partial/unknown outcomes. Then replace the retained native session
+and remove its Ruby control protocol, guards and obsolete packaging requirements.
+Do not declare all current code indispensable or enable an unverified fallback.
+
+An intermediate distribution from commit `4610330` built twice with identical
+binaries and archives. Archive SHA-256:
+`5af834a47be72e9a87d7821503a1ec31bbab52966d2cd92e67ed13ab2944c32e`.
+The extracted artifact passed its checksum inventory, `bwd doctor` and actual
+`bwd brew install fzf` in the disposable VM. It retains the native execution
+implementation and is not final public-CLI migration acceptance.
+
+### Public execution capability acceptance
+
+`Collection.PreparePublic` is an integration-test capability, not a product mode.
+`Engine.Prepare` still selects the retained native implementation. The candidate
+uses normal public `brew info`, `install` and `upgrade` commands, fixed signed API
+metadata and verified bottle cache, disabled installation-time network, updates,
+cleanup, autoremove and opportunistic dependent maintenance. New dependencies
+use the documented `--as-dependency` option. Verification finishes before the
+topologically ordered install/upgrade commands begin.
+
+The only additional operation lock is a private BrewWarden lock. It does not lock
+out ordinary brew commands. A fixed shell startup gate records the child process
+group before releasing it to execute; arguments are not interpolated into shell
+source. Process-group cancellation, consumed attempts, input revalidation and
+policy expiry checks are retained. Recovery after a parent/process interruption
+still needs acceptance before product routing changes.
+
+The disposable `brewwarden-cli-completion-02` VM passed:
+
+- xz 5.8.4 fresh installation, unchanged rerun and replay rejection (112.61 s).
+- jq 1.8.1 to 1.8.2 upgrade, unchanged rerun and replay rejection (132.46 s).
+- Changed verified input refusal with unchanged installed payload (63.61 s).
+- Missing cached bottle refusal with unchanged installed payload (52.98 s).
+- Cancelled execution refusal with unchanged installed payload (54.56 s).
+- jq/xz multi-target fresh installation with the oniguruma dependency, unrelated
+  installed-package preservation, unchanged rerun and replay rejection (134.50 s).
+
+The latter three tests also reject reusing the failed attempt. Logs are named
+`public-session-*.log` in the VM's retained results directory. These pre-launch
+failures do not substitute for testing interruption during an actual installer.
+The first multi-target setup retained an inactive jq 1.8.1 keg after uninstalling
+1.8.2. Planning correctly held the unlinked state. The fresh-install fixture was
+corrected by explicitly removing that old test version in the disposable VM.
+The public plan uses schema 2 so the native recovery adapter cannot accidentally
+apply its different process/lock assumptions to that attempt. Recovery refuses
+that schema before preparing or launching a native reconciliation process.
+
+Public installed information and receipt flags are observations of user-owned
+state, not proof of the digest of an existing installed payload. In particular,
+the earlier ordinary source rebuild retained a `poured_from_bottle` flag even
+though library bytes changed. Do not claim those flags bind an existing payload
+to the newly verified bottle, or silently treat these capability tests as proof
+of all old native payload guarantees. Resolve the final contract and remove the
+superseded mechanism together; do not ship both as competing user modes.
+
+Baseline verification, race, coverage, all configured fuzz targets and lint
+passed. The combined check reached vulnerability scanning but encountered a
+sandbox DNS failure; rerunning that check with network access passed source/test
+and all three built-binary scans. No host Homebrew installation was modified.
+The retained public-capability results archive has SHA-256
+`875f9779fa4db59cb09e00c6d93079fc3d26e404273a29363becd1f04ce0deab`.

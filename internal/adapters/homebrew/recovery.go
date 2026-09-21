@@ -22,6 +22,9 @@ func (e Engine) Snapshot(ctx context.Context, binding domain.Binding) (domain.Di
 	if err != nil {
 		return "", err
 	}
+	if plan.Schema != 1 {
+		return "", errors.New("public execution recovery has not passed acceptance")
+	}
 	root, err := os.MkdirTemp(e.Collector.Directory, "recovery-")
 	if err != nil {
 		return "", err
