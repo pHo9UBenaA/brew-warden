@@ -1,6 +1,6 @@
 # Complete a maintainable Homebrew security wrapper
 
-Date: 2026-09-22. Status: investigation and implementation in progress.
+Date: 2026-09-22. Status: completed for the agreed local distribution scope.
 Baseline: d79416f. Supersedes the remaining work in PLAN_20260922.md; the product
 contract remains docs/design.md. This file records decisions and acceptance.
 
@@ -87,7 +87,7 @@ public-command alternatives have been investigated concretely.
 - [x] Complete the public-command execution probe and record exact gaps.
 - [x] Resolve the independent-concurrency condition with the user.
 - [x] Implement and remove obsolete mechanisms.
-- [ ] Complete representative coverage and final distribution acceptance.
+- [x] Complete representative coverage and final distribution acceptance.
 
 ## Findings from this investigation
 
@@ -630,3 +630,59 @@ same VM were copied into its test HOME; product validation still checked exact
 artifact/recipe identity, signatures and current advisories. This exercises normal
 cache reuse, not a quota bypass or evidence waiver. Original cold-cache survey
 results and both accepted and held outcomes are retained.
+
+
+## Completion acceptance
+
+All implementation and acceptance items above are complete. The accepted scope is
+Homebrew 7.0.4 at the normal `/opt/homebrew` prefix on Apple Silicon macOS Tahoe,
+using official core bottles. Unsupported or incomplete evidence remains a hold;
+completion does not mean every Homebrew formula has scanner coverage. Signing,
+notarization and publication were not requested and have not been performed.
+
+The final archive was built from source
+`2676e4ad5931e4dbf3605e50c070d8bb5de51738`, using Go 1.27.1 on darwin/amd64 with
+explicit darwin/arm64 output. Two clean builds produced identical executables and
+complete archives. The archive contains no bundled Homebrew or Ruby runtime;
+product execution uses public commands from the verified existing Homebrew.
+This final historical documentation commit does not change the accepted code or
+require substituting an untested archive.
+
+| Acceptance | Result |
+| --- | --- |
+| Full host checks | Baseline, architecture, race, coverage, all six fuzz targets, Staticcheck, source/test and three binary vulnerability scans passed. |
+| Isolated Linux checks | Baseline, race and actual full-filesystem failure test passed. |
+| Final archive CLI | Version, doctor, rejected cask input, jq upgrade, fresh tree/cmake installation, unchanged rerun, age hold, bounded age exception, history and status passed. |
+| Existing dependency preservation | oniguruma file hashes were unchanged across jq upgrade; full Cellar hashes were unchanged across the repeated installation and age hold. |
+| Parent process death | Final archive crash test passed in 119.52 s; the installer continued independently, recovery waited for owned processes and recorded reconciliation without inventing success or replaying installation. |
+| Installer control protection | Real sandbox denied writes to its profile and process records; verified installation and replay rejection passed in 266.37 s. |
+| Missing verified cache | Execution stopped without installed file changes and could not replay the consumed attempt; passed in 282.79 s. |
+| Interruption and partial failure | Session-aware interruption/recovery passed in 54.02 s; actual link conflict preserved the existing file and recorded partial installation in 75.31 s. |
+| Runtime integrity | A guest-only altered runtime manifest was rejected before installation. |
+
+Distribution acceptance ran in an isolated macOS 26.6.2 arm64 VM with no host
+mounts. Host Homebrew was not modified. The final executable reported the exact
+source revision above, and installed jq, tree and cmake reported their expected
+versions. The retained CLI procedure and logs reproduce the tested operations.
+
+Cold-cache representative collection established complete evidence for cmake
+4.4.3 and tree 2.3.2, followed by successful installation from the final archive.
+zstd was held because lz4 was younger than seven days. ca-certificates, OpenSSL,
+Git, curl and Python closures were held for skipped public-scanner subjects;
+ca-certificates' bottle attestation itself was cryptographically verified. These
+outcomes remain explicit limitations, with no package-specific policy bypass.
+Final CLI acceptance reused previously validated immutable evidence caches after
+anonymous GitHub quota exhaustion, as recorded above; current advisories and
+artifact identity/signatures were still checked.
+
+Local deliverables are `dist/brewwarden-darwin-arm64.tar.gz`,
+`dist/SHA256SUMS` and `.cache/completion-evidence.tar.gz`. The evidence package
+contains host and container checks, reproducible-build output, toolchain/source
+records, VM procedures/logs, both representative surveys and crash acceptance.
+
+| Object | SHA-256 |
+| --- | --- |
+| Distribution archive | `0d4eb66748e4ccc00ed4521239deec2792e42907af93ad92c872d71a05613685` |
+| bwd executable | `42192460a3006edcd2f3f5179eb8cd78b9bf96b950d085ab2319b2220bf797ce` |
+| Runtime inventory | `d50f6a3f967fae22b9a84cf705d59b29e15b8ee2311c984f050ce85b2f8c1ce7` |
+| Evidence archive | `898be7dd7de4b8345d80274b0a5198a21085b533259f136062e51f0a6f74db0d` |
