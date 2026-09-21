@@ -99,18 +99,22 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if _, err := (Runtime{source, digestBytes(raw)}).materialize(filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
-	metadata, err := os.ReadFile("../../../.cache/formula.jws.json")
+	metadata, err := os.ReadFile("../../../.cache/packages.arm64_tahoe.jws.json")
 	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeNew(filepath.Join(root, "formula.jws.json"), metadata, 0600); err != nil {
 		t.Fatal(err)
 	}
 	profile, err := w.sandbox("read", false, false, []string{filepath.Join(root, "runtime/brew/Library")})
 	if err != nil {
 		t.Fatal(err)
 	}
-	result, err := w.native(context.Background(), "metadata", profile, "metadata.rb", "jq")
+	cache := filepath.Join(root, metadataCachePath)
+	if err := os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
+		t.Fatal(err)
+	}
+	if err := writeNew(cache, metadata, 0600); err != nil {
+		t.Fatal(err)
+	}
+	result, err := w.metadata(context.Background(), profile, []string{"jq"})
 	if err != nil {
 		log, _ := os.ReadFile(filepath.Join(root, "metadata.stderr"))
 		t.Fatalf("%v: %s", err, log)
@@ -123,6 +127,52 @@ func TestLiveNativeMetadata(t *testing.T) {
 		t.Fatal("unexpected closure", recipes, candidates)
 	}
 	t.Log("authenticated complete metadata closure", digestBytes(result))
+
+	// A warmed derived cache must not bypass signature verification on a later
+	// info invocation. Corrupt only the signature, retaining valid JSON.
+	var signed struct {
+		Payload    string `json:"payload"`
+		Signatures []struct {
+			Protected string          `json:"protected"`
+			Header    json.RawMessage `json:"header"`
+			Signature string          `json:"signature"`
+		} `json:"signatures"`
+	}
+	if err := json.Unmarshal(metadata, &signed); err != nil || len(signed.Signatures) == 0 {
+		t.Fatal("missing signed fixture")
+	}
+	sig := signed.Signatures[0].Signature
+	if len(sig) == 0 {
+		t.Fatal("empty signature")
+	}
+	replacement := "A"
+	if strings.HasPrefix(sig, replacement) {
+		replacement = "B"
+	}
+	signed.Signatures[0].Signature = replacement + sig[1:]
+	corrupt, err := json.Marshal(signed)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(cache, corrupt, 0600); err != nil {
+		t.Fatal(err)
+	}
+	_, err = w.invokeAPI(context.Background(), "invalid-signature", filepath.Join(root, "metadata.sb"), "info", "--json=v2", "--formula", "homebrew/core/jq")
+	if err == nil {
+		t.Fatal("tampered metadata accepted with a warmed derived cache")
+	}
+	// Homebrew deletes invalid signed input before printing its signature error.
+	// The product's immutable-input sandbox blocks that deletion. Repeat with
+	// cache writes allowed (network and host writes still denied) to establish
+	// the precise rejection cause, rather than accept any process failure.
+	_, err = w.invokeAPI(context.Background(), "signature-diagnostic", profile, "info", "--json=v2", "--formula", "homebrew/core/jq")
+	log, _ := os.ReadFile(filepath.Join(root, "signature-diagnostic.stderr"))
+	if err == nil || !strings.Contains(strings.ToLower(string(log)), "signature") {
+		t.Fatalf("tampered metadata was not rejected for its signature: %v: %s", err, log)
+	}
+	if err := os.WriteFile(cache, metadata, 0600); err != nil {
+		t.Fatal(err)
+	}
 	inputs, err := filepath.Abs("../../../.cache/dependency-probe-inputs")
 	if err != nil {
 		t.Fatal(err)

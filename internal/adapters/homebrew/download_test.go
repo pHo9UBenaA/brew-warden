@@ -22,13 +22,13 @@ func TestPublicMetadataBoundaries(t *testing.T) {
 		limit               int64
 		want                bool
 	}{
-		{"complete", "https://formulae.brew.sh/api/formula.jws.json", "signed", 200, 6, true},
-		{"oversized", "https://formulae.brew.sh/api/formula.jws.json", "too large", 200, 6, false},
-		{"unavailable", "https://formulae.brew.sh/api/formula.jws.json", "error", 503, 100, false},
-		{"credentials", "https://secret@formulae.brew.sh/api/formula.jws.json", "", 200, 100, false},
-		{"other host", "https://evil.example/api/formula.jws.json", "", 200, 100, false},
+		{"complete", "https://raw.githubusercontent.com/Homebrew/homebrew-core/commit/Formula/j/jq.rb", "signed", 200, 6, true},
+		{"oversized", "https://raw.githubusercontent.com/Homebrew/homebrew-core/commit/Formula/j/jq.rb", "too large", 200, 6, false},
+		{"unavailable", "https://raw.githubusercontent.com/Homebrew/homebrew-core/commit/Formula/j/jq.rb", "error", 503, 100, false},
+		{"credentials", "https://secret@raw.githubusercontent.com/Homebrew/homebrew-core/commit/Formula/j/jq.rb", "", 200, 100, false},
+		{"other host", "https://evil.example/recipe.rb", "", 200, 100, false},
 		{"other metadata", "https://formulae.brew.sh/api/cask.jws.json", "", 200, 100, false},
-		{"query", "https://formulae.brew.sh/api/formula.jws.json?token=secret", "", 200, 100, false},
+		{"query", "https://raw.githubusercontent.com/Homebrew/homebrew-core/commit/Formula/j/jq.rb?token=secret", "", 200, 100, false},
 		{"other repo", "https://api.github.com/repos/other/repo/attestations/sha256:abc", "", 200, 100, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

@@ -212,7 +212,7 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	return result, nil
 }
 func (w workspace) freezeInputs(inputs nativeInputs) ([]frozenInput, error) {
-	names := []string{"native-inputs.json", "formula.jws.json", "metadata.json", "fetch.json", "inspect.json"}
+	names := []string{"native-inputs.json", metadataCachePath, "metadata.json", "fetch.json", "inspect.json"}
 	scripts, err := nativeScripts.ReadDir(".")
 	if err != nil {
 		return nil, err

@@ -92,18 +92,15 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if client == nil {
 		client = publicClient()
 	}
-	metadata, err := download(ctx, client, "https://formulae.brew.sh/api/formula.jws.json", 80*1024*1024)
-	if err != nil {
-		return err
-	}
-	if err := writeNew(filepath.Join(w.root, "formula.jws.json"), metadata, 0600); err != nil {
-		return err
-	}
 	profile, err := w.sandbox("collect", true, false, []string{filepath.Join(w.root, "runtime/brew/Library")})
 	if err != nil {
 		return err
 	}
-	parsed, err := w.native(ctx, "metadata", profile, "metadata.rb", request.Targets...)
+	parsed, err := w.metadata(ctx, profile, request.Targets)
+	if err != nil {
+		return err
+	}
+	metadata, err := readRegular(filepath.Join(w.root, metadataCachePath), 80*1024*1024)
 	if err != nil {
 		return err
 	}

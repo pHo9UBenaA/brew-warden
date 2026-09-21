@@ -24,10 +24,6 @@ func download(ctx context.Context, client *http.Client, address string, limit in
 		return nil, errors.New("unsupported metadata URL")
 	}
 	switch u.Host {
-	case "formulae.brew.sh":
-		if u.Path != "/api/formula.jws.json" {
-			return nil, errors.New("unsupported metadata path")
-		}
 	case "raw.githubusercontent.com":
 		if !strings.HasPrefix(u.Path, "/Homebrew/homebrew-core/") {
 			return nil, errors.New("unsupported recipe repository")

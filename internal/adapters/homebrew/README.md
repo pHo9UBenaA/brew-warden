@@ -33,12 +33,25 @@ No user credentials, proxy variables or Homebrew settings are inherited.
 
 ## Authenticated candidate inspection
 
-`metadata.rb` delegates JWS signature verification to the pinned Homebrew API and
-its bundled trust root before selecting any recipe. It resolves both runtime and
-build recipe dependencies, rejects duplicate formula identities and bounds the
-inventory. The Go bridge rejects malformed schemas, missing fields, unsupported
-platforms, mismatched paths/URLs, incomplete graphs and cycles. Metadata is bounded
-to 80 MiB and machine-readable bridge responses to 8 MiB.
+`brew info --json=v2 --formula homebrew/core/<name>` delegates metadata loading
+and JWS signature verification to Homebrew and its bundled trust root. Each fresh
+workspace lets the first info command acquire and authenticate its own metadata.
+The resulting signed cache snapshot is then fixed; subsequent dependency queries
+run without network access and cannot replace it. Fully qualified
+names prevent selection of an installed old formula. The Go adapter follows both
+runtime and build recipe dependencies, checks that every requested result is
+present exactly once, and rejects ambiguous fields, mismatched paths/URLs,
+incomplete graphs and cycles. Irrelevant public JSON fields are allowed. Metadata
+is accepted only up to 80 MiB and command responses are bounded to 8 MiB. No private metadata Ruby
+script or direct invocation of Homebrew's JWS verifier remains.
+
+BrewWarden does not request a metadata HTTP endpoint itself. Acquisition,
+interpretation and signature verification belong to the public command. The
+`cache/api/internal/packages.arm64_tahoe.jws.json` cache location remains a
+version-specific detail for saving the exact input consumed by that command.
+The raw signed snapshot and normalized complete metadata result are frozen with
+the candidate inputs. Subsequent fetch and execution use authenticated recipe
+files with API resolution disabled.
 
 Recipes are downloaded at the authenticated tap commit and must match the signed
 recipe checksum before evaluation. Candidate bottle bytes and signatures are
@@ -70,7 +83,10 @@ model; bottle execution still requires complete evidence and bound native inputs
 The explicit `BREWWARDEN_LIVE_RUNTIME` test uses a built runtime and cached signed
 metadata/bottles in a temporary workspace. It has verified the complete jq and
 oniguruma runtime closure plus four build recipe dependencies, with no network or
-host writes. Separate VM probes establish native mutations; parser and mocked
+host writes. Its signed API fixture is `.cache/packages.arm64_tahoe.jws.json`;
+product collection obtains that snapshot through public info instead of requiring
+a pre-seeded cache. The test also verifies that a warmed derived cache cannot
+bypass an invalid signature. Separate VM probes establish native mutations; parser and mocked
 port tests do not establish installation binding. Runtime substitution, extra
 files, unsafe manifests, archive traversal, ambiguous JSON and changed dependency
 closures have negative tests.
@@ -127,7 +143,7 @@ and OSV claims. Provenance failure stops before embedded recipe evaluation.
 Every evidence item is checked against its candidate, claim, observation time,
 one-hour maximum validity and exact saved observation bytes.
 
-Metadata HTTP requests allow only explicit public origins, have bounded responses
+BrewWarden recipe and attestation HTTP requests allow only explicit public origins, have bounded responses
 and deadlines, reject redirects and do not inherit proxy or credential settings.
 Attestation API envelopes reject duplicate/mis-cased duplicate fields; extracting a
 bundle is not verification. Native downloads remain in the private cache. The
