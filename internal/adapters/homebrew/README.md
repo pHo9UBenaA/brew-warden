@@ -232,3 +232,34 @@ multi-target jq/c-ares operation installed the jq/oniguruma dependency graph and
 passed a second run with unchanged Cellar contents. The parameterized payload
 probe also rejected all six corruption cases for each of c-ares, jq and oniguruma
 and restored every fixture byte and mode.
+
+## Public advisory replacement under acceptance
+
+`scanCandidateVulnerabilities` is not yet wired to product collection. It invokes
+public `info --json=v2 --formula` and `vulns --json` with explicit authenticated
+candidate names in an empty private inspection prefix. It adds no direct OSV
+query or Ruby bridge. The pinned scanner checks OSV and formula patch annotations;
+it does not query the separate Homebrew Advisory Database.
+
+Do not run this candidate check against the installation prefix: an existing keg
+SBOM can select the installed version. The adapter rejects existing Cellar/opt
+entries and symlinked inspection directories, reconciles source, recipe, bottle
+and version identities, and freezes metadata and installed-state paths during
+commands. Caller-selected candidates must include the complete bottle runtime
+closure. Native `--deps` also expands build dependencies and is intentionally
+not used here.
+
+JSON lacks clean-subject identities and a checked count. A clean observation
+therefore depends on the pinned command contract and explicit candidate context;
+it is not inferred from arbitrary JSON. Skipped subjects, missing or ambiguous
+fields, unexpected versions/formulae and inconsistent exits hold the scan. Open
+and patched identifiers remain separate for later Homebrew-feed reconciliation.
+No severity or fix-availability filter suppresses findings.
+
+Offline tests cover output refusal and inspection-prefix guards. The opt-in
+`TestLivePublicVulnsCandidateSelection` requires `BREWWARDEN_LIVE_RUNTIME`, native
+arm64 Go execution and OSV access. It exercises a copied runtime, a synthetic
+old-keg SBOM, clean candidate selection, skipped build dependencies, and network
+failure. It does not install packages or change the host Homebrew prefix. Both
+advisory-source integration and distribution acceptance remain required before
+this replaces the current product collector.

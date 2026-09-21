@@ -294,3 +294,59 @@ Completion requires the final distributable to pass these gates and current docs
 to describe its actual behavior. Host Homebrew remains unmodified; push,
 publication, signing identity acquisition and notarization are not authorized by
 this planning decision.
+
+## Public advisory probe and adapter increment
+
+The copied, manifest-verified Homebrew 7.0.4 runtime passed
+`TestLivePublicVulnsCandidateSelection` on Apple Silicon macOS with live OSV
+queries. No host Homebrew prefix was modified. This is an isolated metadata
+fixture test, not a real installed-old-version VM acceptance.
+
+- `brew vulns --json --deps homebrew/core/jq` returned exit zero while listing
+  m4, autoconf, automake and libtool as skipped. They are build dependencies
+  outside the selected bottle runtime closure. Therefore use explicit full
+  candidate lists, without the scanner's independent `--deps` expansion.
+- Explicit jq 1.8.2 and oniguruma 6.9.10 in an empty inspection prefix returned
+  empty findings and skipped arrays. JSON contains neither a checked count nor
+  a list of clean subjects; its interpretation relies on the inspected command,
+  explicit arguments and isolated authenticated candidate context.
+- A synthetic jq 1.6 keg with an upstream-source SBOM changed the public result
+  to jq 1.6 with 20 findings and exit one. Removing only that fixture restored
+  the candidate result. The candidate adapter rejects nonempty Cellar/opt state
+  before launching a command, rather than deleting installed data.
+- Denying network access produced exit one and no JSON, not a clean report.
+
+`vulns.go` adds a not-yet-routed replacement capability. It reconciles public
+`info` metadata with the selected identities/digests and runtime dependencies,
+then invokes the public scanner with explicit candidates. Its sandbox prevents
+writes outside the inspection workspace and changes to metadata, Homebrew
+Library, Cellar and opt during inspection. No private Ruby entrypoint or direct
+OSV HTTP query is used by this capability. Parsing rejects omitted/ambiguous
+fields, skipped subjects, wrong versions, unexpected formulae, and inconsistent
+exit status. Raw findings retain open/patched attribution and advisory aliases.
+
+The official Homebrew feed fetched during this increment was 44,637,704 bytes,
+with 600 formula keys and 13,017 records. Its SHA-256 was
+`c1332dde0989ee7cbe5a953c181cd7396dc63324039b5b416f367c76d313d0e7`.
+All observed ranges used `ECOSYSTEM`; jq, oniguruma and openssl@3 had no entries
+in that snapshot. Those absences must not become a historical-coverage gate.
+The feed is too large for the existing small-response limits. The supplemental
+adapter must fetch it once per operation, use an explicit bounded parser and
+retain one shared observation rather than download/copy it for every candidate.
+
+Remaining before routing: supplemental feed version/range evaluation and patch
+reconciliation; representative live subjects beyond jq/oniguruma; vulnerable
+candidate with an installed clean version; candidate omission/transport schema
+fault tests at the actual command boundary; and complete distribution acceptance.
+The old collector remains wired until the replacement passes these gates.
+
+A further simplification candidate was confirmed through public formula JSON:
+`lrzsz` 0.12.20 revision 1 reports CVE-2018-10195 as patched; `node` 26.9.0
+revision 0 reports eight bump-fixed records; jq has no `vulnerabilities` field.
+The inspected API generator obtains these statuses from the Homebrew advisory
+database using Homebrew's own version comparison. Before adding a comparator,
+evaluate this supported HTTP output as the supplementary evidence provider.
+Match its exact candidate version/revision and artifact metadata; reconcile absent
+fields against a successfully fetched feed inventory. The generator also omits
+this field when database acquisition fails, so absence alone cannot mean clean.
+Public HTTP freshness and cross-snapshot consistency remain acceptance items.
