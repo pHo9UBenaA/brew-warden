@@ -384,3 +384,26 @@ pcre2 10.48 and ripgrep 15.2.0. The jq arm64_tahoe digest was dated to its
 unrelated platform bottle update. Offline tests distinguish unrelated recipe
 edits from a rebuild, omitted API status from no feed records, and matching
 patch fixes from unrelated/absent fixes.
+
+## Native acceptance after provider migration
+
+Commit `8bc31b8` replaces the providers and removes their obsolete implementations.
+Baseline, race, coverage, fuzz, lint and source/binary vulnerability checks passed.
+Full live candidate collection passed jq/oniguruma with all five claims.
+
+A fresh `brewwarden-cli-completion-02` VM reproduced a genuine overly strict
+dependency check: ripgrep 15.2.0's bottle records build dependency pcre2 10.47_1,
+while current authenticated metadata selects pcre2 10.48. The old equality check
+held the operation before mutation. Homebrew treats those historical versions as
+minimum requirements; the current dependency is separately selected and verified.
+The correction checks the complete transitive name closure and minimum versions,
+using Homebrew's version ordering. It does not authorize unknown dependencies or
+skip current artifact/installed-payload verification. A native regression test
+rejects missing/extra/duplicate dependencies, newer requirements and missing
+revision data.
+
+After the correction, actual product service acceptance installed fzf 0.74.4,
+pcre2 10.48 and ripgrep 15.2.0, preserved unrelated installed packages, and passed
+a fully revalidated unchanged rerun (148.36 seconds). This exercises the retained
+native execution path, not the proposed public-command replacement. The separate
+public CLI fresh-install/corruption/missing-cache probe also passed in this VM.

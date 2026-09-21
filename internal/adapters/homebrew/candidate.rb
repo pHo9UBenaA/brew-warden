@@ -59,11 +59,31 @@ class BrewWardenCandidate
       raise "cache outside workspace" unless cached.realpath.to_s.start_with?((root/"cache").to_s + "/")
       raise "cached bottle changed" unless Digest::SHA256.file(cached).hexdigest == item.fetch("bottleSHA256")
       formula.fetch_bottle_tab(quiet: true)
-      dependencies = formula.bottle_tab_attributes.fetch("runtime_dependencies").map { |dep| [dep.fetch("full_name"), dep.fetch("version"), dep.fetch("revision")] }.sort
-      wanted = item.fetch("dependencies").map { |dep| [dep, items.fetch(dep).fetch("version"), items.fetch(dep).fetch("revision")] }.sort
-      raise "OCI dependency graph changed" unless dependencies == wanted
+      validate_runtime_dependencies(name, formula.bottle_tab_attributes.fetch("runtime_dependencies"))
       embedded_sha = Digest::SHA256.hexdigest(embedded_text)
       { name:, cachePath: cached.realpath.to_s, embeddedRecipeSHA256: embedded_sha }
+    end
+  end
+
+  # Bottle/receipt versions describe the build or earlier installation. Homebrew
+  # accepts newer dependencies; current installed bytes are checked separately.
+  # Preserve the full name closure and minimum versions, not historical equality.
+  def validate_runtime_dependencies(name, dependencies)
+    wanted = []
+    pending = items.fetch(name).fetch("dependencies").dup
+    until pending.empty?
+      dependency = pending.pop
+      next if wanted.include?(dependency)
+      raise "cyclic runtime graph" if dependency == name
+      wanted << dependency
+      pending.concat(items.fetch(dependency).fetch("dependencies"))
+    end
+    raise "runtime dependency graph changed" unless dependencies.map { |dep| dep.fetch("full_name") }.sort == wanted.sort
+    dependencies.each do |dependency|
+      version, revision = dependency.fetch("version"), dependency.fetch("revision")
+      raise "invalid dependency version" unless version.is_a?(String) && !version.empty? && revision.is_a?(Integer) && revision >= 0
+      formula = formulae.fetch(dependency.fetch("full_name"))
+      raise "candidate dependency older than bottle requirement" unless formula.pkg_version >= PkgVersion.new(Version.new(version), revision)
     end
   end
 
@@ -84,9 +104,7 @@ class BrewWardenCandidate
       tab = JSON.parse(receipt.read)
       raise "source fallback detected" unless tab.fetch("poured_from_bottle") == true && tab.fetch("built_as_bottle") == true
       raise "installed source identity mismatch" unless tab.fetch("arch") == "arm64" && tab.fetch("used_options").empty? && tab.fetch("source").fetch("tap") == "homebrew/core" && tab.fetch("source").fetch("spec") == "stable" && tab.fetch("source").fetch("versions").fetch("stable") == item.fetch("version")
-      dependencies = tab.fetch("runtime_dependencies").map { |dep| [dep.fetch("full_name"), dep.fetch("version"), dep.fetch("revision")] }.sort
-      wanted = item.fetch("dependencies").map { |dep| [dep, items.fetch(dep).fetch("version"), items.fetch(dep).fetch("revision")] }.sort
-      raise "installed runtime graph mismatch" unless dependencies == wanted
+      validate_runtime_dependencies(name, tab.fetch("runtime_dependencies"))
       embedded = Utils::Bottles.formula_contents(root/"inputs"/filename(item), name:)
       raise "installed recipe mismatch" unless (prefix/".brew/#{name}.rb").read == embedded
       raise "candidate not active" unless formula.opt_prefix.symlink? && formula.opt_prefix.realpath == prefix

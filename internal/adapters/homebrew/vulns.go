@@ -91,8 +91,8 @@ func validAdvisoryID(id string) bool {
 	return true
 }
 
-// scanCandidateVulnerabilities is a replacement capability under acceptance;
-// product collection does not route through it until both advisory sources pass.
+// scanCandidateVulnerabilities checks the explicit candidate closure before
+// collection combines it with the Homebrew advisory status.
 func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates []formulaMetadata) (publicVulnsReport, []byte, error) {
 	fail := func(err error) (publicVulnsReport, []byte, error) { return publicVulnsReport{}, nil, err }
 	if ctx == nil || len(candidates) == 0 || len(candidates) > 128 {

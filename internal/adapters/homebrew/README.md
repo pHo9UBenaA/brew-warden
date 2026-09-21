@@ -61,6 +61,11 @@ It rejects source/graph differences, requirements, options, post-install actions
 resources, optional/test dependencies, migrations and conflicts. The selected
 native bottle digest, tag and rebuild must match the authenticated candidate.
 Cache files must resolve inside the private workspace and match the actual digest.
+OCI and receipt dependency versions are historical lower bounds, not an equality
+requirement for current candidates. Check their complete transitive name closure
+and reject a candidate below a recorded minimum using Homebrew's package version
+ordering. Every actual candidate dependency still needs its own artifact evidence
+and installed-payload verification under the execution locks.
 
 Recipe syntax analysis for upstream source-age and direct OSV mapping has been
 removed. Bottle age follows digest-bound Homebrew history; advisory applicability
