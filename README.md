@@ -11,16 +11,16 @@ The distribution evaluates official core bottles on
 It includes pinned Homebrew 7.0.4, portable Ruby 4.0.7 and an attestation-only
 verifier based on GitHub CLI 2.101.0. Go and a separate `gh` installation are not
 needed by users. Eligibility comes from verified capabilities, not a package-name
-allowlist. The current source inspection recognizes bounded Autotools and CMake
-builds; publication and advisory evidence require a canonical GitHub release
-asset and established repository advisory coverage. Unsupported recipes, casks,
+allowlist. Vulnerability checks combine public `brew vulns` with Homebrew's
+advisory data. Age follows the selected bottle's registration history, including
+same-version rebuilds. Unsupported recipes, casks,
 third-party taps, source builds,
 services, post-install hooks and unverified affected dependents stop before
 installation. Plain `brew` commands are not intercepted.
 
 Every candidate, including dependencies already installed, needs authenticated
-metadata, matching bottle bytes, expected publisher provenance, bound upstream
-publication and current mapped advisory coverage. Missing evidence stops the
+metadata, matching bottle bytes, expected publisher provenance, bottle registration
+age and current advisory checks. Missing evidence stops the
 command. Native Homebrew locks and frozen inputs bind checks to execution;
 installed payloads are compared against native reconstruction of verified bottles.
 These checks reduce specific supply-chain risks; they cannot establish that
@@ -48,9 +48,9 @@ bwd status
 required candidate or affected dependent is unsupported, it stops. Unknown
 Homebrew arguments are rejected rather than passed through.
 
-The default minimum upstream release age is seven days. This dates the verified
-upstream source publication, not a bottle rebuild. An explicit normal-policy
-override is available:
+The default minimum bottle age is seven days. A rebuilt bottle starts its own
+waiting period even when the upstream version is unchanged. An explicit override
+is available:
 
 ```sh
 bwd --minimum-release-age 336h brew install jq

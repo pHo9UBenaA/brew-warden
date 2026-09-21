@@ -16,7 +16,6 @@ type inspectedCandidate struct {
 	Name                 string        `json:"name" required:"true"`
 	CachePath            string        `json:"cachePath" required:"true"`
 	EmbeddedRecipeSHA256 domain.Digest `json:"embeddedRecipeSHA256" required:"true"`
-	UnmodifiedSource     bool          `json:"unmodifiedSource" required:"true"`
 }
 type inspectionDocument struct {
 	Schema     int                  `json:"schema" required:"true"`

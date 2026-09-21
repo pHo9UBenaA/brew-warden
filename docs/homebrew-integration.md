@@ -21,8 +21,8 @@ scope. Exact upstream pins, options and boundary tests live beside each adapter.
 | Artifact integrity | Native checksum verification plus authenticated digest, frozen bottle inputs and complete closure binding | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Metadata authenticity | Pinned Homebrew JWS verification before recipe selection; strict metadata and recipe identity checks | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Bottle provenance | Maintained attestation-only verifier; exact subject, signer and workflow checks without native gh bootstrap | [Attestation](../internal/adapters/attestation/README.md) |
-| Minimum release age | Supplemental publisher evidence bound to source bytes; pure policy enforces upstream publication age | [Publication](../internal/adapters/githubrelease/README.md) |
-| Known vulnerabilities | Supplemental revision-aware candidate mapping, freshness and positive advisory coverage controls; unknown is held | [OSV](../internal/adapters/osv/README.md) |
+| Minimum release age | Official recipe history bound to the selected bottle digest; rebuilds receive their own age | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Known vulnerabilities | Public OSV scanning plus Homebrew advisory status for the exact candidate; unavailable or skipped checks hold | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Execution binding | Pinned native install APIs, frozen inputs, retained formula locks, installer guards and reconstructed installed payload checks | [Homebrew](../internal/adapters/homebrew/README.md) |
 
 For each implemented row, link to its owning adapter and contract tests, and record:
@@ -56,9 +56,9 @@ attestation checks does not by itself constrain helper bootstrap, credentials,
 signer identity or later dependency resolution. Reuse only the guarantees actually
 established, and supplement missing claims through the owning adapters above.
 
-Publication claims do not date bottle rebuilds. Empty advisory responses without
-established coverage are not clean results. Neither provider's claim alone grants
-execution. The native session binds the complete evaluated closure to actual
+Bottle registration history dates the selected digest rather than the upstream
+version. A completed supported advisory lookup can report no known findings
+without a historical-advisory witness. Neither claim alone grants execution. The native session binds the complete evaluated closure to actual
 installation; builds without a trusted runtime digest remain diagnostic-only.
 
 ## Code and evidence ownership

@@ -135,7 +135,7 @@ func Evaluate(a Assessment) Decision {
 				case claim == Vulnerabilities && e.Applicability != NoKnownApplicableFindings:
 					code = "vulnerability_applicability_unresolved"
 				case claim == Publication:
-					if (e.Publication != UpstreamPublication && e.Publication != DistributionPublication) || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
+					if e.Publication != BottleRegistration || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
 						code = "publication_unknown_or_conflicting"
 					} else if a.Now-e.PublishedAt < a.Policy.MinimumAgeSeconds() {
 						code = "release_too_young"

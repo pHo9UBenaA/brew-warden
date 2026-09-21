@@ -9,10 +9,8 @@ import (
 	"time"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/githubrelease"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/osv"
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
 	"github.com/pHo9UBenaA/brew-warden/internal/cli"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
@@ -55,9 +53,9 @@ func service(configPath string) *application.Service {
 		return nil
 	}
 	collector := &homebrew.Collector{
-		Runtime:     homebrew.Runtime{Root: filepath.Join(filepath.Dir(executable), "runtime"), ManifestSHA256: domain.Digest(RuntimeSHA256)},
-		Directory:   filepath.Join(filepath.Dir(configPath), "collections"),
-		Publication: githubrelease.New(), Vulnerabilities: osv.New(),
+		Runtime:   homebrew.Runtime{Root: filepath.Join(filepath.Dir(executable), "runtime"), ManifestSHA256: domain.Digest(RuntimeSHA256)},
+		Directory: filepath.Join(filepath.Dir(configPath), "collections"),
+
 		Verifier: func(path string, sha domain.Digest) ports.ProvenanceVerifier {
 			return attestation.Verifier{Path: path, SHA256: sha}
 		},

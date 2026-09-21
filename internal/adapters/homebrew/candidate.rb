@@ -3,7 +3,6 @@
 require "json"
 require "digest"
 require "formulary"
-require_relative "source"
 
 class BrewWardenCandidate
   attr_reader :root, :document, :formulae, :items
@@ -64,9 +63,7 @@ class BrewWardenCandidate
       wanted = item.fetch("dependencies").map { |dep| [dep, items.fetch(dep).fetch("version"), items.fetch(dep).fetch("revision")] }.sort
       raise "OCI dependency graph changed" unless dependencies == wanted
       embedded_sha = Digest::SHA256.hexdigest(embedded_text)
-      { name:, cachePath: cached.realpath.to_s, embeddedRecipeSHA256: embedded_sha,
-        unmodifiedSource: [formula, embedded].all? { |f| (f.class.instance_methods(false) - %i[install test]).empty? } &&
-          BrewWardenSource.reviewed?(expected.read) && BrewWardenSource.reviewed?(embedded_text) }
+      { name:, cachePath: cached.realpath.to_s, embeddedRecipeSHA256: embedded_sha }
     end
   end
 

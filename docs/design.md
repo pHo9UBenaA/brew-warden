@@ -132,35 +132,34 @@ PATH, and other clients remain outside the wrapper's coverage.
 
 ## Age policy
 
-Keep upstream publication time, Homebrew adoption time, bottle creation time,
-and local first-observation time separate. Record each source and its trust
-conditions. A Git author or committer timestamp is not an independently verified
-publication timestamp.
+Measure the minimum age of the exact Homebrew bottle selected for installation,
+not the upstream software version. A bottle rebuilt yesterday is one day old even
+if the author's version was published a month ago. A different bottle digest
+must establish its own age evidence, including same-version rebuilds.
 
-Fetch metadata dynamically and measure age from a supported publisher's release
-or distribution publication time bound to the selected version/artifact. Do not
-start a fresh waiting period when the user first installs or invokes BrewWarden.
-For example, a release published ten days ago satisfies a seven-day threshold on
-first use if the publication evidence for the selected candidate is sufficient.
+Use official Homebrew recipe history anchored to the authenticated metadata's tap
+commit and recipe digest. Follow the selected bottle digest backwards through
+successive recipe changes. The commit recording its introduction gives the change
+date; when bounded history does not reach that transition, retain a conservative
+"registered no later than" date demonstrated by an earlier matching snapshot.
+Do not label this a download-start timestamp or an independently signed clock.
+Trust Homebrew's recorded commit dates under the existing Homebrew trust model.
+Reject future, conflicting or unavailable history rather than inventing dates.
 
-Expose `--minimum-release-age <duration>` before `brew`; `168h` expresses seven
-days. An explicit argument overrides the optional configuration value. Keep seven
-days as the provisional default until representative metadata has been evaluated.
-The minimum age setting does not waive any integrity, provenance, or vulnerability
-check. Local observations are audit/cache data, not the default age clock.
-
-The adapter must distinguish upstream publication from Homebrew adoption and
-bottle publication/rebuilds, and document which event the threshold covers. Do
-not inherit an old upstream date for an unverified replacement artifact. Select
-and test the authoritative timestamp sources during the first integration probe;
-a usable authenticated publication timestamp is not assumed to exist for every
-package. Missing, conflicting, or future-dated evidence holds the age check rather
-than fabricating a date or falling back to local first-observation waiting.
+Expose `--minimum-release-age <duration>` before `brew`; `168h` means seven days
+and remains the default. An explicit argument overrides optional configuration.
+A first invocation does not start a new waiting period for an old bottle.
+Unrelated recipe edits must not reset the clock when history demonstrates that
+the bottle digest is unchanged. Age exceptions remain explicit and artifact-bound;
+they never waive integrity, provenance, vulnerabilities or execution binding.
+Legacy upstream/distribution publication observations cannot satisfy this policy.
 
 ## Vulnerability evidence
 
-Reuse maintained sources or Homebrew capabilities through adapters. First verify
-candidate-version queries, machine-readable output, and Homebrew patch handling.
+Use public `brew vulns --json` for OSV and official Homebrew advisory data for
+Homebrew-specific applicability and patch fixes. Scan explicit complete candidate
+closures in an empty inspection prefix so an installed SBOM cannot select an old
+version. Do not repeat the same OSV lookup in a separate collector.
 Do not deny a package based only on a fuzzy name match.
 
 Represent `affected`, `not_affected`, and `unknown`, with separate source

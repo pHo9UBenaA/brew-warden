@@ -79,6 +79,7 @@ const (
 	UnknownPublication PublicationEvent = iota
 	UpstreamPublication
 	DistributionPublication
+	BottleRegistration
 )
 
 // Evidence is an adapter claim, not a verifier. The adapter must establish the

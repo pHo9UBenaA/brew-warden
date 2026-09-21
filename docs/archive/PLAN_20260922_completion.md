@@ -350,3 +350,37 @@ Match its exact candidate version/revision and artifact metadata; reconcile abse
 fields against a successfully fetched feed inventory. The generator also omits
 this field when database acquisition fails, so absence alone cannot mean clean.
 Public HTTP freshness and cross-snapshot consistency remain acceptance items.
+
+## Accepted bottle-age policy and provider migration
+
+The user confirmed that a bottle rebuilt yesterday is dated yesterday even when
+its upstream version is older. Use Homebrew's recorded introduction of the exact
+bottle digest. Do not retain author release dates as the default or silently
+substitute an attestation-log timestamp.
+
+Implemented the two-source advisory collector using public `brew vulns` and
+Homebrew's public advisory feed/formula API. Public API status delegates Homebrew
+version comparison and patch attribution; a completed feed distinguishes a
+missing record from an omitted status for an indexed formula. The complete feed
+is retained once as gzip with its decoded SHA-256, avoiding per-candidate copies.
+Direct OSV queries and their historical-record coverage gate are removed.
+
+Implemented digest-bound registration history anchored to the authenticated tap
+commit and current recipe hash. Follow consecutive history with the same bottle
+SHA-256; stop at the previous different bottle. Bounded history that does not
+reach introduction yields a conservative recorded upper bound, marked separately
+from an exact transition. Future/nonmonotonic clocks or mismatched history are
+unavailable evidence. Recipe response bytes and commit metadata are retained.
+Policy accepts the new bottle-registration event, not legacy upstream dates.
+
+The old GitHub release provider, direct OSV adapter, SourceCandidate port and
+Ripper source-procedure recognition were removed after their replacement probes
+passed. Native execution restrictions and retained installer sessions are still
+present pending the separate public execution binding gate.
+
+Live two-source collection passed fzf 0.74.4, jq 1.8.2, oniguruma 6.9.10,
+pcre2 10.48 and ripgrep 15.2.0. The jq arm64_tahoe digest was dated to its
+2026-08-25T09:47:35Z registration, not the upstream version release or a later
+unrelated platform bottle update. Offline tests distinguish unrelated recipe
+edits from a rebuild, omitted API status from no feed records, and matching
+patch fixes from unrelated/absent fixes.

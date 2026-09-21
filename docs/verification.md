@@ -43,7 +43,7 @@ and substitute only the recursive verification invocation. Coverage percentages
 do not include code exercised in those separately built subprocesses.
 
 Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
-configuration, attempt records, publisher responses, template comments, and control-byte rejection. Preserve discovered regressions
+configuration, attempt records, public advisory responses, template comments, and control-byte rejection. Preserve discovered regressions
 as seed cases or reviewed corpus files under the test directories. Add fuzz targets for actual
 product parsers as they appear. Coverage has no arbitrary percentage gate; race
 and fuzz checks cover only exercised behavior. Do not treat a clean advisory

@@ -153,3 +153,63 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	}
 
 }
+
+// Exercises the agreed two-source composition with fresh signed metadata rather
+// than a historical cache; all commands run in the private inspection prefix.
+func TestLivePublicAdvisorySources(t *testing.T) {
+	source := os.Getenv("BREWWARDEN_LIVE_RUNTIME")
+	if source == "" {
+		t.Skip("requires explicitly built native runtime and public advisory access")
+	}
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+		t.Fatal("requires Apple Silicon macOS")
+	}
+	manifest, err := os.ReadFile(filepath.Join(source, "manifest.json"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	root, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	w := workspace{root}
+	if err := w.initialize(); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := (Runtime{source, digestBytes(manifest)}).materialize(filepath.Join(root, "runtime")); err != nil {
+		t.Fatal(err)
+	}
+	profile, err := w.sandbox("acquire", true, false, []string{filepath.Join(root, "runtime/brew/Library")})
+	if err != nil {
+		t.Fatal(err)
+	}
+	targets := []string{"jq", "fzf", "ripgrep"}
+	raw, err := w.metadata(context.Background(), profile, targets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	_, candidates, err := parseMetadata(raw, targets)
+	if err != nil {
+		t.Fatal(err)
+	}
+	evidence, err := w.collectPublicAdvisories(context.Background(), publicClient(), candidates, time.Now().Unix())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(evidence) != len(candidates) {
+		t.Fatal("incomplete combined evidence")
+	}
+	for i, e := range evidence {
+		if e.Subject != candidates[i].artifact() {
+			t.Fatal("wrong evidence subject")
+		}
+		t.Logf("combined advisory %s %s: %v", e.Subject.Name, e.Subject.Version, e.Applicability)
+		if e.Subject.Name == "jq" {
+			age, _, err := bottleRegistration(context.Background(), publicClient(), candidates[i], time.Now().Unix())
+			if err != nil {
+				t.Fatal(err)
+			}
+			t.Logf("bottle registration bound: %s", time.Unix(age.PublishedAt, 0).UTC())
+		}
+	}
+}

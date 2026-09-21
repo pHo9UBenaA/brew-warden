@@ -14,7 +14,7 @@ import (
 	"time"
 )
 
-//go:embed bootstrap.rb candidate.rb inspect.rb source.rb payload.rb session.rb installer_guard.rb reconcile.rb
+//go:embed bootstrap.rb candidate.rb inspect.rb payload.rb session.rb installer_guard.rb reconcile.rb
 var nativeScripts embed.FS
 
 type workspace struct{ root string }

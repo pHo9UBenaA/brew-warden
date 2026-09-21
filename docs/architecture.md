@@ -54,14 +54,11 @@ explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.
 
-The `githubrelease` adapter owns exact publisher mappings, bounded public HTTP
-requests, release-response validation and upstream publication observations.
-It returns typed evidence plus the exact raw bytes retained by the candidate collector.
-Composition supplies it to the candidate collector; its claim alone is never execution permission.
-
-The `osv` adapter owns mapped candidate advisory queries, pagination, exact-tag
-applicability, coverage controls and retained raw observations. Its transport
-and schema validation remain outside policy; unavailable coverage is never clean.
+The Homebrew adapter owns public candidate scanning, official advisory feed/API
+observations and digest-bound bottle registration history. It combines the two
+advisory sources before returning one attributed vulnerability claim per artifact.
+Homebrew performs version-range comparison through its public formula API; the
+wrapper does not maintain a duplicate OSV client or upstream release provider.
 
 The `attestation` adapter owns the pinned verifier process and exact subject /
 signer output contract. Its maintained cryptographic runtime is built separately
@@ -79,9 +76,8 @@ capability records and contract tests. Do not create placeholder abstractions.
 
 The `homebrew` adapter owns the native runtime inventory, signed-metadata bridge,
 private process environment, candidate inspection, bound execution session and
-recovery snapshots. `ports.SourceCandidate`
-connects authenticated source identity to independent publication and advisory
-collectors; providers remain outside policy and do not import one another.
+recovery snapshots. Advisory and bottle-age observations use the same authenticated candidate identity;
+all transport and command details remain outside core policy.
 `tools/runtime-pack` is an explicit build-only native dependency packager, not
 a product bootstrap path or an exemption for external application imports.
 

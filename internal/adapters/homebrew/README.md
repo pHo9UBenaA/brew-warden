@@ -62,21 +62,10 @@ resources, optional/test dependencies, migrations and conflicts. The selected
 native bottle digest, tag and rebuild must match the authenticated candidate.
 Cache files must resolve inside the private workspace and match the actual digest.
 
-An empty patch list alone is not an unmodified-source claim. `source.rb` uses
-Ruby's maintained Ripper parser to recognize standard Autotools/Make and CMake
-build procedures in both current and embedded recipes, without formula-name or
-method-hash registries. It permits literal arguments, bounded local argument
-arrays, native standard argument helpers and path interpolation. Only stable
-specifications are eligible, so an explicitly head-only branch is inactive.
-
-Shell evaluation, source rewriting, arbitrary Ruby calls, custom methods,
-reassigned variables, make evaluation options, CMake script/copy modes and custom
-compiler/include hooks are unsupported. Unknown syntax holds rather than being
-evaluated. Native patch/resource and method-override checks remain separate.
-This is recognition of ordinary build procedures, not proof about arbitrary Ruby,
-build-system internals or protection against compromised Homebrew. The native
-build tools and authenticated upstream source remain trusted under the threat
-model; bottle execution still requires complete evidence and bound native inputs.
+Recipe syntax analysis for upstream source-age and direct OSV mapping has been
+removed. Bottle age follows digest-bound Homebrew history; advisory applicability
+uses public Homebrew commands and data. Native execution restrictions below remain
+until the separately planned public execution migration is verified.
 
 ## Tested boundaries
 
@@ -233,9 +222,9 @@ passed a second run with unchanged Cellar contents. The parameterized payload
 probe also rejected all six corruption cases for each of c-ares, jq and oniguruma
 and restored every fixture byte and mode.
 
-## Public advisory replacement under acceptance
+## Public advisory collection
 
-`scanCandidateVulnerabilities` is not yet wired to product collection. It invokes
+`scanCandidateVulnerabilities` is wired to candidate collection. It invokes
 public `info --json=v2 --formula` and `vulns --json` with explicit authenticated
 candidate names in an empty private inspection prefix. It adds no direct OSV
 query or Ruby bridge. The pinned scanner checks OSV and formula patch annotations;
@@ -260,6 +249,32 @@ Offline tests cover output refusal and inspection-prefix guards. The opt-in
 `TestLivePublicVulnsCandidateSelection` requires `BREWWARDEN_LIVE_RUNTIME`, native
 arm64 Go execution and OSV access. It exercises a copied runtime, a synthetic
 old-keg SBOM, clean candidate selection, skipped build dependencies, and network
-failure. It does not install packages or change the host Homebrew prefix. Both
-advisory-source integration and distribution acceptance remain required before
-this replaces the current product collector.
+failure. It does not install packages or change the host Homebrew prefix. The two-source collection has passed live jq/fzf/ripgrep closure checks. Final
+distribution acceptance and public execution migration remain separate gates.
+
+## Bottle registration age
+
+The adapter queries official Homebrew commit history at the authenticated tap
+commit and verifies the first recipe against its authenticated digest. It follows
+the selected bottle SHA-256 through earlier recipe snapshots, retaining responses
+and recipe bytes. History is bounded to four pages of twenty changes and two
+minutes. A matching historical snapshot provides a conservative upper bound on
+introduction if the exact transition is older than this window. The evidence
+records whether the transition was found. Future/nonmonotonic dates, unavailable
+history and mismatched recipes hold the age check; only an explicit age exception
+can waive that check. Commit dates are trusted Homebrew records, not independent
+publication proofs. Legacy source-release dates are no longer accepted by policy.
+
+## Supplemental advisory data
+
+Fetch the official advisory feed once per operation (64 MiB maximum). Validate
+its inventory and retain exact bytes once in a standard gzip observation. Query
+the public formula API (2 MiB maximum per candidate) and bind its identity,
+version/revision, recipe and bottle digests to the selected metadata. Homebrew's
+API computes range applicability; the wrapper does not implement another version
+comparator. Missing status for a formula listed in the feed holds the operation;
+absence from a completed feed is not a requirement for historical coverage.
+Requests bypass cached validation where supported, reject reported cache age over
+one day, and produce evidence valid for one hour after observation. No signature
+on the HTTP advisory data is claimed. An explicit matching Homebrew patch can
+resolve an upstream finding; unrelated fixes and missing records cannot.

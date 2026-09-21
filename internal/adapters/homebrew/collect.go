@@ -19,12 +19,10 @@ import (
 // Collector owns acquisition in a fresh private workspace. Evidence eligibility
 // does not expose a brew subprocess or authorize installation.
 type Collector struct {
-	Runtime         Runtime
-	Directory       string
-	Publication     ports.EvidenceCollector
-	Vulnerabilities ports.EvidenceCollector
-	Verifier        func(string, domain.Digest) ports.ProvenanceVerifier
-	client          *http.Client
+	Runtime   Runtime
+	Directory string
+	Verifier  func(string, domain.Digest) ports.ProvenanceVerifier
+	client    *http.Client
 }
 type Collection struct {
 	root          string
@@ -44,7 +42,7 @@ type downloadDocument struct {
 }
 
 func (c *Collector) Collect(ctx context.Context, request ports.Request, now int64) (*Collection, error) {
-	if c == nil || ctx == nil || c.Publication == nil || c.Vulnerabilities == nil || c.Verifier == nil || now <= 0 || now > 1<<62 || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" || !domain.ValidRequest(request.Operation, request.Targets) || len(request.Targets) == 0 {
+	if c == nil || ctx == nil || c.Verifier == nil || now <= 0 || now > 1<<62 || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" || !domain.ValidRequest(request.Operation, request.Targets) || len(request.Targets) == 0 {
 		return nil, errors.New("unsupported native collection request")
 	}
 	if !filepath.IsAbs(c.Directory) {
@@ -212,36 +210,36 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := decodeStrict(inspected, &doc); err != nil || doc.Schema != 1 || len(doc.Candidates) != len(candidates) {
 		return errors.New("incomplete native candidate inspection")
 	}
+	advisoryEvidence, err := w.collectPublicAdvisories(ctx, client, candidates, result.observedAt)
+	if err != nil {
+		return err
+	}
 	for i, f := range candidates {
 		inspected := doc.Candidates[i]
 		if inspected.Name != f.Name || !inspected.EmbeddedRecipeSHA256.Valid() {
 			return errors.New("native candidate inspection mismatch")
 		}
-		source := ports.SourceCandidate{Artifact: f.artifact(), SourceURL: f.SourceURL, SourceSHA256: f.SourceSHA256, RecipeSHA256: f.RecipeSHA256, UnmodifiedSource: inspected.UnmodifiedSource}
-		for _, provider := range []struct {
-			claim     domain.Claim
-			collector ports.EvidenceCollector
-		}{{domain.Publication, c.Publication}, {domain.Vulnerabilities, c.Vulnerabilities}} {
-			e, raw, err := provider.collector.Collect(ctx, source, result.observedAt)
-			if err != nil {
-				// Unavailable publication may be eligible for an explicit age exception;
-				// unavailable vulnerability evidence always holds the complete operation.
-				raw, _ = json.Marshal(struct {
-					Schema int
-					Claim  domain.Claim
-					Status string
-				}{1, provider.claim, "unavailable"})
-				e = domain.Evidence{Claim: provider.claim, Subject: source.Artifact, Status: domain.Unavailable, Provider: domain.Supplement, Source: "candidate collector", ProviderVersion: "1", RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600}
-			}
-			if err := checkClaim(e, source.Artifact, provider.claim, result.observedAt); err != nil {
-				return err
-			}
-			if err := w.observation(e, raw); err != nil {
-				return err
-			}
-			result.nodes[i].Evidence = append(result.nodes[i].Evidence, e)
+		e, raw, err := bottleRegistration(ctx, client, f, result.observedAt)
+		if err != nil {
+			// Missing age evidence remains eligible only for an explicit age exception.
+			raw, _ = json.Marshal(struct {
+				Schema int
+				Status string
+			}{1, "bottle registration unavailable"})
+			e = domain.Evidence{Claim: domain.Publication, Subject: f.artifact(), Status: domain.Unavailable, Provider: domain.Homebrew, Source: "Homebrew bottle registration history", ProviderVersion: "github-commits-2022-11-28", RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600}
 		}
+		if err := checkClaim(e, f.artifact(), domain.Publication, result.observedAt); err != nil {
+			return err
+		}
+		if err := w.observation(e, raw); err != nil {
+			return err
+		}
+		if err := checkClaim(advisoryEvidence[i], f.artifact(), domain.Vulnerabilities, result.observedAt); err != nil {
+			return err
+		}
+		result.nodes[i].Evidence = append(result.nodes[i].Evidence, e, advisoryEvidence[i])
 	}
+
 	return nil
 }
 func checkClaim(e domain.Evidence, a domain.Artifact, claim domain.Claim, now int64) error {

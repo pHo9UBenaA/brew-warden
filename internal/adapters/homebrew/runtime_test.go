@@ -273,7 +273,7 @@ end
 	if err := decodeStrict(inspected, &inspectedDoc); err != nil {
 		t.Fatal(err)
 	}
-	if inspectedDoc.Schema != 1 || len(inspectedDoc.Candidates) != 2 || !inspectedDoc.Candidates[0].UnmodifiedSource || !inspectedDoc.Candidates[1].UnmodifiedSource {
+	if inspectedDoc.Schema != 1 || len(inspectedDoc.Candidates) != 2 {
 		t.Fatal("source or closure inspection failed", inspectedDoc)
 	}
 	t.Log("inspected authenticated current and embedded recipes with exact OCI closure", digestBytes(inspected))
