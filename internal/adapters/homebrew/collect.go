@@ -136,7 +136,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := writeNew(filepath.Join(w.root, "native-inputs.json"), inputBytes, 0600); err != nil {
 		return err
 	}
-	downloaded, err := w.native(ctx, "fetch", profile, "fetch.rb")
+	downloaded, err := w.fetchBottles(ctx, profile, candidates)
 	if err != nil {
 		return err
 	}

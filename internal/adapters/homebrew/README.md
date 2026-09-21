@@ -119,8 +119,10 @@ alone does not cover these native execution paths.
 
 `Collector` now performs the complete acquisition sequence in a fresh private
 workspace: authenticate the signed API, fetch checksum-bound recipes at the exact
-tap commit, use native bottle fetching, copy and hash actual cached bytes, verify
-bundle subjects/signers, inspect native recipes/OCI closure, and collect publication
+tap commit, run public `brew fetch --formula --bottle-tag=arm64_tahoe` for the
+explicit complete candidate set, use `brew --cache` to locate each bottle, copy
+and hash actual cached bytes, verify bundle subjects/signers, inspect native
+recipes/OCI closure, and collect publication
 and OSV claims. Provenance failure stops before embedded recipe evaluation.
 Every evidence item is checked against its candidate, claim, observation time,
 one-hour maximum validity and exact saved observation bytes.
@@ -140,6 +142,12 @@ oniguruma closure and verified all five claims for each candidate without host
 Homebrew mutation. It retains its private workspace for examination. Normal tests
 remain offline and cover response bounds, forbidden destinations, ambiguous bundle
 envelopes, changed cached bytes and substituted saved observations.
+
+Public CLI acquisition does not treat exit zero as complete coverage: the number
+of returned cache paths, exact version/tag filenames, resolved private-cache paths,
+authenticated hashes and archive boundaries must all match. Progress text is kept
+only for diagnosis. No private Ruby fetch script is shipped. Native candidate and
+execution inspection remain separate pending demonstrated CLI equivalents.
 
 ## Retained native execution session
 

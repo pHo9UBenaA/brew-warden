@@ -13,7 +13,7 @@ import (
 	"time"
 )
 
-//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb fetch.rb session.rb installer_guard.rb reconcile.rb
+//go:embed bootstrap.rb metadata.rb candidate.rb inspect.rb source.rb payload.rb session.rb installer_guard.rb reconcile.rb
 var nativeScripts embed.FS
 
 type workspace struct{ root string }
@@ -69,9 +69,21 @@ func (w workspace) command(ctx context.Context, profile string, args ...string) 
 	return command
 }
 func (w workspace) native(ctx context.Context, label, profile, script string, args ...string) ([]byte, error) {
+	data, err := w.invoke(ctx, label, profile, append([]string{"ruby", filepath.Join(w.root, script), w.root}, args...)...)
+	if err != nil {
+		return nil, err
+	}
+	if err := writeNew(filepath.Join(w.root, label+".json"), data, 0600); err != nil {
+		return nil, err
+	}
+	return data, nil
+}
+
+// invoke also supports ordinary Homebrew commands, without loading a Ruby bridge.
+func (w workspace) invoke(ctx context.Context, label, profile string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	command := w.command(ctx, profile, append([]string{"ruby", filepath.Join(w.root, script), w.root}, args...)...)
+	command := w.command(ctx, profile, args...)
 	stdout, stderr := &processOutput{}, &processOutput{}
 	command.Stdout = stdout
 	command.Stderr = stderr
@@ -81,10 +93,7 @@ func (w workspace) native(ctx context.Context, label, profile, script string, ar
 		return nil, writeErr
 	}
 	if err != nil || stdout.overflow || stderr.overflow {
-		return nil, fmt.Errorf("native %s failed", label)
-	}
-	if err := writeNew(filepath.Join(w.root, label+".json"), stdout.Bytes(), 0600); err != nil {
-		return nil, err
+		return nil, fmt.Errorf("homebrew %s failed", label)
 	}
 	return stdout.Bytes(), nil
 }

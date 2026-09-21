@@ -266,7 +266,11 @@ handling, source-build fallback rejection, concurrent changes, and attestation
 exceptions. Passing a local bottle alone does not prove dependencies are fixed.
 `--force-bottle` is not assumed to universally prohibit source builds.
 
-The implementation uses pinned native APIs and authenticated original recipes.
+Prefer public Homebrew commands and documented controls, supplementing only
+demonstrated gaps. The current implementation uses pinned native APIs and
+authenticated original recipes; that mechanism is replaceable, not a product
+requirement. A working native-API experiment does not prove that a CLI-based
+implementation cannot meet the same contract.
 Do not generate executable Ruby recipes as an unexamined shortcut. If binding
 cannot be demonstrated for a new path, ship
 inspection while explicitly rejecting mutation commands. This is a release gate,

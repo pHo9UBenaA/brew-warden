@@ -140,19 +140,6 @@ func TestLiveNativeMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	for _, candidate := range candidates {
-		filename := nativeBottleName(candidate)
-		data, err := os.ReadFile(filepath.Join(inputs, filename))
-		if err != nil {
-			t.Fatal(err)
-		}
-		if err := validateBottleArchive(data, candidate); err != nil {
-			t.Fatal(err)
-		}
-		if err := writeNew(filepath.Join(root, "inputs", filename), data, 0600); err != nil {
-			t.Fatal(err)
-		}
-	}
 	cached, err := filepath.Abs("../../../.cache/vm-evidence/acceptance-03/brewwarden-probe.3mwiEaQB/cache/downloads")
 	if err != nil {
 		t.Fatal(err)
@@ -180,6 +167,48 @@ func TestLiveNativeMetadata(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+	downloaded, err := w.fetchBottles(context.Background(), profile, candidates)
+	if err != nil {
+		log, _ := os.ReadFile(filepath.Join(root, "fetch.stderr"))
+		t.Fatalf("public CLI fetch failed: %v: %s", err, log)
+	}
+	if err := w.copyDownloads(downloaded, candidates); err != nil {
+		t.Fatal(err)
+	}
+	t.Log("public CLI fetched complete bottle closure from frozen offline cache")
+	// Native verification is not a credential-free substitute for the bundled
+	// verifier: exercise the actual CLI with the same empty private home.
+	if _, err := w.invoke(context.Background(), "cli-verify", profile, "verify", "--json", "--bottle-tag=arm64_tahoe", "jq"); err == nil {
+		t.Fatal("credential-free native verification unexpectedly succeeded")
+	}
+	verifyLog, err := os.ReadFile(filepath.Join(root, "cli-verify.stderr"))
+	if err != nil || !strings.Contains(string(verifyLog), "missing credentials") {
+		t.Fatalf("unexpected native verification failure: %v: %s", err, verifyLog)
+	}
+	lockProbe := `require "lock_file"
+require "open3"
+root = Pathname(ARGV.fetch(0)).realpath
+raise "private test prefix required" unless HOMEBREW_PREFIX.realpath.to_s.start_with?(root.to_s + "/")
+lock = FormulaLock.new("jq")
+lock.lock
+begin
+  out, err, status = Open3.capture3(HOMEBREW_BREW_FILE.to_s, "install", "--formula", "--force-bottle", "jq")
+  raise "ordinary CLI bypassed retained lock" if status.success?
+  raise "unexpected CLI failure: #{out} #{err}" unless err.include?("already locked")
+  raise "CLI installed despite retained lock" if (HOMEBREW_CELLAR/"jq").exist?
+  puts "ordinary CLI cannot inherit a wrapper-held formula lock"
+ensure
+  lock.unlock
+end
+`
+	if err := writeNew(filepath.Join(root, "cli-lock-probe.rb"), []byte(lockProbe), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := w.native(context.Background(), "cli-lock-probe", profile, "cli-lock-probe.rb"); err != nil {
+		log, _ := os.ReadFile(filepath.Join(root, "cli-lock-probe.stderr"))
+		t.Fatalf("%v: %s", err, log)
+	}
+	t.Log("native CLI requires credentials and cannot inherit retained formula locks")
 	doc := nativeInputs{Schema: 1, Recipes: recipes, Candidates: candidates, Targets: []string{"jq"}, Operation: "install"}
 	data, _ := json.Marshal(doc)
 	if err := writeNew(filepath.Join(root, "native-inputs.json"), data, 0600); err != nil {
