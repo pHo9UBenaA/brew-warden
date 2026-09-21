@@ -572,3 +572,36 @@ Baseline, race, coverage, all fuzz targets and lint passed. The vulnerability st
 encountered sandbox DNS failure; the source/test and three binary scans passed
 when rerun with network access. Remaining work is final generic execution and
 reproducible distribution acceptance, not another architecture decision.
+
+
+### Representative compatibility corrections
+
+The shipped public CLI from `2cd1ca7` passed actual parent-process death after a
+durable start (152.87 s). Its installer continued independently; `status` reported
+unfinished, and `reconcile` waited for the owned operation to stop and recorded
+facts without inventing success or replaying installation. This case invokes the
+extracted distribution executable, not only the Go adapter. The initial harness
+path omitted the archive's `brewwarden/` directory and was corrected before testing.
+
+The expanded survey found three generic adapter restrictions, not missing trust:
+
+- Architecture-independent `all` bottles omit architecture in their OCI tab and
+  use attestations of the byte-identical original platform filenames. The pinned
+  Homebrew attestation source explicitly describes that merge. Require the exact
+  arm64_tahoe name, version, revision, rebuild and authenticated digest, or a direct
+  `all` attestation; do not accept an arbitrary filename prefix.
+- Git's older bottle lists gettext 1.0, whereas current gettext adds json-c.
+  Check every recorded bottle dependency against the fully verified selected API
+  closure and require all direct dependencies. Each selected dependency's own
+  bottle is checked separately. Do not reject a newly expanded transitive closure
+  merely because an older parent bottle does not repeat the new grandchild.
+- OpenSSL includes regular default files in `.bottle/etc`. Public Homebrew restores
+  those verified files with its existing modified-config handling. Accept regular
+  files/directories under `.bottle/etc` and `.bottle/var`; reject other restoration
+  roots and shared-prefix links. No separate installer or Ruby call is introduced.
+
+The Linux container found that the standard-library Getsid wrapper exists on
+macOS but not Linux. A small platform-specific syscall adapter fixes that build;
+Linux baseline, race and full-filesystem failure acceptance now pass. No dependency
+was added. Repeated full checks and final distribution acceptance follow these
+corrections before the completion gate is closed.

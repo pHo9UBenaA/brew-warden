@@ -197,7 +197,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err := os.WriteFile(cache, corrupt, 0600); err != nil {
 		t.Fatal(err)
 	}
-	_, err = w.invokeAPI(context.Background(), "invalid-signature", filepath.Join(root, "metadata.sb"), "info", "--json=v2", "--formula", "homebrew/core/jq")
+	_, err = w.invoke(context.Background(), "invalid-signature", filepath.Join(root, "metadata.sb"), "info", "--json=v2", "--formula", "homebrew/core/jq")
 	if err == nil {
 		t.Fatal("tampered metadata accepted with a warmed derived cache")
 	}
@@ -205,7 +205,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	// The product's immutable-input sandbox blocks that deletion. Repeat with
 	// cache writes allowed (network and host writes still denied) to establish
 	// the precise rejection cause, rather than accept any process failure.
-	_, err = w.invokeAPI(context.Background(), "signature-diagnostic", profile, "info", "--json=v2", "--formula", "homebrew/core/jq")
+	_, err = w.invoke(context.Background(), "signature-diagnostic", profile, "info", "--json=v2", "--formula", "homebrew/core/jq")
 	log, _ := os.ReadFile(filepath.Join(root, "signature-diagnostic.stderr"))
 	if err == nil || !strings.Contains(strings.ToLower(string(log)), "signature") {
 		t.Fatalf("tampered metadata was not rejected for its signature: %v: %s", err, log)

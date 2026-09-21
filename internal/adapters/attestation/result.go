@@ -25,6 +25,14 @@ func verifiedSubject(data []byte, a domain.Artifact) error {
 		return errors.New("missing provenance subjects")
 	}
 	matched := false
+	// Homebrew merges byte-identical platform bottles into an `all` bottle after
+	// attestation. Require the exact current-platform name and the same digest.
+	platformName := ""
+	if a.BottleTag == "all" && a.OS == "macos" && a.Arch == "arm64" {
+		platform := a
+		platform.BottleTag = "arm64_tahoe"
+		platformName = bottleName(platform)
+	}
 	for _, raw := range results {
 		var result struct {
 			Verification json.RawMessage `json:"verificationResult"`
@@ -82,7 +90,7 @@ func verifiedSubject(data []byte, a domain.Artifact) error {
 			if err := decodeObject(subject.Digest, &digest, "sha256"); err != nil {
 				return err
 			}
-			if subject.Name == bottleName(a) {
+			if subject.Name == bottleName(a) || platformName != "" && subject.Name == platformName {
 				if digest.SHA256 != a.SHA256 {
 					return errors.New("provenance digest mismatch")
 				}

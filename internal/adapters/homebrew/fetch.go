@@ -25,14 +25,14 @@ func (w workspace) fetchBottles(ctx context.Context, profile string, candidates 
 	}
 	// The complete closure is already selected from authenticated metadata.
 	// Do not ask --deps to discover additional, unassessed download targets.
-	output, err := w.invokeAPI(ctx, "fetch", profile, append([]string{"fetch", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
+	output, err := w.invoke(ctx, "fetch", profile, append([]string{"fetch", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
 	if err != nil {
 		return nil, err
 	}
 	if err := writeNew(filepath.Join(w.root, "fetch.stdout"), output, 0600); err != nil {
 		return nil, err
 	}
-	paths, err := w.invokeAPI(ctx, "cache-paths", profile, append([]string{"--cache", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
+	paths, err := w.invoke(ctx, "cache-paths", profile, append([]string{"--cache", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
 	if err != nil {
 		return nil, err
 	}

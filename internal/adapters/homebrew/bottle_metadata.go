@@ -52,7 +52,7 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 	}
 	var tab struct {
 		Dependencies []installedDependency `json:"runtime_dependencies" required:"true"`
-		Arch         string                `json:"arch" required:"true"`
+		Arch         string                `json:"arch"`
 	}
 	if err := decodeSchema([]byte(selected), &tab, true); err != nil || (candidate.BottleTag != "all" && tab.Arch != "arm64") || len(tab.Dependencies) > 128 {
 		return errors.New("invalid bottle dependency metadata")
@@ -83,8 +83,13 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 		}
 		seen[dependency.Name] = true
 	}
-	if len(seen) != len(wanted) {
-		return errors.New("bottle dependency metadata omits selected dependencies")
+	// A newly selected dependency may add its own dependencies after this bottle
+	// was built. Its own index is checked separately, and the full selected API
+	// closure is verified and installed in dependency order.
+	for _, name := range candidate.Dependencies {
+		if !seen[name] {
+			return errors.New("bottle dependency metadata omits a direct dependency")
+		}
 	}
 	return nil
 }

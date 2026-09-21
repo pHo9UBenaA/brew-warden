@@ -9,7 +9,6 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
-	"slices"
 	"time"
 )
 
@@ -53,22 +52,11 @@ func (w workspace) command(ctx context.Context, profile string, args ...string) 
 	return command
 }
 
-// invoke also supports ordinary Homebrew commands, without loading a Ruby bridge.
+// Invoke public Homebrew commands without loading a Ruby bridge.
 func (w workspace) invoke(ctx context.Context, label, profile string, args ...string) ([]byte, error) {
-	return w.invokeMode(ctx, label, profile, false, args...)
-}
-
-func (w workspace) invokeAPI(ctx context.Context, label, profile string, args ...string) ([]byte, error) {
-	return w.invokeMode(ctx, label, profile, true, args...)
-}
-
-func (w workspace) invokeMode(ctx context.Context, label, profile string, api bool, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	command := w.command(ctx, profile, args...)
-	if api {
-		command.Env = slices.DeleteFunc(command.Env, func(value string) bool { return value == "HOMEBREW_NO_INSTALL_FROM_API=1" })
-	}
 	stdout, stderr := &processOutput{}, &processOutput{}
 	command.Stdout = stdout
 	command.Stderr = stderr

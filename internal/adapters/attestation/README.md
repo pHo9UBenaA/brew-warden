@@ -69,3 +69,10 @@ digests, malformed or ambiguous JSON. The explicit live test accepts a prebuilt
 helper path in `BREWWARDEN_LIVE_VERIFIER` and verifies the actual jq bottle and
 bundle in the isolated probe cache. The built helper also rejected a wrong
 workflow identity against the same official bundle. No host Homebrew was modified.
+
+Homebrew merges byte-identical platform bottles into an `all` bottle after
+attestation. For this authenticated tag, accept either its exact filename or the
+exact arm64_tahoe filename with the same version, revision, rebuild and SHA-256.
+The inspected Homebrew attestation implementation handles the same merge; this
+adapter additionally requires the complete name and digest, not a name prefix.
+A different platform, rebuild or digest does not establish the selected subject.

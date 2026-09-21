@@ -170,7 +170,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 		}
 		e, raw, err := verifier.Verify(ctx, f.artifact(), filepath.Join(w.root, "inputs", bottleName(f)), file, home, result.observedAt)
 		if err != nil {
-			return errors.New("candidate provenance verification failed")
+			return fmt.Errorf("provenance for %s failed: %w", f.Name, err)
 		}
 		if err := checkClaim(e, f.artifact(), domain.Provenance, result.observedAt); err != nil {
 			return err

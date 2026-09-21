@@ -35,7 +35,8 @@ that older signed packages cannot contain malicious code.
   Bottles may be relocatable or require the exact `/opt/homebrew/Cellar` used for
   execution; another fixed prefix is unsupported. Actual file hashes must match authenticated metadata.
   Archive paths, entry types, permissions, links and sizes are bounded before
-  Homebrew extracts anything. Shared `.bottle` restoration currently holds.
+  Homebrew extracts anything. Verified regular defaults under `.bottle/etc` and `.bottle/var` may be restored
+  by Homebrew inside its prefix; shared-prefix symlinks remain unsupported.
 - The OCI index cached by public fetch must identify the exact digest and bottle
   tag. Its complete runtime dependency names must match the selected signed API
   closure. Historical dependency versions are lower bounds; Homebrew owns version

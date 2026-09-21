@@ -67,7 +67,7 @@ func TestSessionFindsChildInAnotherGroupAfterLeaderDies(t *testing.T) {
 		t.Fatal("invalid child fixture", err)
 	}
 	defer func() {
-		if sid, err := syscall.Getsid(member); err == nil && sid == command.Process.Pid {
+		if sid, err := processSessionID(member); err == nil && sid == command.Process.Pid {
 			_ = syscall.Kill(member, syscall.SIGKILL)
 		}
 	}()

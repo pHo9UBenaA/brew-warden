@@ -137,7 +137,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	// Reconcile public metadata in the same inspection context, before invoking
 	// the scanner. No installed SBOM can replace the selected current version.
 	infoArgs := append([]string{"info", "--json=v2", "--formula"}, args[2:]...)
-	info, err := w.invokeAPI(ctx, "advisory-candidate-info", profile, infoArgs...)
+	info, err := w.invoke(ctx, "advisory-candidate-info", profile, infoArgs...)
 	if err != nil {
 		return fail(err)
 	}

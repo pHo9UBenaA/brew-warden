@@ -39,7 +39,9 @@ func TestBottleExtractionBoundaries(t *testing.T) {
 	for _, header := range []*tar.Header{
 		{Name: "../outside", Typeflag: tar.TypeReg, Size: 1},
 		{Name: "jq/1.8.2/../other", Typeflag: tar.TypeReg, Size: 1},
-		{Name: "jq/1.8.2/.bottle/etc/config", Typeflag: tar.TypeReg, Size: 1},
+		{Name: "jq/1.8.2/.bottle/bin/injected", Typeflag: tar.TypeReg, Size: 1},
+		{Name: "jq/1.8.2/.bottle/etc/config", Typeflag: tar.TypeSymlink, Linkname: "../../../bin/jq"},
+		{Name: "jq/1.8.2/.bottle/etc", Typeflag: tar.TypeReg, Size: 1},
 		{Name: "jq/1.8.2/INSTALL_RECEIPT.json", Typeflag: tar.TypeReg, Size: 1},
 		{Name: "jq/1.8.2/escape", Typeflag: tar.TypeSymlink, Linkname: "../../../etc"},
 		{Name: "jq/1.8.2/escape", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
@@ -57,5 +59,17 @@ func TestBottleExtractionBoundaries(t *testing.T) {
 	data[len(data)-5] ^= 0x01
 	if err := validateBottleArchive(data, candidate); err == nil {
 		t.Fatal("damaged gzip footer accepted")
+	}
+}
+
+func TestBottleDefaultConfigurationIsVerifiedPayload(t *testing.T) {
+	candidate := formulaMetadata{Name: "jq", Version: "1.8.2"}
+	raw := bottleFixture(t,
+		&tar.Header{Name: "jq/1.8.2/.bottle", Typeflag: tar.TypeDir, Mode: 0755},
+		&tar.Header{Name: "jq/1.8.2/.bottle/etc/default.conf", Typeflag: tar.TypeReg, Mode: 0644, Size: 8},
+		&tar.Header{Name: "jq/1.8.2/.bottle/var/state", Typeflag: tar.TypeReg, Mode: 0600, Size: 1},
+	)
+	if err := validateBottleArchive(raw, candidate); err != nil {
+		t.Fatal(err)
 	}
 }

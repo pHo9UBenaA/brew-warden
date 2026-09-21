@@ -32,3 +32,28 @@ func TestBottleMetadataBindsDigestAndCompleteClosure(t *testing.T) {
 		})
 	}
 }
+
+func TestHistoricalBottleCanUseExpandedVerifiedDependencyClosure(t *testing.T) {
+	candidates := metadataFixture().Formulae
+	root := candidates[0]
+	root.Rebuild = 0
+	candidates[0] = root
+	extra := candidates[1]
+	extra.Name = "additional"
+	candidates[1].Dependencies = []string{"additional"}
+	candidates = append(candidates, extra)
+	tab, _ := json.Marshal(`{"arch":"arm64","runtime_dependencies":[{"full_name":"oniguruma","version":"6.9.9","revision":0}]}`)
+	raw := []byte(`{"schemaVersion":2,"manifests":[{"annotations":{"sh.brew.bottle.digest":"` + string(root.BottleSHA256) + `","org.opencontainers.image.ref.name":"` + root.Version + `.arm64_tahoe","sh.brew.tab":` + string(tab) + `}}]}`)
+	if err := validateBottleMetadata(raw, root, candidates); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestAllBottleMayOmitArchitecture(t *testing.T) {
+	candidate := metadataFixture().Formulae[1]
+	candidate.BottleTag, candidate.Rebuild = "all", 0
+	raw := []byte(`{"schemaVersion":2,"manifests":[{"annotations":{"sh.brew.bottle.digest":"` + string(candidate.BottleSHA256) + `","org.opencontainers.image.ref.name":"` + candidate.Version + `.all","sh.brew.tab":"{\"runtime_dependencies\":[]}"}}]}`)
+	if err := validateBottleMetadata(raw, candidate, []formulaMetadata{candidate}); err != nil {
+		t.Fatal(err)
+	}
+}

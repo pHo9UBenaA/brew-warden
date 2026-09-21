@@ -56,7 +56,7 @@ func sessionInProcesses(session, observer int, fields []string) (active, changed
 		if pid == observer {
 			continue
 		}
-		sid, err := syscall.Getsid(pid)
+		sid, err := processSessionID(pid)
 		if errors.Is(err, syscall.ESRCH) {
 			changed = true
 			continue

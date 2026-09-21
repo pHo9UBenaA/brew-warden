@@ -56,7 +56,7 @@ type installedDependency struct {
 
 func publicBrewCommand(ctx context.Context, w workspace, profile string, args ...string) *exec.Cmd {
 	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-f", profile, "/opt/homebrew/bin/brew"}, args...)...)
-	command.Env = slices.DeleteFunc(w.environment(), func(s string) bool { return s == "HOMEBREW_NO_INSTALL_FROM_API=1" || s == "HOMEBREW_DEVELOPER=1" })
+	command.Env = w.environment()
 	command.Env = append(command.Env, "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1", "HOMEBREW_NO_PATH_SHADOW_CHECK=1", "HOMEBREW_NO_ASK=1")
 	command.Dir = w.root
 	command.WaitDelay = 2 * time.Second

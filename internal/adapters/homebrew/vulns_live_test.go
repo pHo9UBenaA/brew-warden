@@ -105,7 +105,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if status != 0 || len(clean.Findings) != 0 || len(clean.Skipped) != 0 {
 		t.Fatal("expected clean candidate and dependency fixture; inspect changed upstream data")
 	}
-	info, err := w.invokeAPI(context.Background(), "probe-info", profile, "info", "--json=v2", "--formula", "homebrew/core/jq", "homebrew/core/oniguruma")
+	info, err := w.invoke(context.Background(), "probe-info", profile, "info", "--json=v2", "--formula", "homebrew/core/jq", "homebrew/core/oniguruma")
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -13,8 +13,8 @@ import (
 
 // Bound the extraction before calling native unpacking. Supported bottles may
 // install payloads and relative links only inside their own versioned keg.
-// Homebrew's .bottle/etc and .bottle/var restoration requires a broader action
-// model, so those shared-prefix effects remain unsupported.
+// Verified regular files under .bottle/etc and .bottle/var may be restored by
+// the public installer inside its prefix. Shared-prefix links remain unsupported.
 func validateBottleArchive(data []byte, f formulaMetadata) error {
 	compressed, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
@@ -43,8 +43,15 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 			return errors.New("unsafe or ambiguous bottle path")
 		}
 		relative := strings.TrimPrefix(name, prefix+"/")
-		if relative == ".bottle" || strings.HasPrefix(relative, ".bottle/") || relative == "INSTALL_RECEIPT.json" {
+		if relative == "INSTALL_RECEIPT.json" {
 			return errors.New("unsupported bottle installation side effects")
+		}
+		if relative == ".bottle" || strings.HasPrefix(relative, ".bottle/") {
+			root := relative == ".bottle" || relative == ".bottle/etc" || relative == ".bottle/var"
+			content := strings.HasPrefix(relative, ".bottle/etc/") || strings.HasPrefix(relative, ".bottle/var/")
+			if root && header.Typeflag != tar.TypeDir || !root && !content || header.Typeflag != tar.TypeDir && header.Typeflag != tar.TypeReg {
+				return errors.New("unsupported bottle shared-prefix entry")
+			}
 		}
 		if header.Mode&07000 != 0 || header.Mode&^07777 != 0 {
 			return errors.New("unsupported bottle permissions")

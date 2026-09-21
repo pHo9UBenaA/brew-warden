@@ -150,3 +150,8 @@ the real command starts and checks stopped-session recovery without replay.
 installing and retains a JSON classification. A passing survey test means the
 survey completed, not that every package was eligible. Read each held reason and
 use actual execution acceptance for supported representative packages.
+
+`TestLiveDistributionParentCrash` takes `BREWWARDEN_VM_DISTRIBUTION_BINARY` pointing
+to an extracted `bwd`. Provision absent xz in the VirtualMac. It kills that parent
+after the actual install starts, requires unfinished status, waits for safe
+reconciliation and checks that history does not invent success or replay work.

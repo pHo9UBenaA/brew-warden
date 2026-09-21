@@ -114,7 +114,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 		for _, name := range names {
 			args = append(args, "homebrew/core/"+name)
 		}
-		raw, err := w.invokeAPI(ctx, fmt.Sprintf("info-%d", len(doc.Formulae)), profile, args...)
+		raw, err := w.invoke(ctx, fmt.Sprintf("info-%d", len(doc.Formulae)), profile, args...)
 		if err != nil {
 			return nil, err
 		}

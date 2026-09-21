@@ -164,3 +164,22 @@ func TestLiveVerifier(t *testing.T) {
 	}
 	t.Log("verified official jq candidate", e.RawSHA256)
 }
+
+func TestAllBottleRequiresIdenticalAttestedPlatformBytes(t *testing.T) {
+	platform := artifactFixture()
+	all := platform
+	all.BottleTag = "all"
+	raw := resultFixture(platform)
+	if err := verifiedSubject([]byte(raw), all); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{
+		strings.Replace(raw, string(platform.SHA256), strings.Repeat("b", 64), 1),
+		strings.Replace(raw, "arm64_tahoe", "arm64_linux", 1),
+		strings.Replace(raw, ".bottle.1.", ".bottle.2.", 1),
+	} {
+		if err := verifiedSubject([]byte(bad), all); err == nil {
+			t.Fatal("unbound all bottle accepted")
+		}
+	}
+}
