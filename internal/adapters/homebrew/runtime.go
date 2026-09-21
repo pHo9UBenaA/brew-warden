@@ -33,8 +33,12 @@ type runtimeManifest struct {
 }
 
 // The manifest digest is selected by the distribution, not by package metadata.
-// Copy only inventoried inputs; unexpected executable/search-path content fails.
+// Copy reviewed Homebrew files from the existing installation into an empty
+// inspection prefix. The distribution contains the verifier and inventory only.
 func (r Runtime) materialize(destination string) (domain.Digest, error) {
+	return r.materializeFrom(destination, "/opt/homebrew")
+}
+func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, error) {
 	if !filepath.IsAbs(r.Root) || !r.ManifestSHA256.Valid() || !filepath.IsAbs(destination) {
 		return "", errors.New("trusted runtime is unavailable")
 	}
@@ -43,7 +47,7 @@ func (r Runtime) materialize(destination string) (domain.Digest, error) {
 		return "", errors.New("runtime manifest integrity mismatch")
 	}
 	var manifest runtimeManifest
-	if err := decodeStrict(raw, &manifest); err != nil || manifest.Schema != 1 || manifest.BrewRevision != brewRevision || len(manifest.Files) == 0 || len(manifest.Files) > 30000 {
+	if err := decodeStrict(raw, &manifest); err != nil || manifest.Schema != 2 || manifest.BrewRevision != brewRevision || len(manifest.Files) == 0 || len(manifest.Files) > 30000 {
 		return "", errors.New("unsupported runtime manifest")
 	}
 	entries := map[string]runtimeEntry{}
@@ -82,7 +86,7 @@ func (r Runtime) materialize(destination string) (domain.Digest, error) {
 		if relative == "manifest.json" {
 			return nil
 		}
-		if _, ok := entries[relative]; !ok {
+		if _, ok := entries[relative]; !ok || strings.HasPrefix(relative, "brew/") {
 			return errors.New("unlisted runtime input")
 		}
 		return nil
@@ -94,7 +98,11 @@ func (r Runtime) materialize(destination string) (domain.Digest, error) {
 		return "", err
 	}
 	for _, entry := range manifest.Files {
-		src, dst := filepath.Join(r.Root, filepath.FromSlash(entry.Path)), filepath.Join(destination, filepath.FromSlash(entry.Path))
+		src := filepath.Join(r.Root, filepath.FromSlash(entry.Path))
+		if strings.HasPrefix(entry.Path, "brew/") {
+			src = filepath.Join(prefix, filepath.FromSlash(strings.TrimPrefix(entry.Path, "brew/")))
+		}
+		dst := filepath.Join(destination, filepath.FromSlash(entry.Path))
 		if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
 			return "", err
 		}
@@ -152,7 +160,10 @@ func digestBytes(data []byte) domain.Digest {
 }
 func readRegular(file string, limit int64) ([]byte, error) {
 	info, err := os.Lstat(file)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > limit {
+	if err != nil {
+		return nil, err
+	}
+	if !info.Mode().IsRegular() || info.Size() > limit {
 		return nil, errors.New("input is not a bounded regular file")
 	}
 	f, err := os.Open(file)

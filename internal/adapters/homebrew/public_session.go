@@ -21,7 +21,6 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-// This capability remains outside product routing until isolated acceptance passes.
 // It coordinates only BrewWarden operations, not independent Homebrew clients.
 type publicSession struct {
 	w        workspace
@@ -58,7 +57,7 @@ type installedDependency struct {
 func publicBrewCommand(ctx context.Context, w workspace, profile string, args ...string) *exec.Cmd {
 	command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", append([]string{"-f", profile, "/opt/homebrew/bin/brew"}, args...)...)
 	command.Env = slices.DeleteFunc(w.environment(), func(s string) bool { return s == "HOMEBREW_NO_INSTALL_FROM_API=1" || s == "HOMEBREW_DEVELOPER=1" })
-	command.Env = append(command.Env, "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1", "HOMEBREW_NO_PATH_SHADOW_CHECK=1")
+	command.Env = append(command.Env, "HOMEBREW_NO_INSTALLED_DEPENDENTS_CHECK=1", "HOMEBREW_NO_PATH_SHADOW_CHECK=1", "HOMEBREW_NO_ASK=1")
 	command.Dir = w.root
 	command.WaitDelay = 2 * time.Second
 	return command
@@ -164,11 +163,11 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 	}
 	return document.Formulae, digest, nil
 }
-func publicActions(states []installedFormula, nodes []domain.Node, request nativeInputs) ([]nativeAction, error) {
+func publicActions(states []installedFormula, nodes []domain.Node, request collectionInputs) ([]plannedAction, error) {
 	if len(states) != len(nodes) {
 		return nil, errors.New("incomplete installed state")
 	}
-	result := make([]nativeAction, 0, len(nodes))
+	result := make([]plannedAction, 0, len(nodes))
 	for i, node := range nodes {
 		state := states[i]
 		if state.Name != node.Artifact.Name || state.Pinned || len(state.Installed) > 32 {
@@ -214,7 +213,7 @@ func publicActions(states []installedFormula, nodes []domain.Node, request nativ
 				return nil, errors.New("active installed version is absent from public info")
 			}
 		}
-		result = append(result, nativeAction{Name: state.Name, Operation: action})
+		result = append(result, plannedAction{Name: state.Name, Operation: action})
 	}
 	return result, nil
 }
@@ -281,7 +280,7 @@ func (w workspace) checkPublicRuntime() error {
 	}
 	return nil
 }
-func (c *Collection) PreparePublic(ctx context.Context, policy domain.Policy, waivers []domain.AgeWaiver, now int64, streams Streams) (ports.Prepared, ports.ExecutionSession, error) {
+func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers []domain.AgeWaiver, now int64, streams Streams) (ports.Prepared, ports.ExecutionSession, error) {
 	if c == nil || ctx == nil || !policy.Valid() || now < c.observedAt || now >= c.observedAt+3600 || len(c.nodes) == 0 {
 		return ports.Prepared{}, nil, errors.New("collection unavailable or expired")
 	}
@@ -290,7 +289,7 @@ func (c *Collection) PreparePublic(ctx context.Context, policy domain.Policy, wa
 		s.Close()
 		return ports.Prepared{}, nil, err
 	}
-	files, err := s.w.freezeInputs(c.inputs)
+	files, err := s.w.freezeInputs()
 	if err != nil || !slices.Equal(files, c.frozen) {
 		return fail(errors.New("collected inputs changed before planning"))
 	}
@@ -326,7 +325,7 @@ func (c *Collection) PreparePublic(ctx context.Context, policy domain.Policy, wa
 	if _, err := rand.Read(nonce); err != nil {
 		return fail(err)
 	}
-	s.plan = executionPlan{Schema: 2, MinimumAge: policy.MinimumAgeSeconds(), Nodes: c.Evidence(), Actions: actions, BeforeState: before, Environment: executionEnvironment{c.runtimeDigest, strings.TrimSpace(string(osVersion)), "/opt/homebrew"}, Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)), IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600), Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{}}
+	s.plan = executionPlan{Schema: 3, MinimumAge: policy.MinimumAgeSeconds(), Nodes: c.Evidence(), Actions: actions, BeforeState: before, Environment: executionEnvironment{c.runtimeDigest, strings.TrimSpace(string(osVersion)), "/opt/homebrew"}, Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)), IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600), Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{}}
 	for _, name := range c.inputs.Targets {
 		for _, node := range c.nodes {
 			if name == node.Artifact.Name {
@@ -376,7 +375,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	}
 	s.prepared = fresh
 	s.plan.Nodes, s.plan.Targets = fresh.Assessment.Nodes, fresh.Assessment.Targets
-	remaining := map[string]nativeAction{}
+	remaining := map[string]plannedAction{}
 	for _, action := range s.plan.Actions {
 		if action.Operation != "keep" {
 			remaining[action.Name] = action
@@ -384,7 +383,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	}
 	sequence := 0
 	for len(remaining) != 0 {
-		var selected nativeAction
+		var selected plannedAction
 		for _, node := range s.plan.Nodes {
 			action, ok := remaining[node.Artifact.Name]
 			if !ok {
@@ -424,8 +423,8 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	if err != nil {
 		return ports.ExecutionResult{ExitKnown: true, ExitCode: 0}, err
 	}
-	actions, err := publicActions(states, s.plan.Nodes, nativeInputs{Operation: "install"})
-	matches := err == nil && slices.IndexFunc(actions, func(a nativeAction) bool { return a.Operation != "keep" }) < 0
+	actions, err := publicActions(states, s.plan.Nodes, collectionInputs{Operation: "install"})
+	matches := err == nil && slices.IndexFunc(actions, func(a plannedAction) bool { return a.Operation != "keep" }) < 0
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }
 func (s *publicSession) runCommand(ctx context.Context, sequence int, args []string) (ports.ExecutionResult, error) {
@@ -438,21 +437,19 @@ func (s *publicSession) runCommand(ctx context.Context, sequence int, args []str
 	defer gate.Close()
 	defer release.Close()
 	base := publicBrewCommand(ctx, s.w, s.profile, args...)
-	// Hold the child before exec until its process group is durably recorded.
+	// Hold the child before exec until its process session is durably recorded.
 	// All command arguments remain separate; the shell program is a fixed literal.
 	command := exec.CommandContext(ctx, "/bin/sh", append([]string{"-c", `read -r ready <&3 || exit 125; exec 3<&-; exec "$@"`, "brewwarden-exec"}, base.Args...)...)
 	command.Env, command.Dir = base.Env, base.Dir
 	command.ExtraFiles = []*os.File{gate, s.lock}
-	command.SysProcAttr = &syscall.SysProcAttr{Setpgid: true}
-	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGKILL) }
+	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}
+	command.Cancel = func() error { return syscall.Kill(-command.Process.Pid, syscall.SIGINT) }
 	command.WaitDelay = 2 * time.Second
 	command.Stdin, command.Stdout, command.Stderr = s.streams.In, s.streams.Out, s.streams.Err
 	if err := command.Start(); err != nil {
 		return ports.ExecutionResult{}, err
 	}
-	raw, _ := json.Marshal(struct {
-		PID int `json:"pid"`
-	}{command.Process.Pid})
+	raw, _ := json.Marshal(processRecord{PID: command.Process.Pid, Session: command.Process.Pid})
 	if err := writeRecord(filepath.Join(s.w.root, fmt.Sprintf("process-%d.json", sequence)), raw); err != nil {
 		_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
 		_ = command.Wait()
@@ -474,6 +471,9 @@ func (s *publicSession) runCommand(ctx context.Context, sequence int, args []str
 		code = 128 + int(status.Signal())
 	}
 	result := ports.ExecutionResult{ExitKnown: code >= 0 && code <= 255, ExitCode: code}
+	if active, err := processSessionActive(command.Process.Pid); err != nil || active {
+		return result, errors.New("owned subprocesses are still active or unavailable; reconcile before retrying")
+	}
 	if waitErr != nil {
 		observe, stop := context.WithTimeout(context.Background(), 5*time.Second)
 		defer stop()

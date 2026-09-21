@@ -24,6 +24,11 @@ An API outage is not evidence that a signature was removed or a vulnerability wa
 fixed. A valid signature, old release, or empty advisory response is not proof of
 harmless software.
 
+Existing packages deliberately installed or changed outside BrewWarden remain
+trusted user-owned state. Public receipt flags are observations, not proof of
+installed payload hashes. Exact bottle integrity and provenance claims apply to
+the acquired artifacts and BrewWarden's own new installation actions.
+
 Only operations routed through BrewWarden are in scope. A proposed PATH shim
 can be bypassed by direct Homebrew paths or a different environment; installing
 the binary alone does not intercept commands.

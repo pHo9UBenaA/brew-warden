@@ -5,11 +5,13 @@ import (
 	"crypto/sha256"
 	"encoding/hex"
 	"encoding/json"
+	"io"
 	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
+	"sync"
 	"testing"
 	"time"
 
@@ -49,12 +51,20 @@ func TestLivePublicCommandExecution(t *testing.T) {
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
 	for pass := 0; pass < 2; pass++ {
+		fault := os.Getenv("BREWWARDEN_VM_PUBLIC_FAULT")
+		runContext, stopRun := context.WithCancel(ctx)
+		defer stopRun()
+		streams := homebrew.Streams{Out: os.Stdout, Err: os.Stderr}
+		interrupt := &interruptOnPour{destination: os.Stdout, cancel: stopRun}
+		if fault == "interrupt" {
+			streams.Out, streams.Err = interrupt, interrupt
+		}
 		now := time.Now().Unix()
 		collection, err := collector.Collect(ctx, ports.Request{Operation: operation, Targets: names}, now)
 		if err != nil {
 			t.Fatal(err)
 		}
-		prepared, session, err := collection.PreparePublic(ctx, domain.DefaultPolicy(), nil, time.Now().Unix(), homebrew.Streams{Out: os.Stdout, Err: os.Stderr})
+		prepared, session, err := collection.Prepare(ctx, domain.DefaultPolicy(), nil, time.Now().Unix(), streams)
 		if err != nil {
 			t.Fatal(err)
 		}
@@ -67,13 +77,35 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			t.Fatal(err)
 		}
 		unrelatedBefore := publicUnrelatedKegs(t, prepared.Assessment.Nodes)
-		fault := os.Getenv("BREWWARDEN_VM_PUBLIC_FAULT")
+		if fault == "interrupt" {
+			if result, err := session.Run(runContext, prepared.Assessment.Binding); err == nil || !interrupt.triggered || !result.ExitKnown || result.ExitCode == 0 {
+				t.Fatal("installer did not reach the interruption fixture", err)
+			}
+			if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
+				t.Fatal("interrupted execution changed unrelated packages")
+			}
+			engine := homebrew.Engine{Collector: &collector}
+			if _, err := engine.Snapshot(ctx, prepared.Assessment.Binding); err == nil {
+				t.Fatal("recovery accepted an open execution session")
+			}
+			if err := session.Close(); err != nil {
+				t.Fatal(err)
+			}
+			state, err := engine.Snapshot(ctx, prepared.Assessment.Binding)
+			if err != nil || !state.Valid() {
+				t.Fatal("interrupted state could not be reconciled", err)
+			}
+			again, err := engine.Snapshot(ctx, prepared.Assessment.Binding)
+			if err != nil || again != state {
+				t.Fatal("recovery changed or replayed the installation", err)
+			}
+			return
+		}
 		if fault != "" {
 			before, err := kegSnapshot("/opt/homebrew/Cellar")
 			if err != nil {
 				t.Fatal(err)
 			}
-			runContext := ctx
 			switch fault {
 			case "changed-input":
 				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "*.tar.gz"))
@@ -139,6 +171,28 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
+
+type interruptOnPour struct {
+	mu          sync.Mutex
+	destination io.Writer
+	cancel      context.CancelFunc
+	tail        string
+	triggered   bool
+}
+
+func (w *interruptOnPour) Write(data []byte) (int, error) {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	w.tail += string(data)
+	if !w.triggered && strings.Contains(w.tail, "Fetching downloads for:") {
+		w.triggered = true
+		w.cancel()
+	}
+	if len(w.tail) > 4096 {
+		w.tail = w.tail[len(w.tail)-4096:]
+	}
+	return w.destination.Write(data)
 }
 
 func publicUnrelatedKegs(t *testing.T, nodes []domain.Node) map[string]string {

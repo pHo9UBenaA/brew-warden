@@ -33,10 +33,10 @@ func main() {
 }
 func hash(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 func run(args []string) error {
-	if len(args) != 7 {
-		return fmt.Errorf("usage: release-pack BINARY RUNTIME MODULES_JSON GO_LICENSE NATIVE_NOTICES SOURCE_REVISION OUTPUT.tar.gz")
+	if len(args) != 6 {
+		return fmt.Errorf("usage: release-pack BINARY RUNTIME MODULES_JSON GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
 	}
-	binary, runtimeRoot, modulesFile, goLicense, nativeNotices, revision, output := args[0], args[1], args[2], args[3], args[4], args[5], args[6]
+	binary, runtimeRoot, modulesFile, goLicense, revision, output := args[0], args[1], args[2], args[3], args[4], args[5]
 	if len(revision) != 40 || strings.Trim(revision, "0123456789abcdef") != "" {
 		return fmt.Errorf("invalid source revision")
 	}
@@ -57,6 +57,12 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
+	adapterDocs, err := filepath.Glob("internal/adapters/*/README.md")
+	if err != nil {
+		return err
+	}
+	docs = append(docs, adapterDocs...)
+	docs = append(docs, "CONTRIBUTING.md")
 	for _, file := range docs {
 		if err := add(filepath.ToSlash(file), file, 0644); err != nil {
 			return err
@@ -76,12 +82,15 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	const pinned = "9424050677790a1c88c66ab769c5167d59a874cd6a02074665268084c97e758b"
+	const pinned = "d50f6a3f967fae22b9a84cf705d59b29e15b8ee2311c984f050ce85b2f8c1ce7"
 	if hash(manifestRaw) != pinned {
-		return fmt.Errorf("unsupported runtime manifest")
+		return fmt.Errorf("unsupported runtime inventory digest")
 	}
+
 	var manifest struct {
-		Files []struct {
+		Schema       int
+		BrewRevision string
+		Files        []struct {
 			Path         string
 			Mode         uint32
 			SHA256, Link string
@@ -90,7 +99,16 @@ func run(args []string) error {
 	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
 		return err
 	}
+	if manifest.Schema != 2 || manifest.BrewRevision != "edb70f031e4170c780799633a1226ff73e1077f4" {
+		return fmt.Errorf("unsupported runtime inventory")
+	}
 	for _, f := range manifest.Files {
+		if strings.HasPrefix(f.Path, "brew/") {
+			continue
+		}
+		if f.Path != "verifier" {
+			return fmt.Errorf("unexpected bundled runtime input")
+		}
 		file := filepath.Join(runtimeRoot, filepath.FromSlash(f.Path))
 		info, err := os.Lstat(file)
 		if err != nil {
@@ -139,7 +157,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	notice := "BrewWarden runtime dependencies\n\nSource revision: " + revision + "\nRuntime manifest SHA-256: " + pinned + "\n\nHomebrew 7.0.4: https://github.com/Homebrew/brew/tree/edb70f031e4170c780799633a1226ff73e1077f4\nPortable Ruby 4.0.7 original distribution: https://cache.ruby-lang.org/pub/ruby/4.0/ruby-4.0.7.tar.gz\nRuby source SHA-256: 911ace20f90d068ca0e4dda6d0e4f0f81e52e52f2dd4f4004c721e253412e82d\nRuby statically includes OpenSSL 4.0.2 and libyaml 0.2.5.\nNative dependency licenses and Ruby LEGAL are in licenses/native.\nHomebrew and bundled gem licenses are retained in runtime/brew.\nSystem dependencies: macOS libSystem, libobjc, libresolv, Security and CoreFoundation.\n\nAttestation-only helper: github.com/cli/cli/v2 v2.101.0\nThe following Go modules are recorded in the actual helper binary; licenses\ninclude additional notices supplied by each module's source distribution.\n\n"
+	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\nRuntime inventory SHA-256: " + pinned + "\n\nHomebrew is reused from the existing installation and is not bundled.\nAttestation-only helper: github.com/cli/cli/v2 v2.101.0\nThe following Go modules are recorded in the helper binary.\n\n"
 	linked := append(info.Deps, &info.Main)
 	sort.Slice(linked, func(i, j int) bool { return linked[i].Path < linked[j].Path })
 	for _, dependency := range linked {
@@ -187,21 +205,6 @@ func run(args []string) error {
 			return fmt.Errorf("no license found for linked module %s", m.Path)
 		}
 		notice += m.Path + " " + m.Version + " " + m.Sum + "\n"
-	}
-	expectedNotices := map[string]string{
-		"Ruby-LEGAL":          "a74812486cffbdc55141a5d9f165d782cbb202660d827622ec966237d4717b99",
-		"Ruby-BSDL":           "36a9a6e7347214bbba599a412617204e65bff065dcbe5c46f5cb454c80de9eb0",
-		"OpenSSL-LICENSE.txt": "7d5450cb2d142651b8afa315b5f238efc805dad827d91ba367d8516bc9d49e7a",
-		"libyaml-LICENSE.txt": "c40112449f254b9753045925248313e9270efa36d226b22d82d4cc6c43c57f29",
-	}
-	for name, want := range expectedNotices {
-		raw, err := os.ReadFile(filepath.Join(nativeNotices, name))
-		if err != nil || hash(raw) != want {
-			return fmt.Errorf("native license input mismatch: %s", name)
-		}
-		if err := add("licenses/native/"+name, filepath.Join(nativeNotices, name), 0644); err != nil {
-			return err
-		}
 	}
 	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0644})
 	return archive(output, items)

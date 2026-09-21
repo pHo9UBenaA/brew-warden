@@ -32,7 +32,7 @@ func bottleFixture(t *testing.T, extra ...*tar.Header) []byte {
 	return data.Bytes()
 }
 func TestBottleExtractionBoundaries(t *testing.T) {
-	candidate := formulaMetadata{Name: "jq", Version: "1.8.2"}
+	candidate := formulaMetadata{BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2"}
 	if err := validateBottleArchive(bottleFixture(t), candidate); err != nil {
 		t.Fatal(err)
 	}

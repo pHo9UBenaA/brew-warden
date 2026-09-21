@@ -25,14 +25,14 @@ func (w workspace) fetchBottles(ctx context.Context, profile string, candidates 
 	}
 	// The complete closure is already selected from authenticated metadata.
 	// Do not ask --deps to discover additional, unassessed download targets.
-	output, err := w.invoke(ctx, "fetch", profile, append([]string{"fetch", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
+	output, err := w.invokeAPI(ctx, "fetch", profile, append([]string{"fetch", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
 	if err != nil {
 		return nil, err
 	}
 	if err := writeNew(filepath.Join(w.root, "fetch.stdout"), output, 0600); err != nil {
 		return nil, err
 	}
-	paths, err := w.invoke(ctx, "cache-paths", profile, append([]string{"--cache", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
+	paths, err := w.invokeAPI(ctx, "cache-paths", profile, append([]string{"--cache", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -53,7 +53,7 @@ func (w workspace) bottleCachePaths(output []byte, candidates []formulaMetadata)
 	}
 	doc := downloadDocument{Schema: 1}
 	for i, line := range lines {
-		if strings.ContainsAny(line, "\x00\r") || !filepath.IsAbs(line) || !strings.HasSuffix(filepath.Base(line), "--"+nativeBottleName(candidates[i])) {
+		if strings.ContainsAny(line, "\x00\r") || !filepath.IsAbs(line) || !strings.HasSuffix(filepath.Base(line), "--"+bottleName(candidates[i])) {
 			return nil, errors.New("unexpected bottle cache path")
 		}
 		path, err := filepath.EvalSymlinks(line)

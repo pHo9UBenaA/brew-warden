@@ -2,6 +2,7 @@ package homebrew
 
 import (
 	"errors"
+	"fmt"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"path"
 	"slices"
@@ -9,6 +10,7 @@ import (
 )
 
 type formulaMetadata struct {
+	BottleTag         string        `json:"bottleTag" required:"true"`
 	Name              string        `json:"name" required:"true"`
 	Version           string        `json:"version" required:"true"`
 	Revision          int           `json:"revision" required:"true"`
@@ -31,7 +33,7 @@ type metadataDocument struct {
 }
 
 func (f formulaMetadata) artifact() domain.Artifact {
-	return domain.Artifact{Tap: "homebrew/core", Name: f.Name, Version: f.Version, Revision: f.Revision, Rebuild: f.Rebuild, OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe", SHA256: f.BottleSHA256}
+	return domain.Artifact{Tap: "homebrew/core", Name: f.Name, Version: f.Version, Revision: f.Revision, Rebuild: f.Rebuild, OS: "macos", Arch: "arm64", BottleTag: f.BottleTag, SHA256: f.BottleSHA256}
 }
 func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaMetadata, error) {
 	var doc metadataDocument
@@ -85,11 +87,6 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 				return err
 			}
 		}
-		for _, dep := range f.BuildDependencies {
-			if err := visit(dep, false); err != nil {
-				return err
-			}
-		}
 		state[name] = 2
 		if runtime {
 			reachable[name] = true
@@ -115,8 +112,8 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 	candidates := []formulaMetadata{}
 	for name := range runtimeNames {
 		f := index[name]
-		if !f.artifact().Valid() || !slices.Contains([]string{":any", ":any_skip_relocation"}, f.Cellar) || f.BottleURL != "https://ghcr.io/v2/homebrew/core/"+strings.ReplaceAll(f.Name, "@", "/")+"/blobs/sha256:"+string(f.BottleSHA256) {
-			return nil, nil, errors.New("unsupported candidate bottle")
+		if !f.artifact().Valid() || !slices.Contains([]string{"arm64_tahoe", "all"}, f.BottleTag) || !slices.Contains([]string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar"}, f.Cellar) || f.BottleURL != "https://ghcr.io/v2/homebrew/core/"+strings.ReplaceAll(f.Name, "@", "/")+"/blobs/sha256:"+string(f.BottleSHA256) {
+			return nil, nil, fmt.Errorf("unsupported bottle for %s: tag %q, cellar %q", f.Name, f.BottleTag, f.Cellar)
 		}
 		candidates = append(candidates, f)
 	}

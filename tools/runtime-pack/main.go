@@ -108,7 +108,7 @@ func run(args []string) error {
 	if err := os.WriteFile(filepath.Join(args[3], "verifier"), verifier, 0755); err != nil {
 		return err
 	}
-	m := manifest{1, brewRevision, []entry{}}
+	m := manifest{2, brewRevision, []entry{}}
 	err = filepath.WalkDir(args[3], func(file string, item os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
@@ -160,6 +160,10 @@ func run(args []string) error {
 	}
 	data = append(data, '\n')
 	if err := os.WriteFile(filepath.Join(args[3], "manifest.json"), data, 0644); err != nil {
+		return err
+	}
+	// Only the inventory and verifier are distributed; Homebrew is already installed.
+	if err := os.RemoveAll(brew); err != nil {
 		return err
 	}
 	fmt.Println(digest(data))

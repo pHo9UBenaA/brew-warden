@@ -12,7 +12,7 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-const executionUnavailable = "runtime_unavailable: this build has no trusted bundled execution runtime; use a verified distribution."
+const executionUnavailable = "runtime_unavailable: this build has no trusted execution inventory; use a verified distribution."
 
 // Version is set by the reproducible development build; it is not a release claim.
 var Version = "development"

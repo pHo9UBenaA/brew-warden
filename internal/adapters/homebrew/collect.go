@@ -26,7 +26,7 @@ type Collector struct {
 }
 type Collection struct {
 	root          string
-	inputs        nativeInputs
+	inputs        collectionInputs
 	nodes         []domain.Node
 	observedAt    int64
 	runtimeDigest domain.Digest
@@ -65,7 +65,7 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 		// Preserve incomplete inputs for diagnosis. They cannot become a session.
 		return nil, fmt.Errorf("candidate collection stopped: %w", err)
 	}
-	result.frozen, err = (workspace{result.root}).freezeInputs(result.inputs)
+	result.frozen, err = (workspace{result.root}).freezeInputs()
 	if err != nil {
 		return nil, err
 	}
@@ -102,33 +102,16 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
-	recipes, candidates, err := parseMetadata(parsed, request.Targets)
+	_, candidates, err := parseMetadata(parsed, request.Targets)
 	if err != nil {
 		return err
 	}
-	for _, recipe := range recipes {
-		address := "https://raw.githubusercontent.com/Homebrew/homebrew-core/" + recipe.TapCommit + "/" + recipe.RecipePath
-		data, err := download(ctx, client, address, 1024*1024)
-		if err != nil {
-			return err
-		}
-		if digestBytes(data) != recipe.RecipeSHA256 {
-			return errors.New("authenticated recipe checksum mismatch")
-		}
-		dest := filepath.Join(w.root, "runtime/brew/Library/Taps/homebrew/homebrew-core", recipe.RecipePath)
-		if err := os.MkdirAll(filepath.Dir(dest), 0700); err != nil {
-			return err
-		}
-		if err := writeNew(dest, data, 0600); err != nil {
-			return err
-		}
-	}
-	result.inputs = nativeInputs{Schema: 1, Recipes: recipes, Candidates: candidates, Targets: request.Targets, Operation: request.Operation}
+	result.inputs = collectionInputs{Schema: 2, Candidates: candidates, Targets: request.Targets, Operation: request.Operation}
 	inputBytes, err := json.Marshal(result.inputs)
 	if err != nil {
 		return err
 	}
-	if err := writeNew(filepath.Join(w.root, "native-inputs.json"), inputBytes, 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "inputs.json"), inputBytes, 0600); err != nil {
 		return err
 	}
 	downloaded, err := w.fetchBottles(ctx, profile, candidates)
@@ -138,7 +121,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := w.copyDownloads(downloaded, candidates); err != nil {
 		return err
 	}
-	metadataClaim, _ := json.Marshal(struct{ SignedMetadata, NativeResult, Runtime domain.Digest }{digestBytes(metadata), digestBytes(parsed), result.runtimeDigest})
+	metadataClaim, _ := json.Marshal(struct{ SignedMetadata, PublicResult, Runtime domain.Digest }{digestBytes(metadata), digestBytes(parsed), result.runtimeDigest})
 	for _, f := range candidates {
 		node := domain.Node{Artifact: f.artifact(), Dependencies: []domain.Artifact{}}
 		for _, name := range f.Dependencies {
@@ -163,9 +146,12 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 			node.Evidence = append(node.Evidence, evidence)
 		}
 		address := "https://api.github.com/repos/Homebrew/homebrew-core/attestations/sha256:" + string(f.BottleSHA256)
-		response, err := download(ctx, client, address, maxManifest)
+		response, err := cachedEvidence(c.Directory, "attestations", f.BottleSHA256)
+		if err == nil && response == nil {
+			response, err = download(ctx, client, address, maxManifest)
+		}
 		if err != nil {
-			return err
+			return fmt.Errorf("provenance for %s unavailable: %w", f.Name, err)
 		}
 		bundle, err := bundles(response)
 		if err != nil {
@@ -182,7 +168,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 		if err := os.Mkdir(home, 0700); err != nil {
 			return err
 		}
-		e, raw, err := verifier.Verify(ctx, f.artifact(), filepath.Join(w.root, "inputs", nativeBottleName(f)), file, home, result.observedAt)
+		e, raw, err := verifier.Verify(ctx, f.artifact(), filepath.Join(w.root, "inputs", bottleName(f)), file, home, result.observedAt)
 		if err != nil {
 			return errors.New("candidate provenance verification failed")
 		}
@@ -192,34 +178,24 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 		if e.Status != domain.Verified {
 			return errors.New("candidate provenance is not verified")
 		}
+		if err := retainEvidence(c.Directory, "attestations", f.BottleSHA256, response); err != nil {
+			return err
+		}
 		if err := w.observation(e, raw); err != nil {
 			return err
 		}
 		node.Evidence = append(node.Evidence, e)
 		result.nodes = append(result.nodes, node)
 	}
-	readProfile, err := w.sandbox("inspect", false, false, []string{filepath.Join(w.root, "runtime/brew/Library"), filepath.Join(w.root, "inputs")})
-	if err != nil {
+	if err := w.checkBottleMetadata(candidates); err != nil {
 		return err
-	}
-	inspected, err := w.native(ctx, "inspect", readProfile, "inspect.rb")
-	if err != nil {
-		return err
-	}
-	var doc inspectionDocument
-	if err := decodeStrict(inspected, &doc); err != nil || doc.Schema != 1 || len(doc.Candidates) != len(candidates) {
-		return errors.New("incomplete native candidate inspection")
 	}
 	advisoryEvidence, err := w.collectPublicAdvisories(ctx, client, candidates, result.observedAt)
 	if err != nil {
 		return err
 	}
 	for i, f := range candidates {
-		inspected := doc.Candidates[i]
-		if inspected.Name != f.Name || !inspected.EmbeddedRecipeSHA256.Valid() {
-			return errors.New("native candidate inspection mismatch")
-		}
-		e, raw, err := bottleRegistration(ctx, client, f, result.observedAt)
+		e, raw, err := cachedBottleRegistration(ctx, client, c.Directory, f, result.observedAt)
 		if err != nil {
 			// Missing age evidence remains eligible only for an explicit age exception.
 			raw, _ = json.Marshal(struct {
@@ -274,7 +250,7 @@ func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error
 		if err := validateBottleArchive(data, candidates[i]); err != nil {
 			return err
 		}
-		if err := writeNew(filepath.Join(w.root, "inputs", nativeBottleName(candidates[i])), data, 0600); err != nil {
+		if err := writeNew(filepath.Join(w.root, "inputs", bottleName(candidates[i])), data, 0600); err != nil {
 			return err
 		}
 	}

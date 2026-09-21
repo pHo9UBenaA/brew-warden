@@ -9,7 +9,7 @@ import (
 
 func metadataFixture() metadataDocument {
 	digest := domain.Digest(strings.Repeat("a", 64))
-	f := formulaMetadata{Name: "jq", Version: "1.8.2", Rebuild: 1, SourceURL: "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", SourceSHA256: digest, RecipeSHA256: digest, RecipePath: "Formula/j/jq.rb", TapCommit: strings.Repeat("b", 40), BottleURL: "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:" + string(digest), BottleSHA256: digest, Cellar: ":any", Dependencies: []string{"oniguruma"}, BuildDependencies: []string{}}
+	f := formulaMetadata{BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2", Rebuild: 1, SourceURL: "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", SourceSHA256: digest, RecipeSHA256: digest, RecipePath: "Formula/j/jq.rb", TapCommit: strings.Repeat("b", 40), BottleURL: "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:" + string(digest), BottleSHA256: digest, Cellar: ":any", Dependencies: []string{"oniguruma"}, BuildDependencies: []string{}}
 	dep := f
 	dep.Name = "oniguruma"
 	dep.RecipePath = "Formula/o/oniguruma.rb"
@@ -57,4 +57,17 @@ func FuzzNativeMetadata(f *testing.F) {
 		}
 		_, _, _ = parseMetadata([]byte(s), []string{"jq"})
 	})
+}
+
+func TestBottleCellarMustMatchExecutionPrefix(t *testing.T) {
+	for _, cellar := range []string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar", "/usr/local/Cellar", "/tmp/Cellar"} {
+		doc := metadataFixture()
+		doc.Formulae[0].Cellar = cellar
+		raw, _ := json.Marshal(doc)
+		_, _, err := parseMetadata(raw, []string{"jq"})
+		want := cellar == ":any" || cellar == ":any_skip_relocation" || cellar == "/opt/homebrew/Cellar"
+		if (err == nil) != want {
+			t.Fatalf("cellar %q: %v", cellar, err)
+		}
+	}
 }

@@ -3,7 +3,6 @@ package homebrew
 import (
 	"bytes"
 	"context"
-	"embed"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -14,30 +13,14 @@ import (
 	"time"
 )
 
-//go:embed bootstrap.rb candidate.rb inspect.rb payload.rb session.rb installer_guard.rb reconcile.rb
-var nativeScripts embed.FS
-
 type workspace struct{ root string }
 
 func (w workspace) environment() []string {
-	return []string{"HOME=" + filepath.Join(w.root, "home"), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TMPDIR=" + filepath.Join(w.root, "tmp"), "XDG_CONFIG_HOME=" + filepath.Join(w.root, "home/config"), "HOMEBREW_CACHE=" + filepath.Join(w.root, "cache"), "HOMEBREW_LOGS=" + filepath.Join(w.root, "logs"), "HOMEBREW_TEMP=" + filepath.Join(w.root, "tmp"), "HOMEBREW_NO_AUTO_UPDATE=1", "HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_INSTALL_FROM_API=1", "HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_COLOR=1", "HOMEBREW_DEVELOPER=1", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_AUTOREMOVE=1", "HOMEBREW_NO_BOOTSNAP=1", "TZ=UTC"}
+	return []string{"HOME=" + filepath.Join(w.root, "home"), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TMPDIR=" + filepath.Join(w.root, "tmp"), "XDG_CONFIG_HOME=" + filepath.Join(w.root, "home/config"), "HOMEBREW_CACHE=" + filepath.Join(w.root, "cache"), "HOMEBREW_LOGS=" + filepath.Join(w.root, "logs"), "HOMEBREW_TEMP=" + filepath.Join(w.root, "tmp"), "HOMEBREW_NO_AUTO_UPDATE=1", "HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_COLOR=1", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_AUTOREMOVE=1", "HOMEBREW_NO_BOOTSNAP=1", "TZ=UTC"}
 }
 func (w workspace) initialize() error {
 	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations", "states"} {
 		if err := os.Mkdir(filepath.Join(w.root, name), 0700); err != nil {
-			return err
-		}
-	}
-	scripts, err := nativeScripts.ReadDir(".")
-	if err != nil {
-		return err
-	}
-	for _, script := range scripts {
-		data, err := nativeScripts.ReadFile(script.Name())
-		if err != nil {
-			return err
-		}
-		if err := writeNew(filepath.Join(w.root, script.Name()), data, 0600); err != nil {
 			return err
 		}
 	}
@@ -68,16 +51,6 @@ func (w workspace) command(ctx context.Context, profile string, args ...string) 
 	command.Dir = w.root
 	command.WaitDelay = 2 * time.Second
 	return command
-}
-func (w workspace) native(ctx context.Context, label, profile, script string, args ...string) ([]byte, error) {
-	data, err := w.invoke(ctx, label, profile, append([]string{"ruby", filepath.Join(w.root, script), w.root}, args...)...)
-	if err != nil {
-		return nil, err
-	}
-	if err := writeNew(filepath.Join(w.root, label+".json"), data, 0600); err != nil {
-		return nil, err
-	}
-	return data, nil
 }
 
 // invoke also supports ordinary Homebrew commands, without loading a Ruby bridge.

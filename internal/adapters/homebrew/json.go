@@ -1,4 +1,4 @@
-// Strict schemas for the runtime inventory and native bridge.
+// Strict schemas for the runtime inventory and Homebrew data.
 package homebrew
 
 import (

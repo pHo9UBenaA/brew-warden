@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"crypto/sha256"
 	"encoding/hex"
@@ -106,7 +105,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	}
 	fault := os.Getenv("BREWWARDEN_VM_FAULT")
 	switch fault {
-	case "", "age", "age-exception", "changed-input", "exception-changed-input", "affected-dependent", "recovery", "link-conflict":
+	case "", "age", "age-exception", "changed-input", "exception-changed-input", "recovery", "link-conflict":
 	default:
 		t.Fatal("unsupported VM fault")
 	}
@@ -121,21 +120,6 @@ func TestLiveNativeExecution(t *testing.T) {
 			for _, node := range collection.Evidence() {
 				waivers = append(waivers, domain.AgeWaiver{Artifact: node.Artifact, Reason: "Explicit VM acceptance exception"})
 			}
-		}
-	}
-	if fault == "affected-dependent" {
-		rack := "/opt/homebrew/Cellar/brewwarden-acceptance-dependent"
-		if err := os.Mkdir(rack, 0755); err != nil {
-			t.Fatal(err)
-		}
-		defer os.RemoveAll(rack)
-		keg := filepath.Join(rack, "0.0.1")
-		if err := os.Mkdir(keg, 0755); err != nil {
-			t.Fatal(err)
-		}
-		receipt := []byte(`{"runtime_dependencies":[{"full_name":"jq","version":"1.8.1","revision":0}]}`)
-		if err := os.WriteFile(filepath.Join(keg, "INSTALL_RECEIPT.json"), receipt, 0644); err != nil {
-			t.Fatal(err)
 		}
 	}
 	if fault == "link-conflict" {
@@ -157,37 +141,15 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 		defer os.Remove("/opt/homebrew/bin/jq")
 	}
-	var nativeErrors bytes.Buffer
 	completeBefore, err := kegSnapshot("/opt/homebrew/Cellar")
 	if err != nil {
 		t.Fatal(err)
 	}
-	prepared, session, err := collection.Prepare(context.Background(), policy, waivers, time.Now().Unix(), homebrew.Streams{In: os.Stdin, Out: os.Stdout, Err: io.MultiWriter(os.Stderr, &nativeErrors)})
-	if fault == "affected-dependent" {
-		if err == nil {
-			_ = session.Close()
-			t.Fatal("unverified affected dependent accepted")
-		}
-		if !strings.Contains(nativeErrors.String(), "affected installed dependent requires a verified plan") {
-			t.Fatal("wrong dependent failure", err, nativeErrors.String())
-		}
-		after, stateErr := kegSnapshot("/opt/homebrew/Cellar")
-		if stateErr != nil || after != completeBefore {
-			t.Fatal("held dependent changed prefix", stateErr)
-		}
-		t.Log("verified affected-dependent refusal")
-		return
-	}
+	prepared, session, err := collection.Prepare(context.Background(), policy, waivers, time.Now().Unix(), homebrew.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr})
 	if err != nil {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	contender := exec.Command("/opt/homebrew/bin/brew", "ruby", "-e", `require "lock_file"; FormulaLock.new("jq").lock; puts "UNEXPECTED_LOCK"`)
-	contender.Env = []string{"HOME=" + directory, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "HOMEBREW_NO_AUTO_UPDATE=1", "HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_INSTALL_FROM_API=1", "HOMEBREW_DEVELOPER=1", "HOMEBREW_NO_BOOTSNAP=1"}
-	output, lockErr := contender.CombinedOutput()
-	if lockErr == nil || !strings.Contains(string(output), "already locked") {
-		t.Fatalf("native lock not retained: %v %s", lockErr, output)
-	}
 	if fault == "changed-input" || fault == "exception-changed-input" {
 		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "jq--*.tar.gz"))
 		if err != nil || len(files) != 1 {
@@ -212,7 +174,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		engine := homebrew.Engine{Collector: &collector}
 		service := application.Service{Journal: journal, Recovery: engine, Clock: nativeClock{}}
 		if err := service.Reconcile(context.Background(), prepared.Assessment.Binding.Attempt); err == nil {
-			t.Fatal("reconciled while original session still held native locks")
+			t.Fatal("reconciled while original session still held its operation lock")
 		}
 		if err := session.Close(); err != nil {
 			t.Fatal(err)
@@ -228,7 +190,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		if err != nil || after != completeBefore {
 			t.Fatal("recovery changed packages", err)
 		}
-		t.Log("native active-lock refusal and stopped-session reconciliation verified")
+		t.Log("BrewWarden active-lock refusal and stopped-session reconciliation verified")
 		return
 	}
 	result, err := application.Execute(context.Background(), prepared, session, journal, nativeClock{})

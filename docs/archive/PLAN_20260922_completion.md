@@ -84,9 +84,9 @@ public-command alternatives have been investigated concretely.
 
 - [x] Re-read repository contracts and the previous migration record.
 - [x] Confirm upstream's explicit lack of internal API compatibility guarantees.
-- [ ] Complete the public-command execution probe and record exact gaps.
-- [ ] Resolve any material guarantee/scope decision with the user.
-- [ ] Implement and remove obsolete mechanisms.
+- [x] Complete the public-command execution probe and record exact gaps.
+- [x] Resolve the independent-concurrency condition with the user.
+- [x] Implement and remove obsolete mechanisms.
 - [ ] Complete representative coverage and final distribution acceptance.
 
 ## Findings from this investigation
@@ -514,3 +514,61 @@ sandbox DNS failure; rerunning that check with network access passed source/test
 and all three built-binary scans. No host Homebrew installation was modified.
 The retained public-capability results archive has SHA-256
 `875f9779fa4db59cb09e00c6d93079fc3d26e404273a29363becd1f04ce0deab`.
+
+
+## Public-only implementation and smaller distribution
+
+The public path replaced the native product route. Removed the seven product
+Ruby scripts, the native control protocol, formula locks, installer monkey
+patches and installed-payload reconstruction. Removed obsolete developer Ruby
+probes; their results and original code remain in Git history. Candidate metadata
+and fetch now use the signed API without downloading/evaluating build recipes.
+A Go data check reconciles the selected OCI bottle digest/ref and complete
+runtime dependency names. Existing user-owned installed state is observed rather
+than represented as newly verified payload bytes. The wrapper does not modify
+unrelated packages to manufacture provenance for externally installed files.
+
+Recovery uses the private operation lock and recorded owned process groups,
+then inventories selected racks and opt links without following links. Tests
+cover partial receipts, changed payloads and live process-group refusal. The
+public VM path passed an in-flight cancellation/recovery case (59.23 s), age
+refusal (58.45 s), age exception (62.57 s), exception plus tampered input refusal
+(59.19 s), and durable stopped-session reconciliation (55.37 s).
+
+The distribution no longer includes Homebrew or portable Ruby. Its schema-2
+inventory identifies the reviewed existing Homebrew files copied into a private
+empty inspection prefix; the verifier remains bundled. New inventory SHA-256:
+`d50f6a3f967fae22b9a84cf705d59b29e15b8ee2311c984f050ce85b2f8c1ce7`.
+This removes the second shipped Homebrew/Ruby runtime and their redistribution
+notice inputs. Reproducible final building and archive-based VM acceptance must
+still complete before marking the plan finished.
+
+
+### Completion follow-through: recovery and generic coverage
+
+Homebrew 7.0.4 `system_command.rb` and `utils/popen.rb` start some children in
+separate process groups. The final public execution schema is therefore 3: each
+command starts in its own POSIX session and completion/recovery checks the entire
+session, not just the original process group. A test kills a session leader while
+a child in another group remains alive; that child must still prevent recovery.
+The corrected live interruption fixture cancels at actual download-phase entry
+rather than after a possibly completed pour. It passed with stopped-session
+reconciliation in 54.02 s. An initial rerun correctly found no install to interrupt
+because xz was already installed; the guest-only fixture was reset before retesting.
+
+The representative survey exposed an unnecessary relocatable-only restriction:
+openssl@3 and git use bottles whose cellar is `/opt/homebrew/Cellar`. Upstream
+`BottleSpecification#compatible_locations?` explicitly accepts the identical
+cellar. Since public execution uses that exact prefix, accept it alongside the
+relocatable markers and reject other fixed prefixes. Architecture-independent
+`all` bottles also participate in exact digest and closure verification.
+
+Validated immutable attestation responses and bottle registration facts are cached
+privately by exact identity. Signatures and current advisory status are still
+verified on every collection. Anonymous GitHub API quota exhaustion was observed
+and is a provider limitation, not negative vulnerability evidence. Cache corruption
+or changed recipe/artifact identity cannot reuse the old registration fact.
+Baseline, race, coverage, all fuzz targets and lint passed. The vulnerability step
+encountered sandbox DNS failure; the source/test and three binary scans passed
+when rerun with network access. Remaining work is final generic execution and
+reproducible distribution acceptance, not another architecture decision.

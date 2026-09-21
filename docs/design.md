@@ -1,10 +1,10 @@
 # Product design
 
-Status: initial official-bottle implementation, updated 2026-09-20. Distribution
+Status: initial official-bottle implementation, updated 2026-09-22. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
-native execution binding and durable attempts. Official core bottle eligibility
+public-command execution binding and durable attempts. Official core bottle eligibility
 is determined by verified capabilities on Apple Silicon macOS Tahoe with the
-standard prefix. Unsupported required capabilities hold execution. Builds without a trusted bundled runtime stay
+standard prefix. Unsupported required capabilities hold execution. Builds without a trusted distribution inventory stay
 read-only. See [distribution](distribution.md) for build and publication boundaries.
 
 ## Purpose and scope
@@ -115,7 +115,7 @@ Homebrew mutation against the same prefix during a BrewWarden operation. This is
 a usage condition, not a claim that BrewWarden blocks external commands. Prefer
 public CLI execution without machinery added solely to prevent independent brew
 operations. Checks binding the wrapper's own artifacts and dependency plan remain
-required. Removing native mechanisms still requires replacement acceptance.
+required. Changes to execution mechanisms require replacement acceptance.
 
 ## Artifact and signature evidence
 
@@ -252,7 +252,7 @@ graphs, exact artifact subjects and attributed evidence. An eligibility `Allow`
 is not an execution permit. Callers must derive binding digests from the actual
 plan, policy, graph and environment and obtain prior-attempt state from a durable
 journal. Distribution builds connect this evaluator through the application
-execution workflow and the native bound session.
+execution workflow and the public-command session.
 
 State flow: draft -> evidence collected -> allow/hold/deny -> revalidated ->
 executing -> succeeded/partial/failed/unknown. An emergency reevaluates only the
@@ -260,28 +260,26 @@ age condition; it cannot jump from deny directly to executing.
 
 ## Binding verification to execution
 
-The supported official-bottle path freezes authenticated inputs, retains native
-Homebrew formula locks through installation and state verification, and rejects
-source fallback or unplanned installers. See the owning
-[adapter contract](../internal/adapters/homebrew/README.md) for tested guarantees.
-Disabling auto-update or holding only a wrapper lock would not establish this
-binding. New execution paths must independently satisfy the same release gate.
+The official-bottle path freezes signed metadata, verified bottle downloads and
+OCI dependency data. The complete runtime closure is checked before mutation.
+Public Homebrew commands install dependencies before targets, with auto-update,
+cleanup, autoremove and opportunistic dependent maintenance disabled. No network
+or changes to verified inputs are allowed during execution. Source fallback or
+an extra download cannot silently substitute an unverified artifact.
 
-For supported brew versions, demonstrate an execution path that consumes the
-verified metadata, artifact digests, and complete dependency plan. Include cache
-handling, source-build fallback rejection, concurrent changes, and attestation
-exceptions. Passing a local bottle alone does not prove dependencies are fixed.
-`--force-bottle` is not assumed to universally prohibit source builds.
+Selected existing kegs are observed through public metadata, receipts and active
+links. They are trusted user-owned state: checking a newly downloaded bottle does
+not cryptographically verify an already installed payload. BrewWarden binds its
+own new installations to verified bottle bytes and records the existing state
+used by the plan. It does not reconstruct or replace unchanged packages merely
+to claim that it installed them. Unrelated packages are not scheduled for
+maintenance. The no-concurrent-independent-mutation condition above applies.
 
-Prefer public Homebrew commands and documented controls, supplementing only
-demonstrated gaps. The current implementation uses pinned native APIs and
-authenticated original recipes; that mechanism is replaceable, not a product
-requirement. A working native-API experiment does not prove that a CLI-based
-implementation cannot meet the same contract.
-Do not generate executable Ruby recipes as an unexamined shortcut. If binding
-cannot be demonstrated for a new path, ship
-inspection while explicitly rejecting mutation commands. This is a release gate,
-not a retreat from the all-in-one product goal.
+A preview, `--force-bottle`, disabled updates or a wrapper lock alone is not proof
+of binding. The owning [adapter contract](../internal/adapters/homebrew/README.md)
+records the fixed input, cache and actual execution checks. No private Ruby API
+or generated executable recipe is used by BrewWarden. A new unsupported path
+must remain unavailable until its relevant binding is demonstrated.
 
 An upgrade can partially succeed. Record both exit status and actual state.
 Post-install matching does not prevent prior code execution. Do not automatically
@@ -373,9 +371,11 @@ exception. Old records cannot be overwritten, and inventory exhaustion fails.
 Exit status, actual state and policy eligibility remain separate. A zero exit
 with an unexpected state is unknown. A nonzero exit with changed state is partial.
 Outcome persistence failure leaves an unresolved attempt requiring reconciliation.
-These contracts are wired to the native session in distribution builds. Native
-reconciliation reacquires the original candidate locks, retains observed state,
-and appends a reconciliation outcome without claiming a lost process succeeded.
+Distribution builds use the public-command session. Reconciliation acquires the
+BrewWarden operation lock, confirms recorded process sessions are absent, inventories
+selected racks and links, and records the result without inventing an exit status.
+It does not invoke Homebrew or run an installer. Legacy internal-API attempts
+require their matching older build for reconciliation.
 
 ## Implementation and acceptance
 
@@ -388,8 +388,8 @@ and appends a reconciliation outcome without claiming a lost process succeeded.
 4. Add cask, third-party tap, and upstream-signature support by explicit capability.
 5. Improve presentation/performance and design optional automation separately.
 
-The initial supported path has passed native candidate, installation, upgrade,
-unchanged-dependency, exception and lock/recovery probes in a disposable macOS VM.
+The public-command path is exercised through candidate, installation, upgrade,
+unchanged-dependency, exception and recovery tests in a disposable macOS VM.
 The [integration contract](homebrew-integration.md#preflight-investigation)
 continues to apply whenever support expands. Future casks, taps, signatures and
 platforms are separate capabilities, never unchecked fallbacks.

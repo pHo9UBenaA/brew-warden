@@ -3,7 +3,6 @@ package homebrew
 import (
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -14,7 +13,7 @@ import (
 func planFixture() executionPlan {
 	a := metadataFixture().Formulae[0].artifact()
 	digest := domain.Digest(strings.Repeat("a", 64))
-	return executionPlan{Schema: 1, MinimumAge: 0, Targets: []domain.Artifact{a}, Nodes: []domain.Node{{Artifact: a, Dependencies: []domain.Artifact{}, Evidence: []domain.Evidence{}}}, Actions: []nativeAction{{"jq", "install"}}, BeforeState: digest, Environment: executionEnvironment{digest, "26.6.2", "/opt/homebrew"}, Inputs: []frozenInput{{"fixture", digest}}, Attempt: digest, IssuedAt: 100, ExpiresAt: 200, Waivers: []domain.AgeWaiver{}}
+	return executionPlan{Schema: 1, MinimumAge: 0, Targets: []domain.Artifact{a}, Nodes: []domain.Node{{Artifact: a, Dependencies: []domain.Artifact{}, Evidence: []domain.Evidence{}}}, Actions: []plannedAction{{"jq", "install"}}, BeforeState: digest, Environment: executionEnvironment{digest, "26.6.2", "/opt/homebrew"}, Inputs: []frozenInput{{"fixture", digest}}, Attempt: digest, IssuedAt: 100, ExpiresAt: 200, Waivers: []domain.AgeWaiver{}}
 }
 func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 	p := planFixture()
@@ -81,14 +80,14 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	session := &nativeSession{w: workspace{root}, prepared: prepared}
-	if _, err := session.readPrepared(); err != nil {
+	workspace := workspace{root}
+	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.WriteFile(filepath.Join(root, "bottle"), []byte("substitution"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := session.readPrepared(); err == nil {
+	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err == nil {
 		t.Fatal("changed input accepted")
 	}
 	if err := os.WriteFile(filepath.Join(root, "bottle"), data, 0600); err != nil {
@@ -97,28 +96,7 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, "plan.json"), append(raw, ' '), 0600); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := session.readPrepared(); err == nil {
+	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err == nil {
 		t.Fatal("changed exact plan bytes accepted")
-	}
-}
-
-func TestNativeExitHelper(t *testing.T) {
-	if os.Getenv("BREWWARDEN_NATIVE_EXIT_HELPER") == "1" {
-		os.Exit(7)
-	}
-}
-func TestKnownExitWithoutStateEvent(t *testing.T) {
-	command := exec.Command(os.Args[0], "-test.run=^TestNativeExitHelper$")
-	command.Env = append(os.Environ(), "BREWWARDEN_NATIVE_EXIT_HELPER=1")
-	err := command.Run()
-	if err == nil {
-		t.Fatal("exit fixture unexpectedly succeeded")
-	}
-	done := make(chan struct{})
-	close(done)
-	session := nativeSession{command: command, done: done, waitErr: err}
-	result := session.knownExit()
-	if !result.ExitKnown || result.ExitCode != 7 || result.AfterState != "" || result.MatchesPlan {
-		t.Fatal("lost exit status or invented state", result)
 	}
 }

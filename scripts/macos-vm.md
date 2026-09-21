@@ -32,54 +32,32 @@ Run it with `--no-graphics --no-audio --no-clipboard`, without directory sharing
 or attached host disks. Default NAT permits evidence acquisition; the probe's
 own sandbox separately denies network access during native installation.
 
-## Legacy probe preparation and evidence
+## Provision the guest
 
-Use `tart exec` through the image's guest agent. Before any prefix changes,
-check `sw_vers`, `uname -m`, `sysctl -n hw.model`, the user, existing prefix and
-agent dependencies. The tested image reports macOS 26.6.2 (25G83), arm64,
-VirtualMac2,1, user `admin`, and guest-agent 0.14.1. It includes Homebrew.
+Use `tart exec` through the guest agent. Before prefix changes, check `sw_vers`,
+`uname -m`, `sysctl -n hw.model`, the user and the agent's executable dependencies.
+The tested image reports macOS 26.6.2, arm64, VirtualMac2,1 and user admin.
 
-Inside this disposable guest only, preserve the original prefix as
-`/opt/brewwarden-original-homebrew` and make `/opt` writable to the guest admin.
-The running guest agent has only system-library dependencies and remains usable
-after this move. Do not reboot this modified clone: its launch configuration
-still points into the original prefix. Recreate a clone from the stopped base
-for a new independent experiment instead of relying on this altered boot state.
+Inside the disposable guest only, preserve its original Homebrew prefix as
+`/opt/brewwarden-original-homebrew`. Populate `/opt/homebrew` from `git archive`
+of the reviewed Homebrew revision and extract its pinned portable Ruby archive
+under `Library/Homebrew/vendor`, with the matching `portable-ruby/current` link.
+The compatibility inventory generator in `tools/runtime-pack` owns these pins.
+Do not run this provisioning against a host prefix. The running guest agent
+survives the move, but its launch configuration still refers to the old path;
+recreate a clone for independent experiments instead of rebooting this modified
+clone and assuming the agent will restart.
 
-Transfer an explicit tar archive through `tart exec -i ... tar -xf -`; do not
-mount host directories. Include a shallow bare copy of the pinned Homebrew
-source, the probe scripts, signed API metadata, official bottle inputs and the
-verifier. The bare source supports `git archive` without modifying host Homebrew.
-The arm64 gh 2.62.0 release ZIP has SHA-256
-`fdb77f31b8a6dd23c3fd858758d692a45f7fc76383e37d475bdcae038df92afc`,
-matching the official release checksum file. Its acquisition uses public HTTPS;
-this check alone does not establish an independent publisher signature.
-Use the native arm64 portable Ruby already pinned in the probe.
+Transfer explicit archives with `tart exec -i ... tar -xf -`. Do not mount host
+folders. Product test inputs are the verifier/inventory directory and an arm64
+test binary built from `./tests`. The new distribution does not contain Homebrew
+or Ruby; the guest's existing installation must satisfy the reviewed inventory.
+For final acceptance, transfer the complete reproducible distribution archive.
 
-Run the existing six-argument `jq --vm-prefix` probe in the guest. The driver
-refuses an existing `/opt/homebrew` and freezes authenticated inputs before any
-installation. Copy the complete emitted evidence directory back through
-`tart exec ... tar -cf -` into a unique host cache directory. Retain failures as
-well as successes. Stop the clone when no test is running; do not delete the
-base, unrelated VMs or evidence as part of verification.
-
-The first successful standard-prefix run is recorded in the owning
-[Homebrew capability record](homebrew-probe.md#standard-prefix-macos-vm-acceptance).
-The same record also documents the tested jq upgrade continuation. These legacy
-probes are narrower than the current product acceptance described below.
-
-## Current product acceptance
-
-For product tests, transfer the pinned runtime and the arm64 test binary built
-from `./tests`, or transfer the complete archive from the distribution build.
-The old full gh executable above is a legacy probe dependency, not the product
-verifier. Product collection uses its bundled attestation-only helper and real
-publication/advisory providers.
-
-Run the explicit VM cases in [verification](../docs/verification.md), including
-failure/recovery cases, then exercise the packaged CLI. Verify archive checksums,
-`doctor`, install/upgrade, unchanged dependencies, `status` and `history`. Keep
-fixtures confined to the disposable guest, preserve evidence and stop the clone
-when finished. Consult the [native adapter](../internal/adapters/homebrew/README.md)
-for current supported scope; a probe's older limitations do not describe the
-current product as unimplemented.
+Run the cases in [verification](../docs/verification.md), then verify archive
+checksums and exercise the packaged doctor, install, upgrade, status, history and
+reconcile commands. Fixtures must be confined to the disposable guest. Copy logs
+and observations back with `tart exec ... tar -cf -`, preserving failures as well
+as successes. Stop the clone when finished; do not delete the base or unrelated
+VMs. Historical probe code remains recoverable from Git history, not as a second
+maintained Ruby execution path.

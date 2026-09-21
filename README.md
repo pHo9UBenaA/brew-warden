@@ -1,124 +1,91 @@
 # BrewWarden
 
-Verified Homebrew installation with release-age policy, provenance, vulnerability
-coverage checks and an immutable execution history. `bwd` and `brewwarden` are
-the same CLI. Commands execute after checks pass without an additional prompt.
-
-## Supported scope
-
-The distribution evaluates official core bottles on
-**Apple Silicon macOS Tahoe (26.x)** with Homebrew at **`/opt/homebrew`**.
-It includes pinned Homebrew 7.0.4, portable Ruby 4.0.7 and an attestation-only
-verifier based on GitHub CLI 2.101.0. Go and a separate `gh` installation are not
-needed by users. Eligibility comes from verified capabilities, not a package-name
-allowlist. Vulnerability checks combine public `brew vulns` with Homebrew's
-advisory data. Age follows the selected bottle's registration history, including
-same-version rebuilds. Unsupported recipes, casks,
-third-party taps, source builds,
-services, post-install hooks and unverified affected dependents stop before
-installation. Plain `brew` commands are not intercepted.
-
-Every candidate, including dependencies already installed, needs authenticated
-metadata, matching bottle bytes, expected publisher provenance, bottle registration
-age and current advisory checks. Missing evidence stops the
-command. Native Homebrew locks and frozen inputs bind checks to execution;
-installed payloads are compared against native reconstruction of verified bottles.
-These checks reduce specific supply-chain risks; they cannot establish that
-software has no undiscovered vulnerabilities.
-
-## Install and use
-
-Extract a verified distribution archive into a user-owned directory, keeping
-`bwd`, `brewwarden` and `runtime/` together. Add that directory to `PATH`, or link
-`bwd` and `brewwarden` from an existing directory on `PATH`. Do not copy a binary
-away from its runtime. No privileged installer or automatic updates are used.
-See [distribution verification and building](docs/distribution.md) for the trust
-origin and reproducible local build. This repository does not imply that an
-unsigned local build is a published or notarized release.
+Check Homebrew packages before installing them. BrewWarden verifies bottle
+checksums and publisher provenance, checks known vulnerabilities through
+Homebrew's public commands and advisory data, and waits seven days after a bottle
+is registered. Rebuilding a bottle starts its waiting period again.
 
 ```sh
 bwd doctor
 bwd brew install jq
 bwd brew upgrade jq
+```
+
+All required checks finish before installation starts. Missing or unsupported
+evidence stops the command. Successful checks lead directly to ordinary public
+`brew install` or `brew upgrade`, using the verified downloads and dependency plan.
+
+## Install
+
+Extract a verified distribution archive into a user-owned directory and add that
+directory to `PATH`. Keep `bwd`, its `brewwarden` alias and `runtime/` together.
+Users need an existing supported Homebrew installation, but not Go or a separate
+`gh`. Homebrew and Ruby are not bundled or installed by BrewWarden.
+
+The current target is **Apple Silicon macOS Tahoe**, with Homebrew at
+`/opt/homebrew`. See the [Homebrew contract](internal/adapters/homebrew/README.md)
+for the tested version and boundaries, and [distribution](docs/distribution.md)
+for building and verifying an archive. Local build results are not published or
+notarized releases.
+
+Official core bottles are eligible when their complete dependency plan has the
+required evidence. There is no package-name allowlist. Casks, third-party taps,
+source builds and unsupported evidence are held. An empty advisory result means
+no known applicable findings, not proof that the package is harmless.
+
+Do not run another command that changes the same Homebrew installation while
+BrewWarden is running. BrewWarden does not monitor or intercept ordinary `brew`
+commands. It does not claim to authenticate files previously installed outside
+its own verified execution.
+
+## Policy and history
+
+Set a different minimum age or make an explicit, one-attempt age exception:
+
+```sh
+bwd --minimum-release-age 336h brew install jq
+bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
 bwd history
 bwd status
 ```
 
-`brew upgrade` without targets checks the entire installed inventory. If any
-required candidate or affected dependent is unsupported, it stops. Unknown
-Homebrew arguments are rejected rather than passed through.
+An age exception never waives checksums, provenance, advisory checks or dependency
+binding. Dependencies need their own exception reasons. Formulae and versions are
+shown before execution; exceptions also show the exact digest and reason.
+`bwd brew upgrade` without names checks the installed formula inventory.
 
-The default minimum bottle age is seven days. A rebuilt bottle starts its own
-waiting period even when the upstream version is unchanged. An explicit override
-is available:
-
-```sh
-bwd --minimum-release-age 336h brew install jq
-```
-
-An urgent update can waive only age for each explicitly named artifact, for one
-plan and one attempt. Dependencies need their own reasons if their age is waived:
-
-```sh
-bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
-```
-
-Formula names and versions are shown before execution. Age exceptions also show
-the exact bottle digest and reason. Signature,
-checksum, trust, advisory and dependency checks remain mandatory. Exceptions
-expire with the plan (at most ten minutes) and cannot be replayed.
-
-## Configuration and recovery
-
-Optional configuration is `~/Library/Application Support/brewwarden/config.json`:
+Optional policy configuration lives at
+`~/Library/Application Support/brewwarden/config.json`:
 
 ```json
 {"schemaVersion":1,"age":{"minimumHours":168}}
 ```
 
-Use `--config PATH` before `brew` for a different policy file. Configuration does
-not redirect state. Verification records are retained privately beside the default
-configuration and remain readable if policy configuration is invalid. See
-[storage and history](docs/design.md#configuration-and-storage) for their layout.
-Collections can be large; automatic cleanup is not implemented. Preserve records
-while an attempt is unresolved.
+Use `--config PATH` to select another policy file. It does not redirect history.
+Verification records are private and retained beside the default configuration.
+Collections can be large; preserve records while an attempt is unresolved.
 
-If execution is interrupted or its outcome cannot be durably established,
-`status` reports an unresolved attempt and new installations stop:
-
-```sh
-bwd reconcile
-bwd status
-```
-
-The command selects the sole unresolved attempt. An explicit `ATTEMPT_ID` remains
-accepted for diagnostics. Reconciliation reacquires native candidate locks and
-records observed state. It cannot run while the original session holds those locks. It neither claims the
-lost process succeeded nor undoes installation. A fresh command creates a new
-plan; partially installed or inconsistent packages may require manual Homebrew
-repair before they can pass verification. Never delete the journal to retry.
+If `status` reports an interrupted attempt, run `bwd reconcile`. It waits for
+BrewWarden's owned operation to stop and records the actual selected-package
+state. It does not rerun installation, invent a successful exit or roll back
+packages. A fresh command performs fresh checks. Inconsistent installations may
+need ordinary Homebrew repair while BrewWarden is idle.
 
 ## Development
 
-Use the pinned Go version in `.go-version`, Git and a POSIX shell. Full checks
-also require a C compiler for race detection.
+Use the Go version in `.go-version`, then:
 
 ```sh
 ./scripts/setup-hooks.sh
 ./scripts/verify.sh
-./scripts/setup-tools.sh  # Explicit download of pinned development tools
-./scripts/check.sh all   # Includes advisory database access
+./scripts/setup-tools.sh
+./scripts/check.sh all
 ```
 
-Plain `go run ./cmd/bwd` remains diagnostic-only: a trusted runtime digest is
-embedded only by the distribution build. Native mutation acceptance tests require
-a disposable macOS VM and refuse to run on physical hardware. They never update
-the maintainer's Homebrew prefix. See [verification](docs/verification.md).
+Development binaries are diagnostic-only until built with a trusted distribution
+inventory. Mutation acceptance requires a disposable macOS VM; tests never change
+the maintainer's Homebrew installation. See [verification](docs/verification.md),
+[design](docs/design.md), [architecture](docs/architecture.md),
+[threat model](docs/threat-model.md) and [contributing](CONTRIBUTING.md).
 
-- [Product design](docs/design.md)
-- [Architecture](docs/architecture.md)
-- [Threat model](docs/threat-model.md)
-- [Contributing](CONTRIBUTING.md)
-
-BrewWarden is licensed under [MIT](LICENSE). Bundled dependencies retain their own
-licenses; distribution archives include `THIRD_PARTY_NOTICES.txt` and `licenses/`.
+Licensed under [MIT](LICENSE). Distributed dependencies retain their own licenses.

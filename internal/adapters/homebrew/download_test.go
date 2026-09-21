@@ -88,7 +88,7 @@ func TestDownloadedBytesAndObservationBinding(t *testing.T) {
 	if err := writeNew(file, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	candidate := formulaMetadata{Name: "jq", Version: "1.8.2"}
+	candidate := formulaMetadata{BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2"}
 	candidate.BottleSHA256 = digestBytes(original)
 	raw := []byte(`{"schema":1,"downloads":[{"name":"jq","path":"` + file + `"}]}`)
 	if err := os.WriteFile(file, []byte("changed"), 0600); err != nil {

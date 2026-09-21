@@ -3,8 +3,8 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
-if [ "$#" -ne 4 ] || [ "$1" != darwin/arm64 ]; then
-  printf 'Usage: scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE NATIVE_NOTICES\n' >&2
+if [ "$#" -ne 3 ] || [ "$1" != darwin/arm64 ]; then
+  printf 'Usage: scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE\n' >&2
   exit 1
 fi
 if [ "$(go env GOVERSION)" != "go$(cat .go-version)" ]; then
@@ -17,7 +17,6 @@ if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
 fi
 runtime_root=$(CDPATH= cd -- "$2" && pwd -P)
 verifier_source=$(CDPATH= cd -- "$3" && pwd -P)
-native_notices=$(CDPATH= cd -- "$4" && pwd -P)
 source_revision=$(git rev-parse HEAD)
 product_version="0.1.0+$source_revision"
 runtime_digest=$(shasum -a 256 "$runtime_root/manifest.json" | cut -d ' ' -f 1)
@@ -38,7 +37,7 @@ for pass in first second; do
     -ldflags="-s -w -X $module/internal/cli.Version=$product_version -X $module/internal/composition.RuntimeSHA256=$runtime_digest" \
     -o "$build_root/$pass/bwd" ./cmd/bwd)
   go run ./tools/release-pack "$build_root/$pass/bwd" "$runtime_root" \
-    "$build_root/verifier-modules.json" "$go_license" "$native_notices" "$source_revision" \
+    "$build_root/verifier-modules.json" "$go_license" "$source_revision" \
     "$build_root/$pass/brewwarden-darwin-arm64.tar.gz"
 done
 cmp "$build_root/first/bwd" "$build_root/second/bwd"

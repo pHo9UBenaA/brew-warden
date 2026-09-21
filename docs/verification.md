@@ -11,14 +11,13 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, attempt-record, publication-response, advisory-record and provenance-result and native-metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, attempt-record, public advisory, provenance-result and Homebrew metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
-| `./scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE NATIVE_NOTICES` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
+| `./scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
-| `sh scripts/probe-homebrew.sh /absolute/Homebrew/source` | Isolated macOS upstream probes; see [requirements and limits](../scripts/homebrew-probe.md) | Denied by sandbox |
 
 ## Boundaries
 
@@ -69,8 +68,7 @@ and checks refusal without a trusted runtime. Distribution builds additionally
 wire the real execution engine. Their native acceptance tests are explicit and
 separate from the baseline; see Native product acceptance below.
 
-The distribution build checks repeatability of both binaries and complete native
-runtime/license archives. Product installation enforcement and distribution
+The distribution build checks repeatability of both binaries and complete verifier/inventory/license archives. Product installation enforcement and distribution
 packaging are implemented for the supported scope. Public release signing and
 notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
@@ -114,15 +112,14 @@ unknown outcome durability. They do not substitute for native Homebrew execution
 ## Native product acceptance
 
 Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
-`BREWWARDEN_VM_RUNTIME` pointing to the pinned bundle. The test checks the hardware
+`BREWWARDEN_VM_RUNTIME` pointing to the verifier/inventory directory. The test checks the hardware
 model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
 fixtures must provision an older target and the intended existing dependencies.
-The default path checks actual execution, native lock exclusion, candidate payload
-identity, durable outcomes and unchanged installed dependency bytes.
+The default path checks actual execution, BrewWarden operation exclusion, candidate installation, durable outcomes and unchanged installed dependency bytes.
 
 `BREWWARDEN_VM_FAULT` selects `age`, `age-exception`, `changed-input`,
-`exception-changed-input`, `affected-dependent`, `recovery` or `link-conflict`.
-Recovery attempts reconciliation while the native locks are held, terminates the
+`exception-changed-input`, `recovery` or `link-conflict`.
+Recovery attempts reconciliation while the BrewWarden operation lock is held, terminates the
 owned session, then requires a durable observed-state reconciliation with no keg
 changes. Link conflict requires absent jq/oniguruma and exercises a real partial
 installation while preserving an existing shared-prefix file. These tests never
@@ -136,8 +133,20 @@ public release provenance are not implied by local test success.
 `TestLiveGeneralBottleExecution` in `tests/general_execution_test.go` accepts
 space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
 Provision absent targets to test fresh installation. It uses live authenticated
-metadata, release and advisory providers, provenance verification, the real native
+metadata, release and advisory providers, provenance verification, the real public-command
 engine and durable journal. It checks the complete candidate closure, unchanged
 unrelated Cellar racks, then a second successful run with unchanged Cellar bytes.
-It does not reset fixtures implicitly. Retained workspaces include `native.log`
-for failed native operations.
+It does not reset fixtures implicitly. Retained workspaces include public command diagnostics and frozen inputs.
+
+`TestLivePublicCommandExecution` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
+space-separated `BREWWARDEN_VM_PUBLIC_TARGETS`. It checks multiple targets,
+unrelated installed-package preservation, unchanged reruns and replay refusal.
+`BREWWARDEN_VM_PUBLIC_OPERATION=upgrade` selects upgrade. Fault modes are
+`changed-input`, `missing-cache`, `cancel` and `interrupt`; the last cancels after
+the real command starts and checks stopped-session recovery without replay.
+
+`TestLivePublicCoverageSurvey` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
+`BREWWARDEN_VM_SURVEY_TARGETS`. It collects each root's complete evidence without
+installing and retains a JSON classification. A passing survey test means the
+survey completed, not that every package was eligible. Read each held reason and
+use actual execution acceptance for supported representative packages.

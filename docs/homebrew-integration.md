@@ -19,11 +19,11 @@ scope. Exact upstream pins, options and boundary tests live beside each adapter.
 | Requirement | Delegated guarantee and BrewWarden boundary | Owning contract |
 | --- | --- | --- |
 | Artifact integrity | Native checksum verification plus authenticated digest, frozen bottle inputs and complete closure binding | [Homebrew](../internal/adapters/homebrew/README.md) |
-| Metadata authenticity | Pinned Homebrew JWS verification before recipe selection; strict metadata and recipe identity checks | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Metadata authenticity | Public Homebrew JWS verification; strict selected artifact and dependency identities | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Bottle provenance | Maintained attestation-only verifier; exact subject, signer and workflow checks without native gh bootstrap | [Attestation](../internal/adapters/attestation/README.md) |
 | Minimum release age | Official recipe history bound to the selected bottle digest; rebuilds receive their own age | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Known vulnerabilities | Public OSV scanning plus Homebrew advisory status for the exact candidate; unavailable or skipped checks hold | [Homebrew](../internal/adapters/homebrew/README.md) |
-| Execution binding | Pinned native install APIs, frozen inputs, retained formula locks, installer guards and reconstructed installed payload checks | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Execution binding | Public install/upgrade, fixed metadata and cache, verified bottle bytes, complete closure and observed existing state | [Homebrew](../internal/adapters/homebrew/README.md) |
 
 For each implemented row, link to its owning adapter and contract tests, and record:
 
@@ -42,12 +42,10 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 
 ## Preflight investigation
 
-The supported product path has demonstrated native install, upgrade with an
-unchanged dependency, age exceptions, changed-input refusal, affected-dependent
-refusal, lock contention, partial failure and stopped-session reconciliation in
-a disposable macOS VM. The [native adapter](../internal/adapters/homebrew/README.md)
-owns the guarantees and exact supported pins; [verification](verification.md)
-describes the repeatable acceptance entrypoints.
+The public product path is tested in a disposable macOS VM for installation,
+upgrade, unchanged dependencies, age exceptions, input refusal, partial outcomes
+and recovery. The [Homebrew adapter](../internal/adapters/homebrew/README.md) owns
+exact guarantees and pins; [verification](verification.md) lists the entrypoints.
 
 Before expanding support, inspect the selected upstream revision and test both
 successful and skipped verification paths. A native preview or zero exit code
@@ -58,8 +56,8 @@ established, and supplement missing claims through the owning adapters above.
 
 Bottle registration history dates the selected digest rather than the upstream
 version. A completed supported advisory lookup can report no known findings
-without a historical-advisory witness. Neither claim alone grants execution. The native session binds the complete evaluated closure to actual
-installation; builds without a trusted runtime digest remain diagnostic-only.
+without a historical-advisory witness. Neither claim alone grants execution. The public-command session binds new bottle installations and the selected
+existing state to the evaluated plan; builds without a trusted runtime digest remain diagnostic-only.
 
 ## Code and evidence ownership
 
@@ -94,11 +92,10 @@ satisfies their complete contract and equivalent tests pass.
 
 ### Reconciliation
 
-The pinned `FormulaLock` implementation provides nonblocking cross-process
-exclusion for each candidate formula. Reconciliation uses fresh trusted scripts
-and runtime bytes, reacquires every original candidate lock, inventories the
-actual candidate racks and activation links, and retains the snapshot by digest.
-An active original session prevents observation. This records current state only;
-it does not rerun installers, signal remembered process IDs, infer an exit code,
-restore exceptions, or roll back installed packages. The application appends a
-`reconciled` journal transition and requires a new plan for further mutations.
+A private operation lock coordinates BrewWarden sessions. The startup gate records
+owned process sessions before launching commands. Reconciliation requires that lock
+and absent recorded sessions, then inventories selected racks and opt links without
+following symlinks. It does not call Homebrew, rerun installers, signal remembered
+IDs, infer an exit code, restore exceptions or roll back packages. The application
+records a `reconciled` transition and requires a fresh plan. Ordinary independent
+Homebrew mutations are excluded by the documented usage condition, not intercepted.

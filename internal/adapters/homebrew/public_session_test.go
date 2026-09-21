@@ -10,7 +10,7 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-func TestPublicPlanCannotUseNativeRecovery(t *testing.T) {
+func TestPublicRecoveryWaitsForActiveOperation(t *testing.T) {
 	directory := t.TempDir()
 	if err := os.Chmod(directory, 0700); err != nil {
 		t.Fatal(err)
@@ -20,7 +20,7 @@ func TestPublicPlanCannotUseNativeRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	plan := planFixture()
-	plan.Schema = 2
+	plan.Schema = 3
 	raw, err := json.Marshal(plan)
 	if err != nil {
 		t.Fatal(err)
@@ -33,14 +33,19 @@ func TestPublicPlanCannotUseNativeRecovery(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine := Engine{Collector: &Collector{Directory: directory}}
-	if _, err := engine.savedPlan(prepared.Assessment.Binding); err != nil {
+	if _, _, err := engine.savedPlan(prepared.Assessment.Binding); err != nil {
 		t.Fatal("fixture must resolve to a valid saved plan", err)
 	}
-	if _, err := engine.Snapshot(context.Background(), prepared.Assessment.Binding); err == nil || err.Error() != "public execution recovery has not passed acceptance" {
-		t.Fatal("native recovery accepted public attempt", err)
+	lock, err := acquireOperationLock(directory)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer lock.Close()
+	if _, err := engine.Snapshot(context.Background(), prepared.Assessment.Binding); err == nil || err.Error() != "another BrewWarden execution is active" {
+		t.Fatal("recovery accepted an active public attempt", err)
 	}
 	entries, err := os.ReadDir(directory)
-	if err != nil || len(entries) != 1 {
+	if err != nil || len(entries) != 2 {
 		t.Fatal("recovery launched before capability rejection", err)
 	}
 }
@@ -71,7 +76,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 			state := normal
 			state.Installed = append([]installedVersion{}, normal.Installed...)
 			tc.mutate(&state)
-			got, err := publicActions([]installedFormula{state}, []domain.Node{node}, nativeInputs{Operation: "install"})
+			got, err := publicActions([]installedFormula{state}, []domain.Node{node}, collectionInputs{Operation: "install"})
 			if tc.want == "" {
 				if err == nil {
 					t.Fatal("unsupported state accepted")
@@ -82,7 +87,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		})
 	}
 	absent := installedFormula{Name: node.Artifact.Name, Installed: []installedVersion{}}
-	if _, err := publicActions([]installedFormula{absent}, []domain.Node{node}, nativeInputs{Operation: "upgrade", Targets: []string{node.Artifact.Name}}); err == nil {
+	if _, err := publicActions([]installedFormula{absent}, []domain.Node{node}, collectionInputs{Operation: "upgrade", Targets: []string{node.Artifact.Name}}); err == nil {
 		t.Fatal("upgrade of absent root accepted")
 	}
 }

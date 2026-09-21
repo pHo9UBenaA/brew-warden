@@ -5,9 +5,11 @@ import (
 	"context"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"net/http"
 	"net/url"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -47,8 +49,16 @@ func download(ctx context.Context, client *http.Client, address string, limit in
 		return nil, errors.New("metadata request failed")
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || response.ContentLength > limit {
-		return nil, errors.New("metadata response unavailable or oversized")
+	if response.StatusCode != http.StatusOK {
+		if response.Header.Get("X-RateLimit-Remaining") == "0" {
+			if reset, err := strconv.ParseInt(response.Header.Get("X-RateLimit-Reset"), 10, 64); err == nil && reset > 0 && reset < 1<<40 {
+				return nil, fmt.Errorf("%s API rate limit reached; retry after %s", u.Host, time.Unix(reset, 0).UTC().Format(time.RFC3339))
+			}
+		}
+		return nil, fmt.Errorf("metadata request to %s returned HTTP %d", u.Host, response.StatusCode)
+	}
+	if response.ContentLength > limit {
+		return nil, errors.New("metadata response oversized")
 	}
 	data, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
 	if err != nil || int64(len(data)) > limit {

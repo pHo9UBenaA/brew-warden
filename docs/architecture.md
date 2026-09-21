@@ -74,11 +74,11 @@ effects in separate adapters and compose them outside; keep additional pure rule
 in the core. Follow [Homebrew integration](homebrew-integration.md) for the required
 capability records and contract tests. Do not create placeholder abstractions.
 
-The `homebrew` adapter owns the native runtime inventory, signed-metadata bridge,
-private process environment, candidate inspection, bound execution session and
+The `homebrew` adapter owns the reviewed runtime inventory, public signed-metadata commands,
+private process environment, candidate evidence, public execution session and
 recovery snapshots. Advisory and bottle-age observations use the same authenticated candidate identity;
 all transport and command details remain outside core policy.
-`tools/runtime-pack` is an explicit build-only native dependency packager, not
+`tools/runtime-pack` is an explicit build-only compatibility inventory generator, not
 a product bootstrap path or an exemption for external application imports.
 
 ## Enforcement
@@ -108,8 +108,7 @@ under tests when they need multiple concrete layers.
 
 The application service blocks planning while any attempt is unresolved, presents
 exact candidate identities before execution, and reconciles interrupted attempts
-through a separate observation port. The native recovery adapter acquires the
-original candidate locks before observing retained state; it cannot mark a lost
-process successful. CLI code owns argument parsing and presentation, including
-per-artifact age reasons. Composition selects the bundled runtime by a build-time
+through a separate observation port. The recovery adapter acquires the BrewWarden operation lock and checks owned
+process sessions before observing state; it cannot mark a lost process successful. CLI code owns argument parsing and presentation, including
+per-artifact age reasons. Composition selects the verifier and installed-Homebrew inventory by a build-time
 digest and constructs all real providers, the journal and the clock.

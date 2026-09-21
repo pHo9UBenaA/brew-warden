@@ -34,11 +34,8 @@ type infoFormula struct {
 		Stable struct {
 			Rebuild int `json:"rebuild" required:"true"`
 			Files   struct {
-				Tahoe *struct {
-					URL    string        `json:"url" required:"true"`
-					SHA256 domain.Digest `json:"sha256" required:"true"`
-					Cellar string        `json:"cellar" required:"true"`
-				} `json:"arm64_tahoe"`
+				Tahoe *infoBottleFile `json:"arm64_tahoe"`
+				All   *infoBottleFile `json:"all"`
 			} `json:"files" required:"true"`
 		} `json:"stable" required:"true"`
 	} `json:"bottle" required:"true"`
@@ -49,6 +46,12 @@ type infoFormula struct {
 	RecipeChecksum    struct {
 		SHA256 domain.Digest `json:"sha256" required:"true"`
 	} `json:"ruby_source_checksum" required:"true"`
+}
+
+type infoBottleFile struct {
+	URL    string        `json:"url" required:"true"`
+	SHA256 domain.Digest `json:"sha256" required:"true"`
+	Cellar string        `json:"cellar" required:"true"`
 }
 
 func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
@@ -67,7 +70,13 @@ func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
 		}
 		selected[f.Name] = true
 		m := formulaMetadata{Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision, Rebuild: f.Bottle.Stable.Rebuild, SourceURL: f.URLs.Stable.URL, SourceSHA256: f.URLs.Stable.Checksum, RecipeSHA256: f.RecipeChecksum.SHA256, RecipePath: f.RecipePath, TapCommit: f.TapCommit, Dependencies: f.Dependencies, BuildDependencies: f.BuildDependencies}
-		if b := f.Bottle.Stable.Files.Tahoe; b != nil {
+		b := f.Bottle.Stable.Files.Tahoe
+		m.BottleTag = "arm64_tahoe"
+		if b == nil {
+			b = f.Bottle.Stable.Files.All
+			m.BottleTag = "all"
+		}
+		if b != nil {
 			m.BottleURL, m.BottleSHA256, m.Cellar = b.URL, b.SHA256, b.Cellar
 		}
 		result = append(result, m)
@@ -128,7 +137,6 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 		queue = nil
 		for _, f := range batch {
 			queue = append(queue, f.Dependencies...)
-			queue = append(queue, f.BuildDependencies...)
 		}
 	}
 	slices.SortFunc(doc.Formulae, func(a, b formulaMetadata) int { return strings.Compare(a.Name, b.Name) })

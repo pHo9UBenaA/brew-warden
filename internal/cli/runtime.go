@@ -22,7 +22,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		if service == nil {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted bundled execution runtime.")
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted execution inventory.")
 			if err != nil {
 				return 1
 			}
@@ -104,7 +104,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 			_, _ = fmt.Fprintln(errOut, "runtime_unavailable: "+err.Error())
 			return 1
 		}
-		_, err := fmt.Fprintf(out, "Runtime integrity and supported platform verified.\nCandidate eligibility: verified official arm64_tahoe bottles with complete required evidence.\nMinimum release age: %d seconds.\nMetadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n", policy.MinimumAgeSeconds())
+		_, err := fmt.Fprintf(out, "Runtime integrity and supported platform verified.\nCandidate eligibility: verified official bottles for arm64_tahoe with complete required evidence.\nMinimum release age: %d seconds.\nMetadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n", policy.MinimumAgeSeconds())
 		if err != nil {
 			return 1
 		}
