@@ -33,10 +33,12 @@ it does not install, publish or modify Homebrew. The marker is not publisher
 authentication or an execution permit: the supported installed Homebrew tree,
 verified candidate evidence and complete plan are checked on each operation.
 
-Run the archive in a disposable Apple Silicon macOS VM with supported installed
-Homebrew and gh, including doctor, installation, upgrade, exceptions, interruption,
-failure and fresh retry. Changes to the installed-runtime fingerprint or execution
+Run the archive with the [local-only Tart acceptance runner](../scripts/macos-vm.md)
+in a disposable Apple Silicon macOS VM with supported installed Homebrew and gh,
+including doctor, installation, upgrade, exceptions, interruption, failure and
+fresh retry. The VM cases are explicitly build-tagged out of baseline CI.
+Representative authenticated local cases passed; see [verification](verification.md)
+for their scope. Changes to the installed-runtime fingerprint or execution
 binding require renewed native acceptance. The application Go module uses the
 standard library; Homebrew and gh remain external compatibility and security
-dependencies. This migration has not yet passed successful native installation
-or interruption acceptance.
+dependencies. Local acceptance is not publisher authentication.

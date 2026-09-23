@@ -1,7 +1,8 @@
 # Product design
 
-Status: simplified public-command implementation; authenticated native
-install/upgrade and interruption acceptance remains outstanding. Distribution
+Status: simplified public-command implementation. Representative authenticated
+native install, upgrade and interruption cases passed in a disposable Tahoe VM;
+unsupported evidence still holds and publication is a separate decision. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
 public-command execution binding and minimal owned-process state. Official core bottle eligibility
 is determined by verified capabilities on Apple Silicon macOS Tahoe with the

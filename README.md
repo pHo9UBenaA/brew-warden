@@ -11,8 +11,10 @@ bwd brew install jq
 bwd brew upgrade jq
 ```
 
-Native Apple Silicon installation and interruption acceptance still requires an
-authenticated disposable VM; do not treat the local build as product-ready.
+Representative authenticated Apple Silicon installation, upgrade and
+interruption cases passed in a disposable VM. Other required evidence or
+unsupported formulae still hold. Local archives are not signed, notarized or
+published releases.
 All required checks finish before installation starts. Missing or unsupported
 evidence stops the command. Successful checks lead directly to ordinary public
 `brew install` or `brew upgrade`, using the verified downloads and dependency plan.
@@ -87,8 +89,8 @@ Use the Go version in `.go-version`, then:
 ```
 
 Development binaries are diagnostic-only until built as a distribution from
-reviewed source. Mutation acceptance requires a disposable macOS VM; tests never change
-the maintainer's Homebrew installation. See [verification](docs/verification.md),
+reviewed source. Native acceptance uses an explicit local Tart VM runner and opt-in test tag,
+not GitHub Actions; tests never change the maintainer's Homebrew installation. See [verification](docs/verification.md),
 [design](docs/design.md), [architecture](docs/architecture.md),
 [threat model](docs/threat-model.md) and [contributing](CONTRIBUTING.md).
 

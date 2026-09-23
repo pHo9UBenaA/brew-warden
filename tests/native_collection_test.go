@@ -1,8 +1,11 @@
+//go:build vmacceptance
+
 package tests
 
 import (
 	"context"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -17,6 +20,10 @@ func TestLiveCandidateCollection(t *testing.T) {
 	source := os.Getenv("BREWWARDEN_LIVE_COLLECTION_RUNTIME")
 	if source == "" {
 		t.Skip("requires explicit built runtime and public network")
+	}
+	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
+	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
+		t.Fatal("candidate collection requires a disposable VirtualMac")
 	}
 	directory, err := os.MkdirTemp(filepath.Dir(source), "live-collection-")
 	if err != nil {

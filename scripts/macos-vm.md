@@ -32,6 +32,47 @@ Run it with `--no-graphics --no-audio --no-clipboard`, without directory sharing
 or attached host disks. Default NAT permits evidence acquisition; the probe's
 own sandbox separately denies network access during native installation.
 
+## Local-only acceptance runner
+
+The optional VM cases in `tests/` have the `vmacceptance` build tag and are **not**
+part of `go test ./...` or GitHub Actions. `scripts/macos-vm-acceptance.sh` drives
+Tart and compiles those tests only when invoked locally. It does not use
+Playwright or a browser automation dependency: native subprocesses, installed
+Homebrew, package files and crash behavior are the boundaries under test.
+
+From a committed, verified tree, build the distribution, then explicitly supply
+a reviewed Homebrew tree, the installed-compatible arm64 gh executable and the
+archive to a fresh VM clone:
+
+```sh
+export PATH="$PWD/.cache/sdk/go/bin:$PATH" # Or another trusted Go matching .go-version.
+./scripts/build-product.sh darwin/arm64
+./scripts/macos-vm-acceptance.sh prepare brewwarden-tahoe-base brewwarden-local-01 \
+  "$REVIEWED_HOMEBREW_TREE" "$GH_ARM64" \
+  "$PWD/.cache/product-build.EXAMPLE/first/brewwarden-darwin-arm64.tar.gz"
+./scripts/macos-vm-acceptance.sh auth brewwarden-local-01
+# Approve the displayed short-lived device code in a browser; never paste a token.
+./scripts/macos-vm-acceptance.sh suite brewwarden-local-01
+./scripts/macos-vm-acceptance.sh finish brewwarden-local-01
+```
+
+Replace `product-build.EXAMPLE` with the emitted build-evidence directory.
+`suite` invokes the selected cases and their explicit guest-only fixtures in a
+fixed order, stopping on the first failure without inventing success. For
+focused investigation, select `run public TARGETS [FAULT]`, `run native [FAULT]`,
+`run survey TARGETS`, `run crash`, `run general TARGETS`, `run upgrade TARGET`
+and `fixture absent-jq|absent-xz|older-xz|repair-jq` separately. Fixtures modify
+**only that disposable guest**; `absent-*` deliberately uninstalls all versions
+of the named fixture formulae. Do not run unrelated guest mutations concurrently.
+`prepare` verifies VirtualMac arm64 before replacing the guest prefix, then runs
+the packaged `doctor` against the supported installed-runtime fingerprint.
+`auth` starts the standard gh device flow inside a private guest HOME; approval
+is human-mediated. Standard gh device login asks for `repo`, `read:org`, and
+`gist` scopes. `finish` removes guest credentials and stops the VM; also revoke
+the temporary GitHub CLI OAuth authorization from the account afterward.
+Evidence under ignored `.cache/` is disposable, not the sole record of results.
+Never upload VM output containing credentials or copy host credentials into it.
+
 ## Provision the guest
 
 Use `tart exec` through the guest agent. Before prefix changes, check `sw_vers`,

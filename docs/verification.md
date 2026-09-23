@@ -109,6 +109,12 @@ outcomes. They do not substitute for native Homebrew execution.
 
 ## Native product acceptance
 
+All optional `tests/*` native acceptance files use the `vmacceptance` build tag;
+normal `go test ./...`, baseline CI and GitHub Actions do not compile or run
+them. Run them only through the local [Tart VM runner](../scripts/macos-vm.md)
+(or explicitly compile `go test -tags=vmacceptance -c ./tests` for the guest).
+Human-approved GitHub device authentication stays inside the guest, never CI.
+
 Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
 `BREWWARDEN_VM_RUNTIME` set to a private test workspace in the disposable
 VM, with supported Homebrew and installed `gh` in the guest. The test checks the hardware
@@ -125,16 +131,25 @@ a new preflight to refuse the incomplete linked-keg record rather than invent
 success; manual Homebrew repair while idle precedes any successful retry. These
 tests never silently prepare or reset the host Homebrew installation.
 
-For this migration, a disposable Tahoe VM clone passed packaged `doctor`; an
-actual `brew install jq` stopped before mutation because the installed gh lacked
-authentication. No guest credentials were supplied. This exercises the required
-hold, not successful native installation or product readiness. The packaged CLI
-must still pass `doctor` and real install/upgrade and interruption acceptance in
-the VM. Offline tests, Docker tests and payload-only probes cannot
-substitute for this native product-path acceptance. Signing/notarization and
-public release provenance are not implied by local test success.
+Local acceptance in an authenticated disposable Apple Silicon Tahoe VM passed
+packaged `doctor`, fresh jq/oniguruma installation, multi-target zstd/jq with a
+bounded lz4 age exception, unchanged reruns, explicit xz 5.8.3 -> 5.8.4
+upgrade, and upgrade-all with a real xz upgrade. The guest also exercised age
+holds, changed bottle/metadata/cache/installed inputs, cancellation, live
+parent death and child exclusion, partial link failure and manual repair followed
+by fresh verification. A partially poured jq initially produced a false
+success on retry; the linked-keg check and regression test now reject it.
+An unauthenticated guest held before mutation. The coverage survey held hello
+and wget because Homebrew skipped required advisory subjects; this is not a
+formula allowlist or evidence of their safety. These are exercised local cases,
+not a universal compatibility proof. No host Homebrew was changed. Signing,
+notarization and public release provenance are not implied by local test success.
 
-`TestLiveGeneralBottleExecution` in `tests/general_execution_test.go` accepts
+`TestLiveExplicitUpgradeChangesSelectedVersion` takes an older installed
+standard-prefix formula selected by `BREWWARDEN_VM_UPGRADE_TARGET`. It requires
+the public bound upgrade to activate the exact verified newer keg while all
+unrelated installed racks remain unchanged; fixture provisioning is explicit in
+the guest. `TestLiveGeneralBottleExecution` in `tests/general_execution_test.go` accepts
 space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
 Provision absent targets to test fresh installation. It uses live authenticated
 metadata, release and advisory providers, provenance verification, the real public-command

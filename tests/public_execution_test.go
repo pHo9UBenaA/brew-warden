@@ -1,3 +1,5 @@
+//go:build vmacceptance
+
 package tests
 
 import (
@@ -80,7 +82,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		}
 		unrelatedBefore := publicUnrelatedKegs(t, prepared.Assessment.Nodes)
 		if fault == "interrupt" {
-			if result, err := session.Run(runContext, prepared.Assessment.Binding); err == nil || !interrupt.triggered || !result.ExitKnown || result.ExitCode == 0 {
+			if result, err := session.Run(runContext, prepared.Assessment.Binding); err == nil || !interrupt.Triggered() || !result.ExitKnown || result.ExitCode == 0 {
 				t.Fatal("installer did not reach the interruption fixture", err)
 			}
 			if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
@@ -220,6 +222,12 @@ type interruptOnPour struct {
 	cancel      context.CancelFunc
 	tail        string
 	triggered   bool
+}
+
+func (w *interruptOnPour) Triggered() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.triggered
 }
 
 func (w *interruptOnPour) Write(data []byte) (int, error) {

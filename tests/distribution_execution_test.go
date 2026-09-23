@@ -1,3 +1,5 @@
+//go:build vmacceptance
+
 package tests
 
 import (
@@ -10,6 +12,7 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"sync/atomic"
 	"syscall"
 	"testing"
 	"time"
@@ -56,10 +59,10 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 		t.Fatal(string(output), err)
 	}
 	file := filepath.Join(home, "Library/Application Support/brewwarden/collections/inflight.json")
-	stoppedPID := 0
+	var stoppedPID atomic.Int64
 	defer func() {
-		if stoppedPID > 1 {
-			_ = syscall.Kill(stoppedPID, syscall.SIGCONT)
+		if pid := stoppedPID.Load(); pid > 1 {
+			_ = syscall.Kill(int(pid), syscall.SIGCONT)
 		}
 	}()
 	command := newCommand("brew", "install", "xz")
@@ -78,11 +81,11 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 		if err := syscall.Kill(record.PID, syscall.SIGSTOP); err != nil {
 			return err
 		}
-		stoppedPID = record.PID
+		stoppedPID.Store(int64(record.PID))
 		return command.Process.Kill()
 	}}
 	command.Stdout, command.Stderr = trigger, trigger
-	if err := command.Run(); err == nil || !trigger.triggered {
+	if err := command.Run(); err == nil || !trigger.Triggered() {
 		t.Fatal("parent crash fixture not reached", err)
 	}
 	raw, err := os.ReadFile(file)
@@ -96,7 +99,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if err := json.Unmarshal(raw, &owned); err != nil || owned.Schema != 1 || owned.PID <= 1 || owned.Session != owned.PID || len(owned.Plan) != 64 || len(owned.Attempt) != 64 {
 		t.Fatal("invalid owned process record", err)
 	}
-	if owned.PID != stoppedPID {
+	if int64(owned.PID) != stoppedPID.Load() {
 		t.Fatal("the frozen child and durable record do not match")
 	}
 	// The child is still live, so a second BrewWarden mutation must hold.
@@ -104,10 +107,10 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if err == nil || !strings.Contains(string(output), "another BrewWarden execution") && !strings.Contains(string(output), "may still be running") {
 		t.Fatal("continued child was not excluded", string(output), err)
 	}
-	if err := syscall.Kill(stoppedPID, syscall.SIGCONT); err != nil {
+	if err := syscall.Kill(int(stoppedPID.Load()), syscall.SIGCONT); err != nil {
 		t.Fatal("could not resume the owned child", err)
 	}
-	stoppedPID = 0
+	stoppedPID.Store(0)
 	deadline := time.Now().Add(2 * time.Minute)
 	for syscall.Kill(owned.PID, 0) == nil && time.Now().Before(deadline) {
 		time.Sleep(200 * time.Millisecond)
@@ -138,6 +141,12 @@ type killOnInstall struct {
 	triggered   bool
 	destination io.Writer
 	kill        func() error
+}
+
+func (w *killOnInstall) Triggered() bool {
+	w.mu.Lock()
+	defer w.mu.Unlock()
+	return w.triggered
 }
 
 func (w *killOnInstall) Write(p []byte) (int, error) {
