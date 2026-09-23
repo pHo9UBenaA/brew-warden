@@ -87,7 +87,7 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 				return errors.New("unsafe Homebrew runtime path")
 			}
 			if len(manifest.Files) >= 10000 {
-				return errors.New("Homebrew runtime inventory exceeds limit")
+				return errors.New("installed Homebrew runtime inventory exceeds limit")
 			}
 			dst := filepath.Join(brew, relative)
 			if item.IsDir() {
@@ -115,7 +115,7 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 				}
 				total += info.Size()
 				if total > 2*1024*1024*1024 {
-					return errors.New("Homebrew runtime exceeds size limit")
+					return errors.New("installed Homebrew runtime exceeds size limit")
 				}
 				if info.Mode().Perm()&0111 != 0 {
 					entry.Mode = 0755
@@ -140,7 +140,7 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 		if entry.Link != "" {
 			resolved, err := filepath.EvalSymlinks(filepath.Join(destination, filepath.FromSlash(entry.Path)))
 			if err != nil || !strings.HasPrefix(resolved, brew+string(filepath.Separator)) {
-				return "", errors.New("Homebrew runtime link escapes or is unresolved")
+				return "", errors.New("installed Homebrew runtime link escapes or is unresolved")
 			}
 		}
 	}
