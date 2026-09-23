@@ -266,7 +266,10 @@ or changes to verified inputs are allowed during execution. Source fallback or
 an extra download cannot silently substitute an unverified artifact.
 
 Selected existing kegs are observed through public metadata, receipts and active
-links. They are trusted user-owned state: checking a newly downloaded bottle does
+opt links; normal formulae also require Homebrew's matching linked-keg record.
+An opt link alone can remain after a partial pour and must not turn a failed
+installation into success on retry. These are trusted user-owned observations:
+checking a newly downloaded bottle does
 not cryptographically verify an already installed payload. BrewWarden binds its
 own new installations to verified bottle bytes and records the existing state
 used by the plan. It does not reconstruct or replace unchanged packages merely

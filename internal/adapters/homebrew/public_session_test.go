@@ -46,6 +46,53 @@ func TestPublicSessionCloseRemovesCurrentWorkspace(t *testing.T) {
 	}
 }
 
+func TestInstalledLinkRejectsPartialPourAndMismatchedRecords(t *testing.T) {
+	prefix, err := filepath.EvalSymlinks(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	for _, path := range []string{"Cellar/jq/1.8.2", "Cellar/jq/old", "opt", "var/homebrew/linked"} {
+		if err := os.MkdirAll(filepath.Join(prefix, path), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	opt := filepath.Join(prefix, "opt/jq")
+	if err := os.Symlink("../Cellar/jq/1.8.2", opt); err != nil {
+		t.Fatal(err)
+	}
+	if version, incomplete, err := installedLink(prefix, "jq", false); err != nil || !incomplete || version == nil || *version != "1.8.2" {
+		t.Fatal("partially poured keg was not marked incomplete for the after-state", version, incomplete, err)
+	}
+	if version, incomplete, err := installedLink(prefix, "jq", true); err != nil || incomplete || version == nil || *version != "1.8.2" {
+		t.Fatal("keg-only formula without shared-prefix link was rejected", version, incomplete, err)
+	}
+	record := filepath.Join(prefix, "var/homebrew/linked/jq")
+	if err := os.Symlink("../../../Cellar/jq/1.8.2", record); err != nil {
+		t.Fatal(err)
+	}
+	if version, incomplete, err := installedLink(prefix, "jq", false); err != nil || incomplete || version == nil || *version != "1.8.2" {
+		t.Fatal("fully linked keg was not recognized", version, incomplete, err)
+	}
+	if err := os.Remove(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("../../../Cellar/jq/old", record); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := installedLink(prefix, "jq", false); err == nil {
+		t.Fatal("linked record for a different keg was accepted")
+	}
+	if err := os.Remove(record); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(record, []byte("not a Homebrew link"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if _, _, err := installedLink(prefix, "jq", false); err == nil {
+		t.Fatal("non-symlink linked record was accepted")
+	}
+}
+
 func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 	node := domain.Node{Artifact: metadataFixture().Formulae[0].artifact()}
 	active := node.Artifact.Version
@@ -66,6 +113,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		{"newer installed", func(s *installedFormula) { old := "999.0"; s.LinkedKeg = &old; s.Installed[0].Version = old }, ""},
 		{"pinned", func(s *installedFormula) { s.Pinned = true }, ""},
 		{"unlinked", func(s *installedFormula) { s.LinkedKeg = nil }, ""},
+		{"partial pour", func(s *installedFormula) { s.LinkIncomplete = true }, ""},
 		{"source installation", func(s *installedFormula) { s.Installed[0].Poured = false }, ""},
 	} {
 		t.Run(tc.name, func(t *testing.T) {

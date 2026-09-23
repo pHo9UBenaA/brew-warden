@@ -3,6 +3,7 @@ package tests
 import (
 	"context"
 	"encoding/json"
+	"errors"
 	"io"
 	"os"
 	"os/exec"
@@ -35,9 +36,16 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	t.Log("retained distribution crash state", home)
 	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Minute)
 	defer cancel()
+	authDir := os.Getenv("BREWWARDEN_VM_GH_CONFIG_DIR")
+	if authDir != "" && !filepath.IsAbs(authDir) {
+		t.Fatal("guest gh configuration directory must be absolute")
+	}
 	newCommand := func(args ...string) *exec.Cmd {
 		c := exec.CommandContext(ctx, binary, args...)
 		c.Env = []string{"HOME=" + home, "PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
+		if authDir != "" {
+			c.Env = append(c.Env, "GH_CONFIG_DIR="+authDir)
+		}
 		if token := os.Getenv("BREWWARDEN_VM_GH_TOKEN"); token != "" {
 			c.Env = append(c.Env, "GH_TOKEN="+token)
 		}
@@ -47,13 +55,36 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if output, err := newCommand("doctor").CombinedOutput(); err != nil {
 		t.Fatal(string(output), err)
 	}
+	file := filepath.Join(home, "Library/Application Support/brewwarden/collections/inflight.json")
+	stoppedPID := 0
+	defer func() {
+		if stoppedPID > 1 {
+			_ = syscall.Kill(stoppedPID, syscall.SIGCONT)
+		}
+	}()
 	command := newCommand("brew", "install", "xz")
-	trigger := &killOnInstall{destination: os.Stdout, kill: func() error { return command.Process.Kill() }}
+	trigger := &killOnInstall{destination: os.Stdout, kill: func() error {
+		// Freeze the real owned Homebrew process before losing its wrapper.
+		// This makes child continuation and exclusion deterministic even if
+		// the bottle would otherwise pour before the second invocation.
+		raw, err := os.ReadFile(file)
+		if err != nil {
+			return err
+		}
+		var record struct{ PID int }
+		if err := json.Unmarshal(raw, &record); err != nil || record.PID <= 1 {
+			return errors.New("missing owned child before parent crash")
+		}
+		if err := syscall.Kill(record.PID, syscall.SIGSTOP); err != nil {
+			return err
+		}
+		stoppedPID = record.PID
+		return command.Process.Kill()
+	}}
 	command.Stdout, command.Stderr = trigger, trigger
 	if err := command.Run(); err == nil || !trigger.triggered {
 		t.Fatal("parent crash fixture not reached", err)
 	}
-	file := filepath.Join(home, "Library/Application Support/brewwarden/collections/inflight.json")
 	raw, err := os.ReadFile(file)
 	if err != nil {
 		t.Fatal("lost parent did not leave bounded process identity", err)
@@ -65,14 +96,18 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if err := json.Unmarshal(raw, &owned); err != nil || owned.Schema != 1 || owned.PID <= 1 || owned.Session != owned.PID || len(owned.Plan) != 64 || len(owned.Attempt) != 64 {
 		t.Fatal("invalid owned process record", err)
 	}
-	// If the child continues, another BrewWarden mutation must hold. The child
-	// may finish first; in that case only the fresh retry may proceed.
-	if err := syscall.Kill(owned.PID, 0); err == nil {
-		output, err := newCommand("brew", "install", "xz").CombinedOutput()
-		if err == nil || !strings.Contains(string(output), "another BrewWarden execution") && !strings.Contains(string(output), "may still be running") {
-			t.Fatal("continued child was not excluded", string(output), err)
-		}
+	if owned.PID != stoppedPID {
+		t.Fatal("the frozen child and durable record do not match")
 	}
+	// The child is still live, so a second BrewWarden mutation must hold.
+	output, err := newCommand("brew", "install", "xz").CombinedOutput()
+	if err == nil || !strings.Contains(string(output), "another BrewWarden execution") && !strings.Contains(string(output), "may still be running") {
+		t.Fatal("continued child was not excluded", string(output), err)
+	}
+	if err := syscall.Kill(stoppedPID, syscall.SIGCONT); err != nil {
+		t.Fatal("could not resume the owned child", err)
+	}
+	stoppedPID = 0
 	deadline := time.Now().Add(2 * time.Minute)
 	for syscall.Kill(owned.PID, 0) == nil && time.Now().Before(deadline) {
 		time.Sleep(200 * time.Millisecond)

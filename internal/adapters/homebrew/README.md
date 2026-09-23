@@ -71,8 +71,12 @@ maintenance are disabled. A missing bottle cannot be replaced through a network
 fetch or source download during installation.
 
 Existing selected kegs must have supported public installed metadata, an active
-opt link, no custom options and recorded bottle installation. Their receipts and
-versions are observed; these flags do not prove existing payload hashes. The
+opt link, no custom options and recorded bottle installation. Non-keg-only
+formulae must also have Homebrew's matching `var/homebrew/linked` record:
+Homebrew 7.0.4's public `brew link --dry-run` distinguishes this from a partial
+pour that created an opt link but failed to link files into the prefix. This
+version-specific record is read as a symlink, not through a private Ruby API.
+Receipts and versions are observed; neither link proves existing payload hashes. The
 user-owned installed state is trusted under the threat model. Newly introduced
 artifacts are the verified cached bottles. Unrelated installed packages are not
 scanned or scheduled for maintenance, except when explicitly selected by an

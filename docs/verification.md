@@ -120,8 +120,10 @@ The default path checks actual execution, BrewWarden operation exclusion, candid
 `exception-changed-input` or `link-conflict`.
 Process continuation and fresh retry are checked by the distribution parent-crash
 test, not by a saved-plan reconciliation command. Link conflict requires absent jq/oniguruma and exercises a real partial
-installation while preserving an existing shared-prefix file. These tests never
-silently prepare or reset the host Homebrew installation.
+installation while preserving an existing shared-prefix file. It then requires
+a new preflight to refuse the incomplete linked-keg record rather than invent
+success; manual Homebrew repair while idle precedes any successful retry. These
+tests never silently prepare or reset the host Homebrew installation.
 
 For this migration, a disposable Tahoe VM clone passed packaged `doctor`; an
 actual `brew install jq` stopped before mutation because the installed gh lacked
@@ -145,7 +147,8 @@ after their owned process session stops.
 space-separated `BREWWARDEN_VM_PUBLIC_TARGETS`. It checks multiple targets,
 unrelated installed-package preservation, unchanged reruns and replay refusal.
 `BREWWARDEN_VM_PUBLIC_OPERATION=upgrade` selects upgrade. Fault modes are
-`changed-input`, `missing-cache`, `cancel` and `interrupt`; the last cancels after
+`changed-input`, `changed-metadata`, `installed-state`, `missing-cache`,
+`cancel` and `interrupt`; the last cancels after
 the real command starts and checks that a fresh collection, not a saved plan,
 is required before retry.
 
@@ -156,7 +159,10 @@ survey completed, not that every package was eligible. Read each held reason and
 use actual execution acceptance for supported representative packages.
 
 `TestLiveDistributionParentCrash` takes `BREWWARDEN_VM_DISTRIBUTION_BINARY` pointing
-to an extracted `bwd`. Provision absent xz in the VirtualMac. It kills that parent
+to an extracted `bwd`. Provision absent xz in the VirtualMac. If the isolated
+test HOME differs from the guest's authenticated gh HOME, explicitly set
+`BREWWARDEN_VM_GH_CONFIG_DIR` to that guest-owned gh configuration directory;
+never copy host credentials into the VM. It kills that parent
 after the actual install starts, verifies its owned-process record, refuses a
 new mutation while the child is active, then performs a fresh, fully checked
 retry after the child stops. It never infers success from a stale record.

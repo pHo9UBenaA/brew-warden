@@ -169,7 +169,26 @@ func TestLiveNativeExecution(t *testing.T) {
 		if _, err := os.Stat("/opt/homebrew/Cellar/oniguruma/6.9.10"); err != nil {
 			t.Fatal("did not exercise partial dependency installation", err)
 		}
-		t.Log("partial installation retained, existing link conflict preserved, actual state recorded")
+		partial, err := kegSnapshot("/opt/homebrew/Cellar")
+		if err != nil {
+			t.Fatal(err)
+		}
+		// A new invocation must not call an opt-linked partial pour a
+		// successful installation. The user can repair it with Homebrew while
+		// BrewWarden is idle, then retry with fresh verification.
+		engine := homebrew.Engine{Collector: &collector}
+		fresh, next, err := engine.Prepare(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, domain.DefaultPolicy(), nil, time.Now().Unix())
+		if err == nil {
+			_ = next.Close()
+			t.Fatal("partial link was reported as a fresh successful install", fresh)
+		}
+		if !strings.Contains(err.Error(), "link step is incomplete") {
+			t.Fatal("partial link held for the wrong reason", err)
+		}
+		if after, err := kegSnapshot("/opt/homebrew/Cellar"); err != nil || after != partial {
+			t.Fatal("held fresh retry mutated the partial prefix", err)
+		}
+		t.Log("partial installation retained; incomplete link prevents false success on fresh retry")
 		return
 	}
 	if fault == "changed-input" || fault == "exception-changed-input" || fault == "age" {

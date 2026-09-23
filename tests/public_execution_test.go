@@ -115,6 +115,39 @@ func TestLivePublicCommandExecution(t *testing.T) {
 				t.Fatal(err)
 			}
 			switch fault {
+			case "changed-metadata":
+				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "metadata.json"))
+				if err != nil || len(files) != 1 {
+					t.Fatal("missing authenticated metadata fixture", err)
+				}
+				file, err := os.OpenFile(files[0], os.O_WRONLY|os.O_APPEND, 0)
+				if err != nil {
+					t.Fatal(err)
+				}
+				_, writeErr := file.WriteString("changed after verification")
+				if err := file.Close(); writeErr != nil || err != nil {
+					t.Fatal("cannot change metadata fixture", writeErr, err)
+				}
+			case "installed-state":
+				link := "/opt/homebrew/opt/" + names[0]
+				original, err := os.Readlink(link)
+				if err != nil {
+					t.Fatal("requires an installed linked target", err)
+				}
+				if err := os.Remove(link); err != nil {
+					t.Fatal(err)
+				}
+				defer func() {
+					if err := os.Remove(link); err != nil && !os.IsNotExist(err) {
+						t.Error("cannot clear changed installed link", err)
+					}
+					if err := os.Symlink(original, link); err != nil {
+						t.Error("cannot restore installed link", err)
+					}
+				}()
+				if err := os.Symlink("../Cellar/"+names[0]+"/unplanned", link); err != nil {
+					t.Fatal("cannot change installed link", err)
+				}
 			case "changed-input":
 				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "*.tar.gz"))
 				if err != nil || len(files) == 0 {

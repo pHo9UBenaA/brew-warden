@@ -31,12 +31,13 @@ type publicSession struct {
 	consumed bool
 }
 type installedFormula struct {
-	Name      string             `json:"name" required:"true"`
-	Pinned    bool               `json:"pinned" required:"true"`
-	Outdated  bool               `json:"outdated" required:"true"`
-	KegOnly   bool               `json:"keg_only" required:"true"`
-	LinkedKeg *string            `json:"active_version,omitempty"`
-	Installed []installedVersion `json:"installed" required:"true"`
+	Name           string             `json:"name" required:"true"`
+	Pinned         bool               `json:"pinned" required:"true"`
+	Outdated       bool               `json:"outdated" required:"true"`
+	KegOnly        bool               `json:"keg_only" required:"true"`
+	LinkedKeg      *string            `json:"active_version,omitempty"`
+	LinkIncomplete bool               `json:"link_incomplete,omitempty"`
+	Installed      []installedVersion `json:"installed" required:"true"`
 }
 type installedVersion struct {
 	Version       string                `json:"version" required:"true"`
@@ -104,18 +105,12 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 	slices.SortFunc(document.Formulae, func(a, b installedFormula) int { return strings.Compare(a.Name, b.Name) })
 	for i := range document.Formulae {
 		formula := &document.Formulae[i]
-		// Public info represents an absent linked_keg as null. Observe the actual
-		// opt link instead; it also identifies active keg-only installations.
-		formula.LinkedKeg = nil
-		opt := filepath.Join("/opt/homebrew/opt", formula.Name)
-		if _, err := os.Lstat(opt); err == nil {
-			resolved, err := filepath.EvalSymlinks(opt)
-			if err != nil || filepath.Dir(resolved) != filepath.Join("/opt/homebrew/Cellar", formula.Name) {
-				return nil, "", errors.New("active keg escapes candidate rack")
-			}
-			active := filepath.Base(resolved)
-			formula.LinkedKeg = &active
-		} else if !errors.Is(err, os.ErrNotExist) {
+		// Public info represents linked_keg as null for keg-only formulae.
+		// Observe the opt link, and for normal formulae also require Homebrew's
+		// linked-keg record. A partially poured but unlinked keg is not a
+		// successfully installed formula, even if its opt link exists.
+		formula.LinkedKeg, formula.LinkIncomplete, err = installedLink("/opt/homebrew", formula.Name, formula.KegOnly)
+		if err != nil {
 			return nil, "", err
 		}
 		for j := range formula.Installed {
@@ -162,6 +157,50 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 	}
 	return document.Formulae, digest, nil
 }
+
+// Homebrew 7.0.4's Keg#linked? uses var/homebrew/linked, while Keg#optlinked?
+// uses opt. Neither link authenticates the installed payload; both establish
+// whether Homebrew actually completed its own shared-prefix link step.
+func installedLink(prefix, name string, kegOnly bool) (*string, bool, error) {
+	if !domain.ValidRequest("install", []string{name}) {
+		return nil, false, errors.New("invalid installed link identity")
+	}
+	observe := func(file string) (*string, error) {
+		info, err := os.Lstat(file)
+		if errors.Is(err, os.ErrNotExist) {
+			return nil, nil
+		}
+		if err != nil || info.Mode()&os.ModeSymlink == 0 {
+			return nil, errors.New("installed Homebrew link is unsafe")
+		}
+		resolved, err := filepath.EvalSymlinks(file)
+		if err != nil || filepath.Dir(resolved) != filepath.Join(prefix, "Cellar", name) {
+			return nil, errors.New("installed Homebrew link escapes candidate rack")
+		}
+		keg, err := os.Stat(resolved)
+		if err != nil || !keg.IsDir() {
+			return nil, errors.New("installed Homebrew link has no keg")
+		}
+		version := filepath.Base(resolved)
+		return &version, nil
+	}
+	active, err := observe(filepath.Join(prefix, "opt", name))
+	if err != nil {
+		return nil, false, err
+	}
+	linked, err := observe(filepath.Join(prefix, "var", "homebrew", "linked", name))
+	if err != nil {
+		return nil, false, err
+	}
+	if linked != nil && (active == nil || *linked != *active) {
+		return nil, false, errors.New("installed Homebrew linked-keg record differs from opt link")
+	}
+	// Observe the actual partial state after a failed pour. Preparation and
+	// post-execution success checks refuse it, but the changed state remains
+	// available to classify a nonzero exit as partial rather than unknown.
+	return active, !kegOnly && active != nil && linked == nil, nil
+}
+
 func publicActions(states []installedFormula, nodes []domain.Node, request collectionInputs) ([]plannedAction, error) {
 	if len(states) != len(nodes) {
 		return nil, errors.New("incomplete installed state")
@@ -171,6 +210,9 @@ func publicActions(states []installedFormula, nodes []domain.Node, request colle
 		state := states[i]
 		if state.Name != node.Artifact.Name || state.Pinned || len(state.Installed) > 32 {
 			return nil, errors.New("pinned or ambiguous installed candidate")
+		}
+		if state.LinkIncomplete {
+			return nil, errors.New("installed Homebrew link step is incomplete; repair with brew link before retrying")
 		}
 		action := "install"
 		if len(state.Installed) == 0 {
@@ -187,7 +229,7 @@ func publicActions(states []installedFormula, nodes []domain.Node, request colle
 				selected = *state.LinkedKeg
 			}
 			if selected == "" {
-				return nil, errors.New("unlinked installed candidate requires reconciliation")
+				return nil, errors.New("unlinked installed candidate requires manual Homebrew repair")
 			}
 			found := false
 			for _, version := range state.Installed {

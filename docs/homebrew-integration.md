@@ -23,7 +23,7 @@ scope. Exact upstream pins, options and boundary tests live beside each adapter.
 | Bottle provenance | Installed gh 2.101.0 public attestation verifier; exact downloaded digest, signer and verified subject checks | [Attestation](../internal/adapters/attestation/README.md) |
 | Minimum release age | Earliest trusted attestation timestamp for the exact digest; missing evidence holds even with an age exception | [Attestation](../internal/adapters/attestation/README.md) |
 | Known vulnerabilities | Public OSV scanning plus Homebrew advisory status for the exact candidate; unavailable or skipped checks hold | [Homebrew](../internal/adapters/homebrew/README.md) |
-| Execution binding | Public install/upgrade, fixed metadata and cache, verified bottle bytes, complete closure and observed existing state | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Execution binding | Public install/upgrade, fixed metadata and cache, verified bottle bytes, complete closure and observed opt/linked-keg state; partial pours cannot be mistaken for linked installations | [Homebrew](../internal/adapters/homebrew/README.md) |
 
 For each implemented row, link to its owning adapter and contract tests, and record:
 
