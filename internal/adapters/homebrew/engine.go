@@ -103,5 +103,7 @@ func (e Engine) Check(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	return e.Collector.BottleVerifier.Check(bounded)
+	// Runtime inventory copying can exceed the OS probe's short deadline;
+	// gh has its own independent 10-second command deadline.
+	return e.Collector.BottleVerifier.Check(ctx)
 }

@@ -126,8 +126,12 @@ changes. Link conflict requires absent jq/oniguruma and exercises a real partial
 installation while preserving an existing shared-prefix file. These tests never
 silently prepare or reset the host Homebrew installation.
 
-The packaged CLI must also pass `doctor`, a real install/upgrade, `history` and
-`status` in that VM. Offline tests, Docker tests and payload-only probes cannot
+For this migration, a disposable Tahoe VM clone passed packaged `doctor`; an
+actual `brew install jq` stopped before mutation because the installed gh lacked
+authentication. No guest credentials were supplied. This exercises the required
+hold, not successful native installation or product readiness. The packaged CLI
+must still pass `doctor`, a real install/upgrade, `history` and `status` in the
+VM. Offline tests, Docker tests and payload-only probes cannot
 substitute for this native product-path acceptance. Signing/notarization and
 public release provenance are not implied by local test success.
 

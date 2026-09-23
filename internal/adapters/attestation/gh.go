@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -49,7 +50,10 @@ func (v PublicGH) Check(ctx context.Context) error {
 	bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
 	version, err := runGH(bounded, v.Path, []string{"version"})
-	if err != nil || !strings.HasPrefix(string(version), ghVersion) {
+	if err != nil {
+		return errors.New("installed gh version check unavailable or timed out")
+	}
+	if !strings.HasPrefix(string(version), ghVersion) {
 		return errors.New("unsupported installed gh version (requires 2.101.0)")
 	}
 	return nil
@@ -79,7 +83,7 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 		"--predicate-type", "https://slsa.dev/provenance/v1",
 		"--format", "json", "--limit", "100"})
 	if err != nil {
-		return 0, nil, errors.New("public attestation verification failed or unavailable")
+		return 0, nil, fmt.Errorf("public attestation verification unavailable: %w", err)
 	}
 	for _, input := range []struct {
 		path   string
@@ -111,7 +115,22 @@ func runGH(ctx context.Context, path string, args []string) ([]byte, error) {
 	stdout, stderr := &boundedOutput{}, &boundedOutput{}
 	cmd.Stdout, cmd.Stderr = stdout, stderr
 	if err := cmd.Run(); err != nil || stdout.overflow || stderr.overflow || ctx.Err() != nil {
-		return nil, errors.New("gh command failed or output exceeded limit")
+		// Expose only fixed, actionable reasons; gh diagnostics can contain user
+		// paths or credentials and must never be copied into wrapper output.
+		if ctx.Err() != nil {
+			return nil, errors.New("gh command timed out or was cancelled")
+		}
+		if stdout.overflow || stderr.overflow {
+			return nil, errors.New("gh output exceeded limit")
+		}
+		message := strings.ToLower(stderr.String())
+		switch {
+		case strings.Contains(message, "gh auth login"):
+			return nil, errors.New("gh authentication required; run gh auth login")
+		case strings.Contains(message, "rate limit"):
+			return nil, errors.New("GitHub attestation rate limit reached; retry later")
+		}
+		return nil, errors.New("gh command failed")
 	}
 	return stdout.Bytes(), nil
 }

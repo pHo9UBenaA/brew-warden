@@ -117,13 +117,15 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 	verified := "[" + ghResult(a, "2026-09-10T00:00:00Z") + "]"
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
 	for _, tc := range []struct {
-		name, script string
-		ok           bool
+		name, script, reason string
+		ok                   bool
 	}{
-		{"verified", "printf '%s' '" + verified + "'", true},
-		{"empty result", "printf '[]'", false},
-		{"failed request", "printf '%s' '" + verified + "'; exit 2", false},
-		{"bottle changed", "printf changed > \"$3\"; printf '%s' '" + verified + "'", false},
+		{"verified", "printf '%s' '" + verified + "'", "", true},
+		{"empty result", "printf '[]'", "", false},
+		{"failed request", "printf '%s' '" + verified + "'; exit 2", "", false},
+		{"authentication", "echo 'To get started, run gh auth login. secret-marker' >&2; exit 4", "gh authentication required", false},
+		{"rate limit", "echo 'API rate limit exceeded. secret-marker' >&2; exit 1", "rate limit reached", false},
+		{"bottle changed", "printf changed > \"$3\"; printf '%s' '" + verified + "'", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_ = os.WriteFile(bottle, []byte("bottle"), 0600)
@@ -135,6 +137,9 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 			got, raw, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), a, bottle, now)
 			if (err == nil) != tc.ok || tc.ok && (got == 0 || string(raw) != verified) {
 				t.Fatal(got, err)
+			}
+			if tc.reason != "" && (err == nil || !strings.Contains(err.Error(), tc.reason) || strings.Contains(err.Error(), "secret-marker")) {
+				t.Fatal("gh failure lost its actionable redacted reason", err)
 			}
 			if tc.ok {
 				provenance, age, evidenceRaw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
