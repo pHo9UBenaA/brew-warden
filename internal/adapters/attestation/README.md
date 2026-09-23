@@ -1,5 +1,25 @@
 # Bottle provenance boundary
 
+## Public gh migration boundary (not wired into product execution)
+
+`PublicGH.VerifyBottle` is the first isolated migration step. It invokes an
+already-installed absolute `gh` path (no helper bootstrap or bundle download),
+accepts only the inspected CLI version 2.101.0, and runs `gh attestation verify`
+with `--repo Homebrew/homebrew-core`, the SLSA v1 predicate, JSON format and
+`--limit 100`. GitHub CLI owns Sigstore verification and the user's normal
+credentials/trust roots. BrewWarden rehashes the bottle and command before and
+after verification; checks every result's exact selected subject, signer,
+repository, predicate and every trusted Rekor timestamp; rejects saturated
+results, invalid/missing/future times and incomplete output. It selects the
+oldest verified timestamp across the matching results for these exact bytes.
+Other versions, including 2.62.0, hold until their output contracts are tested.
+
+This adapter is exercised with subprocess fixtures, not yet connected to
+collection, domain age, execution or distribution. The current product still
+uses the legacy verifier and recipe-history age path described below. Neither
+these tests nor the local Intel macOS host establish native Apple Silicon
+acceptance. Do not treat this isolated capability as product readiness.
+
 Capability: `homebrew.core.provenance.v1`. Cryptographic verification is delegated
 to the maintained GitHub CLI v2.101.0 attestation command, built with an isolated
 entrypoint by `scripts/build-verifier.sh`. The entrypoint changes no upstream
