@@ -2,8 +2,6 @@ package tests
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"encoding/json"
 	"os"
 	"os/exec"
@@ -29,17 +27,12 @@ func TestLivePublicCoverageSurvey(t *testing.T) {
 	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
 		t.Fatal("requires disposable VM")
 	}
-	manifest, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(manifest)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "coverage-survey-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("retained survey", directory)
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	type observation struct {
 		Name, Result string
 		Candidates   []domain.Node

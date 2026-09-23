@@ -3,11 +3,13 @@ package homebrew
 import (
 	"crypto/sha256"
 	"encoding/hex"
+	"encoding/json"
 	"errors"
 	"io"
 	"os"
 	"path"
 	"path/filepath"
+	"slices"
 	"strings"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
@@ -16,127 +18,143 @@ import (
 const brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"
 const maxManifest = 8 * 1024 * 1024
 
+// SHA-256 of the sorted public Homebrew executable/Library subtree at the
+// inspected revision (including its installed portable Ruby). The tree is read
+// from the installed prefix, never bundled or downloaded by BrewWarden.
+const supportedRuntimeDigest domain.Digest = "e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c"
+
 type Runtime struct {
-	Root           string
-	ManifestSHA256 domain.Digest
-}
-type runtimeEntry struct {
-	Path   string        `json:"path" required:"true"`
-	Mode   uint32        `json:"mode" required:"true"`
-	SHA256 domain.Digest `json:"sha256" required:"true"`
-	Link   string        `json:"link" required:"true"`
-}
-type runtimeManifest struct {
-	Schema       int            `json:"schema" required:"true"`
-	BrewRevision string         `json:"brewRevision" required:"true"`
-	Files        []runtimeEntry `json:"files" required:"true"`
+	// An explicit pin is used only by isolated adapter fixtures. Composition
+	// constructs Runtime{} so a product invocation cannot select a new pin.
+	ExpectedSHA256 domain.Digest
 }
 
-// The manifest digest is selected by the distribution, not by package metadata.
-// Copy reviewed Homebrew files from the existing installation into an empty
-// inspection prefix. The distribution currently contains only this inventory.
+type runtimeEntry struct {
+	Path   string        `json:"path"`
+	Mode   uint32        `json:"mode"`
+	SHA256 domain.Digest `json:"sha256"`
+	Link   string        `json:"link"`
+}
+type runtimeManifest struct {
+	Schema       int            `json:"schema"`
+	BrewRevision string         `json:"brewRevision"`
+	Files        []runtimeEntry `json:"files"`
+}
+
 func (r Runtime) materialize(destination string) (domain.Digest, error) {
 	return r.materializeFrom(destination, "/opt/homebrew")
 }
+
+// Copy the installed public brew implementation to an empty inspection prefix.
+// A matching reviewed tree establishes version support; file-by-file comparison
+// before execution detects changes between collection and mutation. No runtime
+// files or inventory are read from the distribution or .cache.
 func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, error) {
-	if !filepath.IsAbs(r.Root) || !r.ManifestSHA256.Valid() || !filepath.IsAbs(destination) {
-		return "", errors.New("trusted runtime is unavailable")
+	if !filepath.IsAbs(destination) || !filepath.IsAbs(prefix) {
+		return "", errors.New("invalid Homebrew inspection prefix")
 	}
-	raw, err := readRegular(filepath.Join(r.Root, "manifest.json"), maxManifest)
-	if err != nil || digestBytes(raw) != r.ManifestSHA256 {
-		return "", errors.New("runtime manifest integrity mismatch")
-	}
-	var manifest runtimeManifest
-	if err := decodeStrict(raw, &manifest); err != nil || manifest.Schema != 2 || manifest.BrewRevision != brewRevision || len(manifest.Files) == 0 || len(manifest.Files) > 30000 {
-		return "", errors.New("unsupported runtime manifest")
-	}
-	entries := map[string]runtimeEntry{}
-	for _, entry := range manifest.Files {
-		if !safeRelative(entry.Path) || entry.Path == "manifest.json" || entry.Mode != 0644 && entry.Mode != 0755 || entries[entry.Path].Path != "" {
-			return "", errors.New("unsafe runtime inventory")
-		}
-		if entry.Link != "" {
-			if entry.SHA256 != "" || path.IsAbs(entry.Link) || !safeRelative(path.Clean(path.Join(path.Dir(entry.Path), entry.Link))) {
-				return "", errors.New("unsafe runtime symlink")
-			}
-		} else if !entry.SHA256.Valid() {
-			return "", errors.New("missing runtime file digest")
-		}
-		entries[entry.Path] = entry
-	}
-	for _, entry := range entries {
-		for parent := path.Dir(entry.Path); parent != "."; parent = path.Dir(parent) {
-			if _, exists := entries[parent]; exists {
-				return "", errors.New("runtime file used as parent")
-			}
-		}
-	}
-	err = filepath.WalkDir(r.Root, func(file string, entry os.DirEntry, walkErr error) error {
-		if walkErr != nil {
-			return walkErr
-		}
-		if entry.IsDir() {
-			return nil
-		}
-		relative, err := filepath.Rel(r.Root, file)
-		if err != nil {
-			return err
-		}
-		relative = filepath.ToSlash(relative)
-		if relative == "manifest.json" {
-			return nil
-		}
-		if _, ok := entries[relative]; !ok || strings.HasPrefix(relative, "brew/") {
-			return errors.New("unlisted runtime input")
-		}
-		return nil
-	})
+	parent, err := filepath.EvalSymlinks(filepath.Dir(destination))
 	if err != nil {
 		return "", err
+	}
+	destination = filepath.Join(parent, filepath.Base(destination))
+	if destination == prefix || strings.HasPrefix(destination, prefix+string(filepath.Separator)) {
+		return "", errors.New("inspection prefix overlaps installed Homebrew")
+	}
+	pin := r.ExpectedSHA256
+	if pin == "" {
+		pin = supportedRuntimeDigest
+	}
+	if !pin.Valid() {
+		return "", errors.New("unsupported Homebrew version pin")
 	}
 	if err := os.Mkdir(destination, 0700); err != nil {
 		return "", err
 	}
-	for _, entry := range manifest.Files {
-		src := filepath.Join(r.Root, filepath.FromSlash(entry.Path))
-		if strings.HasPrefix(entry.Path, "brew/") {
-			src = filepath.Join(prefix, filepath.FromSlash(strings.TrimPrefix(entry.Path, "brew/")))
-		}
-		dst := filepath.Join(destination, filepath.FromSlash(entry.Path))
-		if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+	brew := filepath.Join(destination, "brew")
+	if err := os.Mkdir(brew, 0700); err != nil {
+		return "", err
+	}
+	manifest := runtimeManifest{Schema: 2, BrewRevision: brewRevision, Files: []runtimeEntry{}}
+	var total int64
+	for _, root := range []string{"bin/brew", "Library/Homebrew"} {
+		err := filepath.WalkDir(filepath.Join(prefix, root), func(file string, item os.DirEntry, walkErr error) error {
+			if walkErr != nil {
+				return walkErr
+			}
+			relative, err := filepath.Rel(prefix, file)
+			if err != nil || !safeRelative(filepath.ToSlash(relative)) {
+				return errors.New("unsafe Homebrew runtime path")
+			}
+			if len(manifest.Files) >= 10000 {
+				return errors.New("Homebrew runtime inventory exceeds limit")
+			}
+			dst := filepath.Join(brew, relative)
+			if item.IsDir() {
+				return os.MkdirAll(dst, 0700)
+			}
+			if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+				return err
+			}
+			info, err := item.Info()
+			if err != nil {
+				return err
+			}
+			entry := runtimeEntry{Path: filepath.ToSlash(path.Join("brew", filepath.ToSlash(relative))), Mode: 0644}
+			if info.Mode()&os.ModeSymlink != 0 {
+				entry.Link, err = os.Readlink(file)
+				if err != nil || path.IsAbs(entry.Link) || !safeRelative(path.Clean(path.Join(path.Dir(entry.Path), entry.Link))) {
+					return errors.New("unsafe Homebrew runtime link")
+				}
+				if err := os.Symlink(entry.Link, dst); err != nil {
+					return err
+				}
+			} else {
+				if !info.Mode().IsRegular() || info.Size() < 0 || info.Size() > 128*1024*1024 {
+					return errors.New("unsupported Homebrew runtime file")
+				}
+				total += info.Size()
+				if total > 2*1024*1024*1024 {
+					return errors.New("Homebrew runtime exceeds size limit")
+				}
+				if info.Mode().Perm()&0111 != 0 {
+					entry.Mode = 0755
+				}
+				data, err := readRegular(file, 128*1024*1024)
+				if err != nil {
+					return err
+				}
+				entry.SHA256 = digestBytes(data)
+				if err := writeNew(dst, data, os.FileMode(entry.Mode)); err != nil {
+					return err
+				}
+			}
+			manifest.Files = append(manifest.Files, entry)
+			return nil
+		})
+		if err != nil {
 			return "", err
-		}
-		if entry.Link != "" {
-			info, err := os.Lstat(src)
-			if err != nil || info.Mode()&os.ModeSymlink == 0 {
-				return "", errors.New("runtime symlink replaced")
-			}
-			link, err := os.Readlink(src)
-			if err != nil || link != entry.Link {
-				return "", errors.New("runtime link changed")
-			}
-			if err := os.Symlink(link, dst); err != nil {
-				return "", err
-			}
-		} else {
-			data, err := readRegular(src, 128*1024*1024)
-			if err != nil || digestBytes(data) != entry.SHA256 {
-				return "", errors.New("runtime file integrity mismatch")
-			}
-			if err := writeNew(dst, data, os.FileMode(entry.Mode)); err != nil {
-				return "", err
-			}
 		}
 	}
 	for _, entry := range manifest.Files {
 		if entry.Link != "" {
 			resolved, err := filepath.EvalSymlinks(filepath.Join(destination, filepath.FromSlash(entry.Path)))
-			if err != nil || !strings.HasPrefix(resolved, destination+string(filepath.Separator)) {
-				return "", errors.New("runtime link escapes or is unresolved")
+			if err != nil || !strings.HasPrefix(resolved, brew+string(filepath.Separator)) {
+				return "", errors.New("Homebrew runtime link escapes or is unresolved")
 			}
 		}
 	}
-	return r.ManifestSHA256, nil
+	slices.SortFunc(manifest.Files, func(a, b runtimeEntry) int { return strings.Compare(a.Path, b.Path) })
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		return "", err
+	}
+	raw = append(raw, '\n')
+	digest := digestBytes(raw)
+	if digest != pin {
+		return digest, errors.New("installed Homebrew version or runtime differs from supported build")
+	}
+	return digest, nil
 }
 
 func safeRelative(value string) bool {
@@ -201,8 +219,6 @@ func writeNew(file string, data []byte, mode os.FileMode) error {
 	return dir.Sync()
 }
 
-// A private workspace has one record writer. Publish complete bytes by rename;
-// readers never treat a pending file as a committed observation or plan.
 func writeRecord(file string, data []byte) error {
 	if _, err := os.Lstat(file); !errors.Is(err, os.ErrNotExist) {
 		return errors.New("record already exists or is inaccessible")

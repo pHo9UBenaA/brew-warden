@@ -1,4 +1,4 @@
-// Strict schemas for the runtime inventory and Homebrew data.
+// Strict schemas for persisted Homebrew and execution data.
 package homebrew
 
 import (

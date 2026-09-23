@@ -80,11 +80,6 @@ func TestLiveNativeExecution(t *testing.T) {
 	if operation != "install" && operation != "upgrade" {
 		t.Fatal("unsupported VM operation")
 	}
-	raw, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(raw)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "live-execution-")
 	if err != nil {
 		t.Fatal(err)
@@ -95,7 +90,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	collection, err := collector.Collect(context.Background(), ports.Request{Operation: operation, Targets: []string{"jq"}}, time.Now().Unix())
 	if err != nil {
 		t.Fatal(err)

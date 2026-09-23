@@ -12,7 +12,7 @@ import (
 )
 
 // RunWithRuntime keeps wrapper options separate from literal Homebrew arguments.
-// A missing trusted distribution continues to use the diagnostic-only interface.
+// A build without the distribution marker remains diagnostic-only.
 func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, history ports.History, service *application.Service) int {
 	if len(args) == 1 && args[0] == "--version" {
 		if _, err := fmt.Fprintln(out, "BrewWarden "+Version); err != nil {
@@ -22,7 +22,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		if service == nil {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build has no trusted execution inventory.")
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build cannot enable execution.")
 			if err != nil {
 				return 1
 			}
@@ -90,7 +90,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	if service == nil {
 		if len(rest) == 1 && rest[0] == "doctor" {
-			_, _ = fmt.Fprintf(errOut, "minimum_release_age_seconds: %d\n%s\nNo live Homebrew checks were run. This build cannot establish a trusted runtime.\n", policy.MinimumAgeSeconds(), executionUnavailable)
+			_, _ = fmt.Fprintf(errOut, "minimum_release_age_seconds: %d\n%s\nNo live Homebrew checks were run. This build cannot enable execution.\n", policy.MinimumAgeSeconds(), executionUnavailable)
 			return 1
 		}
 		return refuseUnavailable(rest, policy, errOut, history)

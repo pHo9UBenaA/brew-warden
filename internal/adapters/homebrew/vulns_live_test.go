@@ -23,10 +23,6 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		t.Fatal("requires Apple Silicon macOS")
 	}
-	raw, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -35,7 +31,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Runtime{source, digestBytes(raw)}).materialize(filepath.Join(root, "runtime")); err != nil {
+	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
 	signed, err := os.ReadFile("../../../.cache/packages.arm64_tahoe.jws.json")
@@ -164,10 +160,6 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		t.Fatal("requires Apple Silicon macOS")
 	}
-	manifest, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
 	root, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)
@@ -176,7 +168,7 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Runtime{source, digestBytes(manifest)}).materialize(filepath.Join(root, "runtime")); err != nil {
+	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
 	profile, err := w.sandbox("acquire", true, false, []string{filepath.Join(root, "runtime/brew/Library")})

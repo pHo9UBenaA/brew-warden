@@ -2,8 +2,6 @@ package tests
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"io"
 	"os"
 	"os/exec"
@@ -34,11 +32,6 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	if !domain.ValidRequest("install", targets) {
 		t.Fatal("invalid acceptance targets")
 	}
-	raw, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(raw)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "general-execution-")
 	if err != nil {
 		t.Fatal(err)
@@ -56,7 +49,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 		}
 		before[rack.Name()] = snapshot
 	}
-	collector := &homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
+	collector := &homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	journal := localstate.Journal{Path: filepath.Join(directory, "attempts")}
 	log, err := os.Create(filepath.Join(directory, "native.log"))
 	if err != nil {

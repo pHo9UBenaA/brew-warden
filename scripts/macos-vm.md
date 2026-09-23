@@ -42,16 +42,18 @@ Inside the disposable guest only, preserve its original Homebrew prefix as
 `/opt/brewwarden-original-homebrew`. Populate `/opt/homebrew` from `git archive`
 of the reviewed Homebrew revision and extract its pinned portable Ruby archive
 under `Library/Homebrew/vendor`, with the matching `portable-ruby/current` link.
-The compatibility inventory generator in `tools/runtime-pack` owns these pins.
+The Homebrew adapter owns the installed-runtime fingerprint and supported
+revision; VM provisioning must use the same reviewed source and Ruby bytes.
 Do not run this provisioning against a host prefix. The running guest agent
 survives the move, but its launch configuration still refers to the old path;
 recreate a clone for independent experiments instead of rebooting this modified
 clone and assuming the agent will restart.
 
 Transfer explicit archives with `tart exec -i ... tar -xf -`. Do not mount host
-folders. Product test inputs are the inventory directory, an installed supported gh
-command, and an arm64 test binary built from `./tests`. The new distribution does not contain Homebrew
-or Ruby; the guest's existing installation must satisfy the reviewed inventory.
+folders. Product test inputs are a private workspace, installed supported gh
+and an arm64 test binary built from `./tests`. The distribution contains no
+Homebrew or Ruby bytes; the guest installation must match the reviewed runtime
+fingerprint.
 For final acceptance, transfer the complete reproducible distribution archive.
 
 Run the cases in [verification](../docs/verification.md), then verify archive

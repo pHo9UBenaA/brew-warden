@@ -2,8 +2,6 @@ package tests
 
 import (
 	"context"
-	"crypto/sha256"
-	"encoding/hex"
 	"os"
 	"path/filepath"
 	"strings"
@@ -20,17 +18,12 @@ func TestLiveCandidateCollection(t *testing.T) {
 	if source == "" {
 		t.Skip("requires explicit built runtime and public network")
 	}
-	raw, err := os.ReadFile(filepath.Join(source, "manifest.json"))
-	if err != nil {
-		t.Fatal(err)
-	}
-	sum := sha256.Sum256(raw)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "live-collection-")
 	if err != nil {
 		t.Fatal(err)
 	}
 	t.Log("retained collection", directory)
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	now := time.Now().Unix()
 	result, err := collector.Collect(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, now)
 	if err != nil {

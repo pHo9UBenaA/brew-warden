@@ -20,11 +20,12 @@ evidence stops the command. Successful checks lead directly to ordinary public
 ## Install
 
 Extract a verified distribution archive into a user-owned directory and add that
-directory to `PATH`. Keep `bwd`, its `brewwarden` alias and `runtime/` together.
+directory to `PATH`. Keep `bwd` and its `brewwarden` alias together.
 Users need an existing supported Homebrew installation and an installed supported
 `gh` (currently 2.101.0), but not Go. BrewWarden does not install or update `gh`.
-The archive still contains a Homebrew compatibility inventory; removing it is
-pending. Homebrew, Ruby and the attestation verifier are not bundled.
+Homebrew, Ruby and the attestation verifier are not bundled. BrewWarden
+checks the installed Homebrew tree before copying it to an isolated inspection
+prefix; an unsupported or changed implementation holds execution.
 
 The current target is **Apple Silicon macOS Tahoe**, with Homebrew at
 `/opt/homebrew`. See the [Homebrew contract](internal/adapters/homebrew/README.md)

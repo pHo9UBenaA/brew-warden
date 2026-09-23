@@ -12,7 +12,7 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-const executionUnavailable = "runtime_unavailable: this build has no trusted execution inventory; use a verified distribution."
+const executionUnavailable = "runtime_unavailable: this build is diagnostic-only; use a verified distribution."
 
 // Version is set by the reproducible development build; it is not a release claim.
 var Version = "development"
@@ -31,7 +31,7 @@ func RunWithServices(args []string, stdout, stderr io.Writer, source ports.Confi
 	return RunWithRuntime(context.Background(), args, stdout, stderr, source, journal, nil)
 }
 
-// A missing runtime is a capability failure within the common CLI, never a
+// A missing distribution build marker is a capability failure within the common CLI, never a
 // fallback to a native process. Keep legacy refusal records readable/writable.
 func refuseUnavailable(rest []string, policy domain.Policy, stderr io.Writer, journal ports.History) int {
 	_, _ = fmt.Fprintln(stderr, executionUnavailable)

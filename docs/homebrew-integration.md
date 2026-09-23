@@ -57,7 +57,7 @@ established, and supplement missing claims through the owning adapters above.
 Verified attestation time dates the selected digest rather than the upstream
 version. A completed supported advisory lookup can report no known findings
 without a historical-advisory witness. Neither claim alone grants execution. The public-command session binds new bottle installations and the selected
-existing state to the evaluated plan; builds without a trusted runtime digest remain diagnostic-only.
+existing state to the evaluated plan; builds without the distribution build marker remain diagnostic-only.
 
 ## Code and evidence ownership
 

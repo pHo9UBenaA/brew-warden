@@ -33,5 +33,5 @@ Subprocess tests check digest binding, multiple attestations and timestamps,
 oldest-time selection, `all` bottles, result limits, invalid output, version
 checks, failed commands, changed bytes and cancellation. This migration has not
 undergone native Apple Silicon distribution acceptance. The current distribution
-no longer bundles a verifier; the Homebrew inventory and recovery migration
-remain pending.
+bundles neither a verifier nor Homebrew runtime. Recovery simplification and
+successful native acceptance remain pending.

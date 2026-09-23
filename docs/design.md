@@ -2,11 +2,11 @@
 
 Status: partial migration to public gh attestation age. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
-public-command execution binding and durable attempts; the Homebrew inventory
-and attempt reconciliation remain pending removal. Official core bottle eligibility
+public-command execution binding and durable attempts; attempt reconciliation
+remains pending replacement with a minimal in-flight record. Official core bottle eligibility
 is determined by verified capabilities on Apple Silicon macOS Tahoe with the
-standard prefix. Unsupported required capabilities hold execution. Builds without a trusted distribution inventory stay
-read-only. See [distribution](distribution.md) for build and publication boundaries.
+standard prefix. Unsupported required capabilities hold execution. Development builds without
+the distribution build marker stay read-only. See [distribution](distribution.md) for build and publication boundaries.
 
 ## Purpose and scope
 
@@ -333,7 +333,7 @@ If an execution record cannot be persisted, do not begin a mutation. Read-only
 reconciliation diagnostics should remain available.
 
 The `history` command lists execution attempts and legacy pre-execution refusals.
-In builds without a trusted runtime, supported install/upgrade request shapes
+In diagnostic-only builds, supported install/upgrade request shapes
 produce immutable refusal records under `history` beside the default user
 configuration. Distribution builds record execution attempts separately; policy
 holds before reservation do not create an attempt. Changing `--config` does not

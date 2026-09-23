@@ -6,7 +6,6 @@ import (
 	"compress/gzip"
 	"crypto/sha256"
 	"encoding/hex"
-	"encoding/json"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -30,10 +29,10 @@ func main() {
 }
 func hash(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 func run(args []string) error {
-	if len(args) != 5 {
-		return fmt.Errorf("usage: release-pack BINARY RUNTIME GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
+	if len(args) != 4 {
+		return fmt.Errorf("usage: release-pack BINARY GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
 	}
-	binary, runtimeRoot, goLicense, revision, output := args[0], args[1], args[2], args[3], args[4]
+	binary, goLicense, revision, output := args[0], args[1], args[2], args[3]
 	if len(revision) != 40 || strings.Trim(revision, "0123456789abcdef") != "" {
 		return fmt.Errorf("invalid source revision")
 	}
@@ -75,41 +74,9 @@ func run(args []string) error {
 	if err := add("licenses/Go-LICENSE", goLicense, 0644); err != nil {
 		return err
 	}
-	manifestRaw, err := os.ReadFile(filepath.Join(runtimeRoot, "manifest.json"))
-	if err != nil {
-		return err
-	}
-	const pinned = "eceb8e6b60fe19cc5d52849121bf4408ceef028f5ab7197e9db706867fda1b66"
-	if hash(manifestRaw) != pinned {
-		return fmt.Errorf("unsupported runtime inventory digest")
-	}
-
-	var manifest struct {
-		Schema       int
-		BrewRevision string
-		Files        []struct {
-			Path         string
-			Mode         uint32
-			SHA256, Link string
-		}
-	}
-	if err := json.Unmarshal(manifestRaw, &manifest); err != nil {
-		return err
-	}
-	if manifest.Schema != 2 || manifest.BrewRevision != "edb70f031e4170c780799633a1226ff73e1077f4" {
-		return fmt.Errorf("unsupported runtime inventory")
-	}
-	if len(manifest.Files) == 0 {
-		return fmt.Errorf("empty runtime inventory")
-	}
-	for _, f := range manifest.Files {
-		if !strings.HasPrefix(f.Path, "brew/") {
-			return fmt.Errorf("unexpected bundled runtime input")
-		}
-	}
-	// No Homebrew, Ruby or attestation executable is bundled.
-	items = append(items, item{Name: "runtime/manifest.json", Data: manifestRaw, Mode: 0644})
-	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\nRuntime inventory SHA-256: " + pinned + "\n\nHomebrew and GitHub CLI are installed separately and are not bundled.\n"
+	// Installed Homebrew is checked at collection and again before execution;
+	// the distribution contains no runtime files or generated inventory.
+	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\n\nHomebrew and GitHub CLI are installed separately and are not bundled.\n"
 	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0644})
 	return archive(output, items)
 }

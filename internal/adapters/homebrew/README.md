@@ -5,15 +5,15 @@ private installer APIs or reconstruct installed payloads with Homebrew internals
 
 ## Supported runtime
 
-The inspected and tested implementation is Homebrew 7.0.4 at
+The supported installed implementation is Homebrew 7.0.4 at
 `edb70f031e4170c780799633a1226ff73e1077f4`, using its portable Ruby 4.0.7 on Apple
-Silicon macOS Tahoe at `/opt/homebrew`. The distribution's inventory SHA-256 is
-`eceb8e6b60fe19cc5d52849121bf4408ceef028f5ab7197e9db706867fda1b66`.
-
-Homebrew and Ruby are reused from the existing prefix. `tools/runtime-pack`
-creates the reviewed source/file inventory and packages only the inventory. Before collecting evidence, the adapter checks and copies
-inventoried Homebrew files into an empty private inspection prefix. Unexpected
-versions or changed required files hold. No Homebrew bootstrap or update occurs.
+Silicon macOS Tahoe at `/opt/homebrew`. The adapter fingerprints its installed
+`bin/brew` and `Library/Homebrew` tree (SHA-256
+`e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c`)
+while copying it into an empty private inspection prefix. Missing, changed,
+extra, unsafe or unsupported files hold. This compatibility fingerprint is
+in source, not a distributed runtime or file inventory. Homebrew and Ruby are
+reused from the existing prefix; no bootstrap or update occurs.
 The empty prefix prevents an installed old SBOM from selecting the wrong version
 for candidate vulnerability scanning. Execution uses `/opt/homebrew/bin/brew`.
 
@@ -102,5 +102,4 @@ age exceptions, tampering, cancellation, partial failure and recovery. See
 
 The collector retains the verified gh response only within the pending workspace
 and does not use attestation or registration caches. Advisory status is
-collected afresh. The inventory-based inspection prefix and reconciliation
-workflow remain migration work.
+collected afresh. The legacy reconciliation workflow remains migration work.

@@ -3,8 +3,8 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
-if [ "$#" -ne 2 ] || [ "$1" != darwin/arm64 ]; then
-  printf 'Usage: scripts/build-product.sh darwin/arm64 RUNTIME\n' >&2
+if [ "$#" -ne 1 ] || [ "$1" != darwin/arm64 ]; then
+  printf 'Usage: scripts/build-product.sh darwin/arm64\n' >&2
   exit 1
 fi
 if [ "$(go env GOVERSION)" != "go$(cat .go-version)" ]; then
@@ -15,10 +15,9 @@ if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   printf 'Commit verified source before building distribution artifacts.\n' >&2
   exit 1
 fi
-runtime_root=$(CDPATH= cd -- "$2" && pwd -P)
 source_revision=$(git rev-parse HEAD)
 product_version="0.1.0+$source_revision"
-runtime_digest=$(shasum -a 256 "$runtime_root/manifest.json" | cut -d ' ' -f 1)
+source_digest=$(printf '%s' "$source_revision" | shasum -a 256 | cut -d ' ' -f 1)
 build_root=$(mktemp -d "$PWD/.cache/product-build.XXXXXXXX")
 printf 'Distribution build evidence: %s\n' "$build_root"
 printf '%s\n' "$source_revision" > "$build_root/source-revision"
@@ -31,9 +30,9 @@ for pass in first second; do
   mkdir -p "$build_root/$pass/source"
   tar -xf "$build_root/source.tar" -C "$build_root/$pass/source"
   (cd "$build_root/$pass/source" && GOOS=darwin GOARCH=arm64 go build -a -trimpath -buildvcs=false \
-    -ldflags="-s -w -X $module/internal/cli.Version=$product_version -X $module/internal/composition.RuntimeSHA256=$runtime_digest" \
+    -ldflags="-s -w -X $module/internal/cli.Version=$product_version -X $module/internal/composition.DistributionSource=$source_digest" \
     -o "$build_root/$pass/bwd" ./cmd/bwd)
-  go run ./tools/release-pack "$build_root/$pass/bwd" "$runtime_root" \
+  go run ./tools/release-pack "$build_root/$pass/bwd" \
     "$go_license" "$source_revision" "$build_root/$pass/brewwarden-darwin-arm64.tar.gz"
 done
 cmp "$build_root/first/bwd" "$build_root/second/bwd"

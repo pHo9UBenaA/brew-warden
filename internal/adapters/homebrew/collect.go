@@ -60,7 +60,7 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 	if err != nil {
 		return nil, err
 	}
-	result := &Collection{root: root, observedAt: now, runtimeDigest: c.Runtime.ManifestSHA256}
+	result := &Collection{root: root, observedAt: now}
 	if err := c.collect(ctx, result, request); err != nil {
 		// Preserve incomplete inputs for diagnosis. They cannot become a session.
 		return nil, fmt.Errorf("candidate collection stopped: %w", err)
@@ -78,7 +78,9 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := w.initialize(); err != nil {
 		return err
 	}
-	if _, err := c.Runtime.materialize(filepath.Join(w.root, "runtime")); err != nil {
+	var err error
+	result.runtimeDigest, err = c.Runtime.materialize(filepath.Join(w.root, "runtime"))
+	if err != nil {
 		return err
 	}
 	client := c.client

@@ -16,7 +16,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
-| `./scripts/build-product.sh darwin/arm64 RUNTIME` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
+| `./scripts/build-product.sh darwin/arm64` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 
 ## Boundaries
@@ -64,11 +64,11 @@ vulnerability scans, supported toolchains, fuzzing, races, vet, and release noti
 Staticcheck is an additional analysis tool, not a Go security certification.
 
 The baseline tests development CLI binaries against a tripwire `brew` executable
-and checks refusal without a trusted runtime. Distribution builds additionally
+and checks refusal without a distribution build marker. Distribution builds additionally
 wire the real execution engine. Their native acceptance tests are explicit and
 separate from the baseline; see Native product acceptance below.
 
-The distribution build checks repeatability of both binaries and complete inventory/license archives. Product installation enforcement and distribution
+The distribution build checks repeatability of both binaries and complete license/documentation archives. Product installation enforcement and distribution
 packaging are implemented for the supported scope. Public release signing and
 notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
@@ -112,8 +112,8 @@ unknown outcome durability. They do not substitute for native Homebrew execution
 ## Native product acceptance
 
 Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
-`BREWWARDEN_VM_RUNTIME` pointing to the inventory directory, with supported
-installed `gh` in the guest. The test checks the hardware
+`BREWWARDEN_VM_RUNTIME` set to a private test workspace in the disposable
+VM, with supported Homebrew and installed `gh` in the guest. The test checks the hardware
 model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
 fixtures must provision an older target and the intended existing dependencies.
 The default path checks actual execution, BrewWarden operation exclusion, candidate installation, durable outcomes and unchanged installed dependency bytes.

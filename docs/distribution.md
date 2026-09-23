@@ -1,45 +1,42 @@
 # Distribution
 
-The archive contains `bwd`, its `brewwarden` alias, a reviewed Homebrew
-compatibility manifest, checksums and licenses. Neither Homebrew, portable Ruby
-nor an attestation verifier executable is bundled. Users need installed,
-supported Homebrew and GitHub CLI (`gh` 2.101.0). BrewWarden does not install
-or upgrade either command. Keep the extracted directory together and add it
-to PATH; no privileged installation or automatic update is performed.
+The archive contains `bwd`, its `brewwarden` alias, checksums, documentation
+and licenses. No Homebrew source, portable Ruby, runtime inventory or attestation
+verifier executable is bundled. Users need an installed supported Homebrew and
+GitHub CLI (`gh` 2.101.0). BrewWarden does not install or upgrade either command.
+Add the extracted directory to PATH; no privileged installation or automatic
+update is performed.
 
 ## Trust and verification
 
 The source repository is `https://github.com/pHo9UBenaA/brew-warden`. Local builds
 are unsigned development distributions. A checksum verifies transport integrity
-or repeatability, not publisher identity. Trust reviewed source and dependency
-inputs, verify the archive digest before extraction, and check `SHA256SUMS` in the
-extracted directory. A public release requires publisher-authenticated provenance
+or repeatability, not publisher identity. Trust reviewed source and dependencies,
+verify the archive digest before extraction, and check `SHA256SUMS` in the
+extracted directory. A public release needs publisher-authenticated provenance
 for the exact source and archive through a trusted release channel. Local builds
 do not imply publication, signing or Apple notarization.
 
 ## Reproducible build
 
-Use the Go version in `.go-version`. Run `go run ./tools/runtime-pack` with the
-reviewed Homebrew source, portable Ruby archive and a new output directory;
-run without arguments for usage. It validates the pinned inputs and generates
-the manifest documented in the [Homebrew contract](../internal/adapters/homebrew/README.md).
-Homebrew and Ruby bytes are excluded from the output. This compatibility
-inventory is still part of the distribution and remains migration work.
-
-Commit verified changes, then run:
+Use the Go version in `.go-version`. Commit verified changes, then run:
 
 ```sh
-./scripts/build-product.sh darwin/arm64 /absolute/runtime
+./scripts/build-product.sh darwin/arm64
 ```
 
-The offline build extracts committed source twice and forces compilation. The
-binaries and complete archives must match byte for byte. Archive metadata excludes
-host paths, users and timestamps. The build retains toolchain and application
-module inventories; it does not install, publish or modify Homebrew.
+The offline build extracts committed source twice, sets a build marker bound to
+the source revision and forces compilation. The binary and full archive must
+match byte for byte across builds. Archive metadata excludes host paths, users
+and timestamps. The build retains toolchain and application module inventories;
+it does not install, publish or modify Homebrew. The marker is not publisher
+authentication or an execution permit: the supported installed Homebrew tree,
+verified candidate evidence and complete plan are checked on each operation.
 
-Run the archive in a disposable Apple Silicon macOS VM, including doctor,
-installation, upgrade, policy exceptions, interruption, failure and fresh retry.
-Changes to runtime pins or binding behavior require renewed native acceptance.
-The application Go module uses the standard library; installed Homebrew and gh
-remain external compatibility and security dependencies. The public-gh migration
-has not passed this native distribution acceptance yet.
+Run the archive in a disposable Apple Silicon macOS VM with supported installed
+Homebrew and gh, including doctor, installation, upgrade, exceptions, interruption,
+failure and fresh retry. Changes to the installed-runtime fingerprint or execution
+binding require renewed native acceptance. The application Go module uses the
+standard library; Homebrew and gh remain external compatibility and security
+dependencies. This migration has not yet passed successful native installation
+or interruption acceptance.

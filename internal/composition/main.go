@@ -16,9 +16,10 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-// RuntimeSHA256 is set only by the distribution build after runtime validation.
-// Development builds without a trusted bundle remain diagnostic-only.
-var RuntimeSHA256 string
+// DistributionSource is set by the reproducible distribution build. It is not
+// an execution permit: the installed Homebrew tree and all plan inputs are
+// checked afresh. Development builds remain diagnostic-only.
+var DistributionSource string
 
 type clock struct{}
 
@@ -40,20 +41,12 @@ func Main() {
 	os.Exit(code)
 }
 func service(configPath string) *application.Service {
-	if !domain.Digest(RuntimeSHA256).Valid() || configPath == "" {
-		return nil
-	}
-	executable, err := os.Executable()
-	if err != nil {
-		return nil
-	}
-	executable, err = filepath.EvalSymlinks(executable)
-	if err != nil {
+	if !domain.Digest(DistributionSource).Valid() || configPath == "" {
 		return nil
 	}
 	gh, _ := attestation.InstalledGH() // Missing/incompatible gh holds doctor and collection.
 	collector := &homebrew.Collector{
-		Runtime:   homebrew.Runtime{Root: filepath.Join(filepath.Dir(executable), "runtime"), ManifestSHA256: domain.Digest(RuntimeSHA256)},
+		Runtime:   homebrew.Runtime{},
 		Directory: filepath.Join(filepath.Dir(configPath), "collections"),
 
 		BottleVerifier: gh,
