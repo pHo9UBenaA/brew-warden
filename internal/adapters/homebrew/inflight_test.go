@@ -132,7 +132,9 @@ func TestInFlightParentDeathAndFreshRetry(t *testing.T) {
 			if err := syscall.Kill(-record.PID, syscall.SIGKILL); err != nil && !errors.Is(err, syscall.ESRCH) {
 				t.Fatal(err)
 			}
-			deadline := time.Now().Add(5 * time.Second)
+			// The system may retain a dead orphan briefly while it is reaped,
+			// and a busy process table can force conservative retry snapshots.
+			deadline := time.Now().Add(30 * time.Second)
 			for {
 				if err := clearStoppedInFlight(directory); err == nil {
 					break
