@@ -19,9 +19,8 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-// PublicGH is an isolated public-command capability. The product must not use
-// its age evidence until the collection, execution and distribution boundaries
-// have migrated together. Only the inspected CLI version is accepted.
+// PublicGH verifies the exact bottle bytes with the installed public gh CLI.
+// Only the inspected CLI version is accepted.
 type PublicGH struct {
 	Path string
 }
