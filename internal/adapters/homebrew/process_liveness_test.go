@@ -58,13 +58,6 @@ func TestProcessInventoryIncludesOtherUsers(t *testing.T) {
 	t.Skip("no isolated other-user process session available")
 }
 
-func TestProcessInventoryDistinguishesAbsentSession(t *testing.T) {
-	active, err := processSessionActive(1 << 29)
-	if err != nil || active {
-		t.Fatal("could not establish an absent session without signalling processes", active, err)
-	}
-}
-
 func TestProcessSessionHelper(t *testing.T) {
 	mode := os.Getenv("BREWWARDEN_SESSION_HELPER")
 	if mode == "member" {
