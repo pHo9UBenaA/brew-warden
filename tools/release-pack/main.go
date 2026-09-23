@@ -5,11 +5,9 @@ import (
 	"archive/tar"
 	"compress/gzip"
 	"crypto/sha256"
-	"debug/buildinfo"
 	"encoding/hex"
 	"encoding/json"
 	"fmt"
-	"io"
 	"os"
 	"path/filepath"
 	"sort"
@@ -17,7 +15,6 @@ import (
 	"time"
 )
 
-type module struct{ Path, Version, Dir, Sum string }
 type item struct {
 	Name string
 	Data []byte
@@ -33,10 +30,10 @@ func main() {
 }
 func hash(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
 func run(args []string) error {
-	if len(args) != 6 {
-		return fmt.Errorf("usage: release-pack BINARY RUNTIME MODULES_JSON GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
+	if len(args) != 5 {
+		return fmt.Errorf("usage: release-pack BINARY RUNTIME GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
 	}
-	binary, runtimeRoot, modulesFile, goLicense, revision, output := args[0], args[1], args[2], args[3], args[4], args[5]
+	binary, runtimeRoot, goLicense, revision, output := args[0], args[1], args[2], args[3], args[4]
 	if len(revision) != 40 || strings.Trim(revision, "0123456789abcdef") != "" {
 		return fmt.Errorf("invalid source revision")
 	}
@@ -82,7 +79,7 @@ func run(args []string) error {
 	if err != nil {
 		return err
 	}
-	const pinned = "d50f6a3f967fae22b9a84cf705d59b29e15b8ee2311c984f050ce85b2f8c1ce7"
+	const pinned = "eceb8e6b60fe19cc5d52849121bf4408ceef028f5ab7197e9db706867fda1b66"
 	if hash(manifestRaw) != pinned {
 		return fmt.Errorf("unsupported runtime inventory digest")
 	}
@@ -102,110 +99,17 @@ func run(args []string) error {
 	if manifest.Schema != 2 || manifest.BrewRevision != "edb70f031e4170c780799633a1226ff73e1077f4" {
 		return fmt.Errorf("unsupported runtime inventory")
 	}
+	if len(manifest.Files) == 0 {
+		return fmt.Errorf("empty runtime inventory")
+	}
 	for _, f := range manifest.Files {
-		if strings.HasPrefix(f.Path, "brew/") {
-			continue
-		}
-		if f.Path != "verifier" {
+		if !strings.HasPrefix(f.Path, "brew/") {
 			return fmt.Errorf("unexpected bundled runtime input")
 		}
-		file := filepath.Join(runtimeRoot, filepath.FromSlash(f.Path))
-		info, err := os.Lstat(file)
-		if err != nil {
-			return err
-		}
-		if f.Link != "" {
-			link, err := os.Readlink(file)
-			if err != nil || link != f.Link {
-				return fmt.Errorf("runtime link mismatch")
-			}
-			items = append(items, item{Name: "runtime/" + f.Path, Link: link, Mode: int64(f.Mode)})
-			continue
-		}
-		if !info.Mode().IsRegular() {
-			return fmt.Errorf("runtime input is not regular")
-		}
-		data, err := os.ReadFile(file)
-		if err != nil {
-			return err
-		}
-		if hash(data) != f.SHA256 {
-			return fmt.Errorf("runtime checksum mismatch: %s", f.Path)
-		}
-		items = append(items, item{Name: "runtime/" + f.Path, Data: data, Mode: int64(f.Mode)})
 	}
+	// No Homebrew, Ruby or attestation executable is bundled.
 	items = append(items, item{Name: "runtime/manifest.json", Data: manifestRaw, Mode: 0644})
-	modules := map[string]module{}
-	stream, err := os.Open(modulesFile)
-	if err != nil {
-		return err
-	}
-	defer stream.Close()
-	decoder := json.NewDecoder(stream)
-	for {
-		var m module
-		err := decoder.Decode(&m)
-		if err == io.EOF {
-			break
-		}
-		if err != nil {
-			return err
-		}
-		modules[m.Path] = m
-	}
-	info, err := buildinfo.ReadFile(filepath.Join(runtimeRoot, "verifier"))
-	if err != nil {
-		return err
-	}
-	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\nRuntime inventory SHA-256: " + pinned + "\n\nHomebrew is reused from the existing installation and is not bundled.\nAttestation-only helper: github.com/cli/cli/v2 v2.101.0\nThe following Go modules are recorded in the helper binary.\n\n"
-	linked := append(info.Deps, &info.Main)
-	sort.Slice(linked, func(i, j int) bool { return linked[i].Path < linked[j].Path })
-	for _, dependency := range linked {
-		m, ok := modules[dependency.Path]
-		if !ok || m.Dir == "" {
-			return fmt.Errorf("missing source module %s", dependency.Path)
-		}
-		// The helper's main module is built from a reviewed local copy.
-		if dependency.Path != info.Main.Path && (m.Version != dependency.Version || m.Sum != dependency.Sum) {
-			return fmt.Errorf("module version mismatch")
-		}
-		count := 0
-		err := filepath.WalkDir(m.Dir, func(file string, entry os.DirEntry, err error) error {
-			if err != nil {
-				return err
-			}
-			if entry.IsDir() {
-				if entry.Name() == ".git" {
-					return filepath.SkipDir
-				}
-				return nil
-			}
-			name := strings.ToLower(entry.Name())
-			if !(strings.Contains(name, "license") || strings.HasPrefix(name, "copying") || strings.HasPrefix(name, "notice")) {
-				return nil
-			}
-			stat, err := entry.Info()
-			if err != nil {
-				return err
-			}
-			if !stat.Mode().IsRegular() || stat.Size() > 2*1024*1024 {
-				return nil
-			}
-			relative, err := filepath.Rel(m.Dir, file)
-			if err != nil {
-				return err
-			}
-			count++
-			return add("licenses/go/"+m.Path+"/"+filepath.ToSlash(relative), file, 0644)
-		})
-		if err != nil {
-			return err
-		}
-		if count == 0 {
-			return fmt.Errorf("no license found for linked module %s", m.Path)
-		}
-		notice += m.Path + " " + m.Version + " " + m.Sum + "\n"
-	}
+	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\nRuntime inventory SHA-256: " + pinned + "\n\nHomebrew and GitHub CLI are installed separately and are not bundled.\n"
 	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0644})
 	return archive(output, items)
 }

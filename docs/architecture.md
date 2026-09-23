@@ -54,16 +54,15 @@ explicit time and evidence without I/O in the domain. Create other
 layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.
 
-The Homebrew adapter owns public candidate scanning, official advisory feed/API
-observations and digest-bound bottle registration history. It combines the two
+The Homebrew adapter owns public candidate scanning and official advisory feed/API
+observations. The attestation adapter owns digest-bound age observations. It combines the two
 advisory sources before returning one attributed vulnerability claim per artifact.
 Homebrew performs version-range comparison through its public formula API; the
 wrapper does not maintain a duplicate OSV client or upstream release provider.
 
-The `attestation` adapter owns the pinned verifier process and exact subject /
-signer output contract. Its maintained cryptographic runtime is built separately
-and inventoried in [dependency rules](dependencies.md); it is not an exception
-allowing third-party imports into the pure policy or application layers.
+The `attestation` adapter owns the installed public gh process, exact subject /
+signer output contract, and verified timestamp parsing. Its gh version is checked
+before use; no third-party imports are allowed into pure policy or application.
 
 ## Homebrew boundary
 
@@ -76,7 +75,7 @@ capability records and contract tests. Do not create placeholder abstractions.
 
 The `homebrew` adapter owns the reviewed runtime inventory, public signed-metadata commands,
 private process environment, candidate evidence, public execution session and
-recovery snapshots. Advisory and bottle-age observations use the same authenticated candidate identity;
+recovery snapshots. Advisory and attestation-age observations use the same authenticated candidate identity;
 all transport and command details remain outside core policy.
 `tools/runtime-pack` is an explicit build-only compatibility inventory generator, not
 a product bootstrap path or an exemption for external application imports.
@@ -110,5 +109,5 @@ The application service blocks planning while any attempt is unresolved, present
 exact candidate identities before execution, and reconciles interrupted attempts
 through a separate observation port. The recovery adapter acquires the BrewWarden operation lock and checks owned
 process sessions before observing state; it cannot mark a lost process successful. CLI code owns argument parsing and presentation, including
-per-artifact age reasons. Composition selects the verifier and installed-Homebrew inventory by a build-time
-digest and constructs all real providers, the journal and the clock.
+per-artifact age reasons. Composition selects the installed gh verifier and the distribution-inventoried
+Homebrew runtime and constructs the providers, journal and clock.

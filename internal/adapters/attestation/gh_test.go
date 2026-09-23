@@ -12,6 +12,13 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
+func artifactFixture() domain.Artifact {
+	return domain.Artifact{Tap: "homebrew/core", Name: "jq", Version: "1.8.2", Rebuild: 1, OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe", SHA256: domain.Digest(strings.Repeat("a", 64))}
+}
+func resultFixture(a domain.Artifact) string {
+	return `[{"verificationResult":{"signature":{"certificate":{"subjectAlternativeName":"` + identityPrefix + `publish-commit-bottles.yml@refs/heads/main","issuer":"` + issuer + `","sourceRepositoryURI":"` + repository + `","runnerEnvironment":"github-hosted"}},"statement":{"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"` + bottleName(a) + `","digest":{"sha256":"` + string(a.SHA256) + `"}}]}}}]`
+}
+
 func ghResult(a domain.Artifact, timestamps ...string) string {
 	var entries []map[string]json.RawMessage
 	_ = json.Unmarshal([]byte(resultFixture(a)), &entries)
@@ -57,6 +64,47 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 	}
 }
 
+func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {
+	platform := artifactFixture()
+	all := platform
+	all.BottleTag = "all"
+	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
+	raw := ghResult(platform, "2026-09-10T00:00:00Z")
+	if _, err := oldestVerifiedTimestamp([]byte("["+raw+"]"), all, now); err != nil {
+		t.Fatal(err)
+	}
+	for _, bad := range []string{
+		strings.Replace(raw, string(platform.SHA256), strings.Repeat("b", 64), 1),
+		strings.Replace(raw, "arm64_tahoe", "arm64_linux", 1),
+		strings.Replace(raw, ".bottle.1.", ".bottle.2.", 1),
+	} {
+		if _, err := oldestVerifiedTimestamp([]byte("["+bad+"]"), all, now); err == nil {
+			t.Fatal("unbound all bottle accepted")
+		}
+	}
+}
+
+func TestInstalledGHInputAndOutputBounds(t *testing.T) {
+	root := t.TempDir()
+	file, link := filepath.Join(root, "file"), filepath.Join(root, "link")
+	if err := os.WriteFile(file, []byte("data"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink(file, link); err != nil {
+		t.Fatal(err)
+	}
+	if _, err := hashFile(link, 10); err == nil {
+		t.Fatal("symlink verifier input accepted")
+	}
+	if _, err := hashFile(file, 3); err == nil {
+		t.Fatal("oversized verifier input accepted")
+	}
+	out := &boundedOutput{}
+	if _, err := out.Write(make([]byte, maxResponse+1)); err == nil || !out.overflow {
+		t.Fatal("unbounded verifier output accepted")
+	}
+}
+
 func TestPublicGHCommandBoundary(t *testing.T) {
 	root := t.TempDir()
 	a := artifactFixture()
@@ -87,6 +135,15 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 			got, raw, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), a, bottle, now)
 			if (err == nil) != tc.ok || tc.ok && (got == 0 || string(raw) != verified) {
 				t.Fatal(got, err)
+			}
+			if tc.ok {
+				provenance, age, evidenceRaw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
+				if err != nil || provenance.Claim != domain.Provenance || age.Claim != domain.Publication ||
+					age.Publication != domain.VerifiedAttestation || age.PublishedAt != got ||
+					provenance.RawSHA256 != EvidenceDigest(evidenceRaw) || age.RawSHA256 != provenance.RawSHA256 ||
+					provenance.Subject != a || age.Subject != a {
+					t.Fatal("provenance and age not bound to the same bytes", err)
+				}
 			}
 		})
 	}

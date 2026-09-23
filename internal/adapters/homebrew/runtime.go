@@ -34,7 +34,7 @@ type runtimeManifest struct {
 
 // The manifest digest is selected by the distribution, not by package metadata.
 // Copy reviewed Homebrew files from the existing installation into an empty
-// inspection prefix. The distribution contains the verifier and inventory only.
+// inspection prefix. The distribution currently contains only this inventory.
 func (r Runtime) materialize(destination string) (domain.Digest, error) {
 	return r.materializeFrom(destination, "/opt/homebrew")
 }
@@ -136,11 +136,7 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 			}
 		}
 	}
-	verifier, ok := entries["verifier"]
-	if !ok || !verifier.SHA256.Valid() || verifier.Mode != 0755 {
-		return "", errors.New("runtime verifier is missing")
-	}
-	return verifier.SHA256, nil
+	return r.ManifestSHA256, nil
 }
 
 func safeRelative(value string) bool {

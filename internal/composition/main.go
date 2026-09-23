@@ -14,7 +14,6 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
 	"github.com/pHo9UBenaA/brew-warden/internal/cli"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
-	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
 // RuntimeSHA256 is set only by the distribution build after runtime validation.
@@ -52,13 +51,12 @@ func service(configPath string) *application.Service {
 	if err != nil {
 		return nil
 	}
+	gh, _ := attestation.InstalledGH() // Missing/incompatible gh holds doctor and collection.
 	collector := &homebrew.Collector{
 		Runtime:   homebrew.Runtime{Root: filepath.Join(filepath.Dir(executable), "runtime"), ManifestSHA256: domain.Digest(RuntimeSHA256)},
 		Directory: filepath.Join(filepath.Dir(configPath), "collections"),
 
-		Verifier: func(path string, sha domain.Digest) ports.ProvenanceVerifier {
-			return attestation.Verifier{Path: path, SHA256: sha}
-		},
+		BottleVerifier: gh,
 	}
 	engine := homebrew.Engine{Collector: collector, Streams: homebrew.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}}
 	return &application.Service{Planner: engine, Recovery: engine, Diagnostics: engine, Journal: localstate.Journal{Path: filepath.Join(filepath.Dir(configPath), "attempts")}, Clock: clock{}}

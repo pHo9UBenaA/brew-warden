@@ -49,8 +49,8 @@ recreate a clone for independent experiments instead of rebooting this modified
 clone and assuming the agent will restart.
 
 Transfer explicit archives with `tart exec -i ... tar -xf -`. Do not mount host
-folders. Product test inputs are the verifier/inventory directory and an arm64
-test binary built from `./tests`. The new distribution does not contain Homebrew
+folders. Product test inputs are the inventory directory, an installed supported gh
+command, and an arm64 test binary built from `./tests`. The new distribution does not contain Homebrew
 or Ruby; the guest's existing installation must satisfy the reviewed inventory.
 For final acceptance, transfer the complete reproducible distribution archive.
 

@@ -15,7 +15,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
@@ -42,9 +41,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 	t.Log("retained public execution", directory)
 	seedVMEvidenceCache(t, directory)
 	sum := sha256.Sum256(manifest)
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, Verifier: func(path string, digest domain.Digest) ports.ProvenanceVerifier {
-		return attestation.Verifier{Path: path, SHA256: digest}
-	}}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	operation := os.Getenv("BREWWARDEN_VM_PUBLIC_OPERATION")
 	if operation == "" {
 		operation = "install"

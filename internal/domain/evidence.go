@@ -79,7 +79,8 @@ const (
 	UnknownPublication PublicationEvent = iota
 	UpstreamPublication
 	DistributionPublication
-	BottleRegistration
+	BottleRegistration // Legacy evidence is not accepted for the attestation-age policy.
+	VerifiedAttestation
 )
 
 // Evidence is an adapter claim, not a verifier. The adapter must establish the

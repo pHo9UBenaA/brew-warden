@@ -2,8 +2,8 @@
 
 Check Homebrew packages before installing them. BrewWarden verifies bottle
 checksums and publisher provenance, checks known vulnerabilities through
-Homebrew's public commands and advisory data, and waits seven days after a bottle
-is registered. Rebuilding a bottle starts its waiting period again.
+Homebrew's public commands and advisory data, and waits seven days from the
+oldest verified attestation for the exact bottle digest. New bytes start a new age.
 
 ```sh
 bwd doctor
@@ -11,6 +11,8 @@ bwd brew install jq
 bwd brew upgrade jq
 ```
 
+The public-gh migration has not passed native Apple Silicon acceptance or
+removed the legacy distribution/state workflow; do not treat it as product-ready.
 All required checks finish before installation starts. Missing or unsupported
 evidence stops the command. Successful checks lead directly to ordinary public
 `brew install` or `brew upgrade`, using the verified downloads and dependency plan.
@@ -19,8 +21,10 @@ evidence stops the command. Successful checks lead directly to ordinary public
 
 Extract a verified distribution archive into a user-owned directory and add that
 directory to `PATH`. Keep `bwd`, its `brewwarden` alias and `runtime/` together.
-Users need an existing supported Homebrew installation, but not Go or a separate
-`gh`. Homebrew and Ruby are not bundled or installed by BrewWarden.
+Users need an existing supported Homebrew installation and an installed supported
+`gh` (currently 2.101.0), but not Go. BrewWarden does not install or update `gh`.
+The archive still contains a Homebrew compatibility inventory; removing it is
+pending. Homebrew, Ruby and the attestation verifier are not bundled.
 
 The current target is **Apple Silicon macOS Tahoe**, with Homebrew at
 `/opt/homebrew`. See the [Homebrew contract](internal/adapters/homebrew/README.md)
@@ -51,8 +55,9 @@ bwd history
 bwd status
 ```
 
-An age exception never waives checksums, provenance, advisory checks or dependency
-binding. Dependencies need their own exception reasons. Formulae and versions are
+An age exception waives only a verified but too-young timestamp. Missing or
+invalid timestamps, checksums, provenance, advisory checks and dependency
+binding cannot be waived. Dependencies need their own exception reasons. Formulae and versions are
 shown before execution; exceptions also show the exact digest and reason.
 `bwd brew upgrade` without names checks the installed formula inventory.
 

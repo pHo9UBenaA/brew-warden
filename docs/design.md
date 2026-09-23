@@ -1,8 +1,9 @@
 # Product design
 
-Status: initial official-bottle implementation, updated 2026-09-22. Distribution
+Status: partial migration to public gh attestation age. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
-public-command execution binding and durable attempts. Official core bottle eligibility
+public-command execution binding and durable attempts; the Homebrew inventory
+and attempt reconciliation remain pending removal. Official core bottle eligibility
 is determined by verified capabilities on Apple Silicon macOS Tahoe with the
 standard prefix. Unsupported required capabilities hold execution. Builds without a trusted distribution inventory stay
 read-only. See [distribution](distribution.md) for build and publication boundaries.
@@ -145,14 +146,12 @@ not the upstream software version. A bottle rebuilt yesterday is one day old eve
 if the author's version was published a month ago. A different bottle digest
 must establish its own age evidence, including same-version rebuilds.
 
-Use official Homebrew recipe history anchored to the authenticated metadata's tap
-commit and recipe digest. Follow the selected bottle digest backwards through
-successive recipe changes. The commit recording its introduction gives the change
-date; when bounded history does not reach that transition, retain a conservative
-"registered no later than" date demonstrated by an earlier matching snapshot.
-Do not label this a download-start timestamp or an independently signed clock.
-Trust Homebrew's recorded commit dates under the existing Homebrew trust model.
-Reject future, conflicting or unavailable history rather than inventing dates.
+Use the earliest verified GitHub CLI attestation timestamp for the exact bottle
+digest, across every verified result and timestamp returned for that digest.
+Missing, future, malformed or saturated attestation results hold the whole
+operation, even with an age exception. A later attestation for identical bytes
+does not restart the age; a new digest must establish its own age. Do not use
+recipe history, source-release dates, or download times as age evidence.
 
 Expose `--minimum-release-age <duration>` before `brew`; `168h` means seven days
 and remains the default. An explicit argument overrides optional configuration.
@@ -212,7 +211,8 @@ user assertion and does not become a verified advisory.
 
 | Condition | Emergency behavior |
 | --- | --- |
-| Too young or age evidence unknown | May waive the specific age rule with a recorded reason |
+| Verified attestation too young | May waive the specific age rule with a recorded reason |
+| Missing or invalid attestation timestamp | Hold; cannot waive |
 | Hash mismatch or invalid signature | Deny; cannot waive |
 | Required verification unavailable, missing, or unsupported | Hold; cannot waive |
 | Unapproved tap or signing identity | Separate trust-policy change and replan required |

@@ -13,7 +13,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
@@ -96,9 +95,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	if err != nil && !os.IsNotExist(err) {
 		t.Fatal(err)
 	}
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, Verifier: func(path string, digest domain.Digest) ports.ProvenanceVerifier {
-		return attestation.Verifier{Path: path, SHA256: digest}
-	}}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	collection, err := collector.Collect(context.Background(), ports.Request{Operation: operation, Targets: []string{"jq"}}, time.Now().Unix())
 	if err != nil {
 		t.Fatal(err)

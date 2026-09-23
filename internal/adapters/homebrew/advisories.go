@@ -127,7 +127,7 @@ func parseBrewAdvisoryStatus(raw []byte, candidate formulaMetadata, records []js
 		return brewAdvisoryStatus{}, err
 	}
 	f := info[0]
-	if f.artifact() != candidate.artifact() || f.RecipeSHA256 != candidate.RecipeSHA256 || f.SourceSHA256 != candidate.SourceSHA256 || f.SourceURL != candidate.SourceURL {
+	if f.artifact() != candidate.artifact() {
 		return brewAdvisoryStatus{}, errors.New("public advisory metadata does not match candidate")
 	}
 	var doc struct {

@@ -135,7 +135,7 @@ func Evaluate(a Assessment) Decision {
 				case claim == Vulnerabilities && e.Applicability != NoKnownApplicableFindings:
 					code = "vulnerability_applicability_unresolved"
 				case claim == Publication:
-					if e.Publication != BottleRegistration || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
+					if e.Publication != VerifiedAttestation || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
 						code = "publication_unknown_or_conflicting"
 					} else if a.Now-e.PublishedAt < a.Policy.MinimumAgeSeconds() {
 						code = "release_too_young"
@@ -143,7 +143,7 @@ func Evaluate(a Assessment) Decision {
 				}
 			}
 			if code != "" {
-				if claim == Publication && waivers[node.Artifact] {
+				if claim == Publication && code == "release_too_young" && waivers[node.Artifact] {
 					d.Waived = append(d.Waived, node.Artifact)
 				} else {
 					add(Hold, code, node.Artifact, claim)

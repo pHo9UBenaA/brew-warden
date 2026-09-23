@@ -204,12 +204,5 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 			t.Fatal("wrong evidence subject")
 		}
 		t.Logf("combined advisory %s %s: %v", e.Subject.Name, e.Subject.Version, e.Applicability)
-		if e.Subject.Name == "jq" {
-			age, _, err := bottleRegistration(context.Background(), publicClient(), candidates[i], time.Now().Unix())
-			if err != nil {
-				t.Fatal(err)
-			}
-			t.Logf("bottle registration bound: %s", time.Unix(age.PublishedAt, 0).UTC())
-		}
 	}
 }

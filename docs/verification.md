@@ -16,7 +16,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
-| `./scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
+| `./scripts/build-product.sh darwin/arm64 RUNTIME` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 
 ## Boundaries
@@ -68,7 +68,7 @@ and checks refusal without a trusted runtime. Distribution builds additionally
 wire the real execution engine. Their native acceptance tests are explicit and
 separate from the baseline; see Native product acceptance below.
 
-The distribution build checks repeatability of both binaries and complete verifier/inventory/license archives. Product installation enforcement and distribution
+The distribution build checks repeatability of both binaries and complete inventory/license archives. Product installation enforcement and distribution
 packaging are implemented for the supported scope. Public release signing and
 notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
@@ -112,7 +112,8 @@ unknown outcome durability. They do not substitute for native Homebrew execution
 ## Native product acceptance
 
 Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
-`BREWWARDEN_VM_RUNTIME` pointing to the verifier/inventory directory. The test checks the hardware
+`BREWWARDEN_VM_RUNTIME` pointing to the inventory directory, with supported
+installed `gh` in the guest. The test checks the hardware
 model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
 fixtures must provision an older target and the intended existing dependencies.
 The default path checks actual execution, BrewWarden operation exclusion, candidate installation, durable outcomes and unchanged installed dependency bytes.
@@ -156,8 +157,6 @@ to an extracted `bwd`. Provision absent xz in the VirtualMac. It kills that pare
 after the actual install starts, requires unfinished status, waits for safe
 reconciliation and checks that history does not invent success or replay work.
 
-When GitHub's anonymous quota is exhausted, the public-command and distribution
-crash fixtures can set `BREWWARDEN_VM_EVIDENCE_CACHE` to a retained VM collection
-store. Only immutable attestation/registration cache files are copied. The real
-product revalidates their identity and signatures and queries current advisories;
-this is a cache-hit acceptance case, not fresh-provider availability evidence.
+When GitHub's anonymous quota is exhausted, native acceptance holds. The
+attestation and registration caches have been removed. A retry must query gh
+and the advisory providers again; no cached-provider exception is available.

@@ -23,12 +23,6 @@ type infoFormula struct {
 	Versions struct {
 		Stable string `json:"stable" required:"true"`
 	} `json:"versions" required:"true"`
-	URLs struct {
-		Stable struct {
-			URL      string        `json:"url" required:"true"`
-			Checksum domain.Digest `json:"checksum" required:"true"`
-		} `json:"stable" required:"true"`
-	} `json:"urls" required:"true"`
 	Revision int `json:"revision" required:"true"`
 	Bottle   struct {
 		Stable struct {
@@ -39,13 +33,7 @@ type infoFormula struct {
 			} `json:"files" required:"true"`
 		} `json:"stable" required:"true"`
 	} `json:"bottle" required:"true"`
-	Dependencies      []string `json:"dependencies" required:"true"`
-	BuildDependencies []string `json:"build_dependencies" required:"true"`
-	TapCommit         string   `json:"tap_git_head" required:"true"`
-	RecipePath        string   `json:"ruby_source_path" required:"true"`
-	RecipeChecksum    struct {
-		SHA256 domain.Digest `json:"sha256" required:"true"`
-	} `json:"ruby_source_checksum" required:"true"`
+	Dependencies []string `json:"dependencies" required:"true"`
 }
 
 type infoBottleFile struct {
@@ -69,7 +57,7 @@ func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
 			return nil, errors.New("homebrew info identity mismatch")
 		}
 		selected[f.Name] = true
-		m := formulaMetadata{Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision, Rebuild: f.Bottle.Stable.Rebuild, SourceURL: f.URLs.Stable.URL, SourceSHA256: f.URLs.Stable.Checksum, RecipeSHA256: f.RecipeChecksum.SHA256, RecipePath: f.RecipePath, TapCommit: f.TapCommit, Dependencies: f.Dependencies, BuildDependencies: f.BuildDependencies}
+		m := formulaMetadata{Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision, Rebuild: f.Bottle.Stable.Rebuild, Dependencies: f.Dependencies}
 		b := f.Bottle.Stable.Files.Tahoe
 		m.BottleTag = "arm64_tahoe"
 		if b == nil {

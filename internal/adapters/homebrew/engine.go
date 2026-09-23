@@ -71,7 +71,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	return collection.Prepare(ctx, policy, waivers, now, e.Streams)
 }
 func (e Engine) Check(ctx context.Context) error {
-	if e.Collector == nil || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
+	if e.Collector == nil || e.Collector.BottleVerifier == nil || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return errors.New("runtime requires Apple Silicon macOS Tahoe")
 	}
 	bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
@@ -100,5 +100,8 @@ func (e Engine) Check(ctx context.Context) error {
 		return err
 	}
 	_, err = e.Collector.Runtime.materialize(filepath.Join(temporary, "runtime"))
-	return err
+	if err != nil {
+		return err
+	}
+	return e.Collector.BottleVerifier.Check(bounded)
 }

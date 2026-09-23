@@ -1,98 +1,37 @@
-# Bottle provenance boundary
+# Bottle provenance and age boundary
 
-## Public gh migration boundary (not wired into product execution)
+Capability: `homebrew.core.provenance.v2` and `homebrew.core.age.v2`.
 
-`PublicGH.VerifyBottle` is the first isolated migration step. It invokes an
-already-installed absolute `gh` path (no helper bootstrap or bundle download),
-accepts only the inspected CLI version 2.101.0, and runs `gh attestation verify`
-with `--repo Homebrew/homebrew-core`, the SLSA v1 predicate, JSON format and
-`--limit 100`. GitHub CLI owns Sigstore verification and the user's normal
-credentials/trust roots. BrewWarden rehashes the bottle and command before and
-after verification; checks every result's exact selected subject, signer,
-repository, predicate and every trusted Rekor timestamp; rejects saturated
-results, invalid/missing/future times and incomplete output. It selects the
-oldest verified timestamp across the matching results for these exact bytes.
-Other versions, including 2.62.0, hold until their output contracts are tested.
+The collector uses an already-installed, absolute GitHub CLI 2.101.0 path;
+other versions hold until their output contracts have been reviewed and tested.
+It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
+--predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
+GitHub CLI owns Sigstore verification, public trust roots and the user's normal
+credentials. It is not installed, upgraded, bundled or invoked through a shell.
 
-This adapter is exercised with subprocess fixtures, not yet connected to
-collection, domain age, execution or distribution. The current product still
-uses the legacy verifier and recipe-history age path described below. Neither
-these tests nor the local Intel macOS host establish native Apple Silicon
-acceptance. Do not treat this isolated capability as product readiness.
+The adapter hashes the actual selected bottle and gh executable before and
+after verification. It bounds time, file sizes, stdout, stderr and JSON nesting.
+Each verified result must identify the exact bottle name and digest (allowing
+the byte-identical arm64_tahoe subject for an `all` bottle), the official core
+repository, a supported main-branch Homebrew workflow and GitHub-hosted runner.
+It checks every verified Rekor timestamp, rejects absent, future or malformed
+times, empty output and a result set reaching the fetch limit. The earliest
+valid timestamp across all matching results is the age of those exact bytes.
+The raw verified response is retained by digest in the pending operation's
+frozen observations for both provenance and age. A new digest cannot inherit a
+prior bottle's age; later attestations of unchanged bytes do not reset it.
 
-Capability: `homebrew.core.provenance.v1`. Cryptographic verification is delegated
-to the maintained GitHub CLI v2.101.0 attestation command, built with an isolated
-entrypoint by `scripts/build-verifier.sh`. The entrypoint changes no upstream
-verification code. It supplies bounded HTTP clients and process IO, and exposes
-only the attestation verifier. It does not install gh or use Homebrew to bootstrap
-its own trusted helper. Distribution wiring remains separate from this adapter.
+Upstream JSON help for GitHub CLI v2.101.0 distinguishes verified certificate
+and timestamps from workflow-controlled predicate fields. `--repo` and the
+pinned predicate type filter verification; BrewWarden validates output coverage
+rather than treating a successful process alone as proof of all subjects.
+Missing gh, authentication/rate-limit failure, unsupported signer, saturation,
+invalid output, changed bytes and timeout all hold before mutation. Only a
+verified but too-young timestamp can be waived by the age exception policy.
 
-## Guarantee and checks
-
-Homebrew's native attestation path depends on gh, can bootstrap helpers and has
-paths which skip unavailable bottles. The adapter verifies each actual candidate
-bottle explicitly. It passes a local bundle, `--repo Homebrew/homebrew-core`,
-anchored `--cert-identity-regex` for the inspected publish-commit-bottles and
-dispatch-build-bottle workflows on `refs/heads/main`, the GitHub Actions OIDC
-issuer, `--deny-self-hosted-runners`, the SLSA v1 predicate and JSON output.
-Upstream owns Sigstore, certificate, transparency-log and TUF verification.
-The [upstream command](https://github.com/cli/cli/tree/v2.101.0/pkg/cmd/attestation/verify)
-and verification library are retained unchanged. Homebrew itself is trusted by
-the threat model; this does not claim safety against a compromised Homebrew build.
-
-BrewWarden additionally validates the distribution-selected verifier hash, actual
-bottle digest, exact filename/platform/revision/rebuild, verified certificate
-identity, repository, issuer, runner environment, statement type and exact subject
-digest. Exit zero or empty output cannot establish provenance. Inputs are rehashed
-after verification, and a missing or changed input fails. This is evidence
-collection, not an execution lock; the native session must retain frozen bytes.
-
-The helper gets an empty credential environment, system-only PATH, private HOME,
-no inherited proxy or GH tokens, and a 90-second total deadline. Input files must
-be regular, not symlinks. Bundles/output are bounded to 8 MiB, bottles to 2 GiB and
-the helper to 128 MiB. Exact raw verifier output is returned with its digest and
-a one-hour observation lifetime. The application must retain it before execution.
-Invalid signatures, unavailable TUF services, unsupported output and input changes
-all fail. No emergency override changes this boundary. TUF refresh requires network;
-local bundles do not imply fully offline verification.
-
-## Dependency and build inventory
-
-The Go wrapper still has no third-party module imports. The verifier is an explicit
-runtime dependency, not a zero-dependency claim. Its build starts with module
-`github.com/cli/cli/v2@v2.101.0`, checksum
-`h1:zJ+YxyhomQ9PHDjB5wwv4tCFnjq6vEbfI0pRdOsJ0xo=`, and the repository's pinned Go.
-The upstream module graph contains 465 entries including the main module; the
-arm64 linked build metadata identifies 138 dependency modules. Build evidence
-retains both inventories and all module checksums. This includes maintained
-Sigstore, TUF and in-toto implementations and upstream CLI transitive dependencies.
-The source template is reviewed and compiled by this separate build, not included
-in the standard-library-only application graph. It is never downloaded by a hook,
-check or product invocation. Updating the upstream pin requires this full review.
-
-On 2026-09-20, two forced darwin/arm64 builds were byte-identical, SHA-256
-`d0813b4f0e4c992036780d491e814389f8b549af5cf996406b027e946707b817`.
-Native links are system libSystem, libresolv, CoreFoundation and Security only.
-The binary vulnerability scan reported no affected symbols or imported packages.
-The full module graph includes GO-2026-5932 in unused OpenPGP code; the attestation
-entrypoint does not link/call that package. The full gh release did report that
-finding at package level, which is why its unrelated command registry is excluded.
-A clean scan is not a general security proof. Release licensing/notice packaging
-and signatures must cover this dependency before distribution.
-
-## Tests
-
-Subprocess tests check credential isolation, nonzero exits despite convincing
-output, empty success, changed inputs, cancellation, helper substitution and
-bounds. Parser tests reject wrong signers, subjects, platforms, predicates,
-digests, malformed or ambiguous JSON. The explicit live test accepts a prebuilt
-helper path in `BREWWARDEN_LIVE_VERIFIER` and verifies the actual jq bottle and
-bundle in the isolated probe cache. The built helper also rejected a wrong
-workflow identity against the same official bundle. No host Homebrew was modified.
-
-Homebrew merges byte-identical platform bottles into an `all` bottle after
-attestation. For this authenticated tag, accept either its exact filename or the
-exact arm64_tahoe filename with the same version, revision, rebuild and SHA-256.
-The inspected Homebrew attestation implementation handles the same merge; this
-adapter additionally requires the complete name and digest, not a name prefix.
-A different platform, rebuild or digest does not establish the selected subject.
+Subprocess tests check digest binding, multiple attestations and timestamps,
+oldest-time selection, `all` bottles, result limits, invalid output, version
+checks, failed commands, changed bytes and cancellation. This migration has not
+undergone native Apple Silicon distribution acceptance. The current distribution
+no longer bundles a verifier; the Homebrew inventory and recovery migration
+remain pending.

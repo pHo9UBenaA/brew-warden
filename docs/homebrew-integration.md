@@ -20,8 +20,8 @@ scope. Exact upstream pins, options and boundary tests live beside each adapter.
 | --- | --- | --- |
 | Artifact integrity | Native checksum verification plus authenticated digest, frozen bottle inputs and complete closure binding | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Metadata authenticity | Public Homebrew JWS verification; strict selected artifact and dependency identities | [Homebrew](../internal/adapters/homebrew/README.md) |
-| Bottle provenance | Maintained attestation-only verifier; exact subject, signer and workflow checks without native gh bootstrap | [Attestation](../internal/adapters/attestation/README.md) |
-| Minimum release age | Official recipe history bound to the selected bottle digest; rebuilds receive their own age | [Homebrew](../internal/adapters/homebrew/README.md) |
+| Bottle provenance | Installed gh 2.101.0 public attestation verifier; exact downloaded digest, signer and verified subject checks | [Attestation](../internal/adapters/attestation/README.md) |
+| Minimum release age | Earliest trusted attestation timestamp for the exact digest; missing evidence holds even with an age exception | [Attestation](../internal/adapters/attestation/README.md) |
 | Known vulnerabilities | Public OSV scanning plus Homebrew advisory status for the exact candidate; unavailable or skipped checks hold | [Homebrew](../internal/adapters/homebrew/README.md) |
 | Execution binding | Public install/upgrade, fixed metadata and cache, verified bottle bytes, complete closure and observed existing state | [Homebrew](../internal/adapters/homebrew/README.md) |
 
@@ -54,7 +54,7 @@ attestation checks does not by itself constrain helper bootstrap, credentials,
 signer identity or later dependency resolution. Reuse only the guarantees actually
 established, and supplement missing claims through the owning adapters above.
 
-Bottle registration history dates the selected digest rather than the upstream
+Verified attestation time dates the selected digest rather than the upstream
 version. A completed supported advisory lookup can report no known findings
 without a historical-advisory witness. Neither claim alone grants execution. The public-command session binds new bottle installations and the selected
 existing state to the evaluated plan; builds without a trusted runtime digest remain diagnostic-only.

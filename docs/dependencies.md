@@ -39,14 +39,14 @@ require strict validation. Use maintained parsers.
 Launch fixed executables with argument arrays, never shell-built commands.
 Constrain executable paths, options, environment, resource limits, and output.
 
-## Attestation runtime helper
+## Installed attestation command
 
 The [provenance adapter](../internal/adapters/attestation/README.md) delegates
-cryptography to a separately built, pinned upstream attestation command. Its
-module graph and native dependencies are part of the product trust surface even
-though the application module remains standard-library-only. The explicit build
-records checksums, module inventory, native links and repeatability. The helper
-is not silently installed, downloaded or updated during product execution.
+cryptography to installed GitHub CLI 2.101.0. It is not bundled, installed,
+downloaded or updated by BrewWarden. A missing or incompatible command holds
+operations requiring its evidence; its version and trust roots remain explicit
+product dependencies even though the application module uses only the standard
+library.
 
 ## Release requirements
 

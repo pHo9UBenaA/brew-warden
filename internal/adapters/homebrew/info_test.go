@@ -10,8 +10,16 @@ const infoFixture = `{"formulae":[{"name":"jq","full_name":"jq","tap":"homebrew/
 
 func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	f, err := parseInfo([]byte(infoFixture), []string{"jq"})
-	if err != nil || len(f) != 1 || f[0].Dependencies[0] != "oniguruma" || f[0].Rebuild != 1 || !f[0].RecipeSHA256.Valid() {
+	if err != nil || len(f) != 1 || f[0].Dependencies[0] != "oniguruma" || f[0].Rebuild != 1 || !f[0].BottleSHA256.Valid() {
 		t.Fatal(f, err)
+	}
+	// Source hosts and recipe paths are not bottle eligibility inputs. A
+	// different project layout must follow the same selected bottle path.
+	unrelatedSource := strings.Replace(infoFixture, "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", "https://downloads.example.org/archive", 1)
+	unrelatedSource = strings.Replace(unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`, 1)
+	other, err := parseInfo([]byte(unrelatedSource), []string{"jq"})
+	if err != nil || len(other) != 1 || other[0].artifact() != f[0].artifact() || other[0].Dependencies[0] != f[0].Dependencies[0] {
+		t.Fatal("source-specific metadata changed bottle selection", err)
 	}
 	for name, raw := range map[string]string{
 		"missing revision":     strings.Replace(infoFixture, `"revision":0,`, "", 1),
@@ -19,7 +27,7 @@ func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 		"null dependencies":    strings.Replace(infoFixture, `"dependencies":["oniguruma"]`, `"dependencies":null`, 1),
 		"duplicate name":       strings.Replace(infoFixture, `"name":"jq"`, `"name":"evil","name":"jq"`, 1),
 		"ambiguous case":       strings.Replace(infoFixture, `"revision":0`, `"Revision":0`, 1),
-		"nested case":          strings.Replace(infoFixture, `"checksum":`, `"Checksum":`, 1),
+		"nested case":          strings.Replace(infoFixture, `"sha256":"ca67c64`, `"SHA256":"ca67c64`, 1),
 		"wrong tap":            strings.Replace(infoFixture, `"tap":"homebrew/core"`, `"tap":"other/core"`, 1),
 		"wrong identity":       strings.Replace(infoFixture, `"full_name":"jq"`, `"full_name":"other/jq"`, 1),
 		"cask result":          strings.Replace(infoFixture, `"casks":[]`, `"casks":["jq"]`, 1),

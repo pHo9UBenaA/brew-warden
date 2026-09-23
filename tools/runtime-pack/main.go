@@ -19,7 +19,6 @@ import (
 
 const brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"
 const rubySHA = "e0088dff5614b39387300136ec7a5f95bf1e07589547245c919524fc9e8b4197"
-const verifierSHA = "d0813b4f0e4c992036780d491e814389f8b549af5cf996406b027e946707b817"
 
 type entry struct {
 	Path   string `json:"path"`
@@ -40,18 +39,18 @@ func main() {
 	}
 }
 func run(args []string) error {
-	if len(args) != 4 {
-		return fmt.Errorf("usage: runtime-pack /Homebrew/source /portable-ruby.tar.gz /verifier /new-runtime-directory")
+	if len(args) != 3 {
+		return fmt.Errorf("usage: runtime-pack /Homebrew/source /portable-ruby.tar.gz /new-runtime-directory")
 	}
 	for _, arg := range args {
 		if !filepath.IsAbs(arg) {
 			return fmt.Errorf("absolute paths required")
 		}
 	}
-	if err := os.Mkdir(args[3], 0700); err != nil {
+	if err := os.Mkdir(args[2], 0700); err != nil {
 		return err
 	}
-	brew := filepath.Join(args[3], "brew")
+	brew := filepath.Join(args[2], "brew")
 	if err := os.Mkdir(brew, 0755); err != nil {
 		return err
 	}
@@ -98,25 +97,15 @@ func run(args []string) error {
 	if err := os.Symlink("4.0.7", filepath.Join(brew, "Library/Homebrew/vendor/portable-ruby/current")); err != nil {
 		return err
 	}
-	verifier, err := os.ReadFile(args[2])
-	if err != nil {
-		return err
-	}
-	if digest(verifier) != verifierSHA {
-		return fmt.Errorf("verifier checksum mismatch; rebuild and review its pin")
-	}
-	if err := os.WriteFile(filepath.Join(args[3], "verifier"), verifier, 0755); err != nil {
-		return err
-	}
 	m := manifest{2, brewRevision, []entry{}}
-	err = filepath.WalkDir(args[3], func(file string, item os.DirEntry, walkErr error) error {
+	err = filepath.WalkDir(args[2], func(file string, item os.DirEntry, walkErr error) error {
 		if walkErr != nil {
 			return walkErr
 		}
 		if item.IsDir() {
 			return nil
 		}
-		relative, err := filepath.Rel(args[3], file)
+		relative, err := filepath.Rel(args[2], file)
 		if err != nil {
 			return err
 		}
@@ -131,7 +120,7 @@ func run(args []string) error {
 				return err
 			}
 			resolved, err := filepath.EvalSymlinks(file)
-			if err != nil || !strings.HasPrefix(resolved, args[3]+string(filepath.Separator)) {
+			if err != nil || !strings.HasPrefix(resolved, args[2]+string(filepath.Separator)) {
 				return fmt.Errorf("unresolved or escaping runtime link: %s", relative)
 			}
 		} else {
@@ -159,10 +148,10 @@ func run(args []string) error {
 		return err
 	}
 	data = append(data, '\n')
-	if err := os.WriteFile(filepath.Join(args[3], "manifest.json"), data, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(args[2], "manifest.json"), data, 0644); err != nil {
 		return err
 	}
-	// Only the inventory and verifier are distributed; Homebrew is already installed.
+	// Only the inventory is distributed; Homebrew is already installed.
 	if err := os.RemoveAll(brew); err != nil {
 		return err
 	}

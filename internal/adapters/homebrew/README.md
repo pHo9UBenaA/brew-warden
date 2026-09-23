@@ -8,11 +8,10 @@ private installer APIs or reconstruct installed payloads with Homebrew internals
 The inspected and tested implementation is Homebrew 7.0.4 at
 `edb70f031e4170c780799633a1226ff73e1077f4`, using its portable Ruby 4.0.7 on Apple
 Silicon macOS Tahoe at `/opt/homebrew`. The distribution's inventory SHA-256 is
-`d50f6a3f967fae22b9a84cf705d59b29e15b8ee2311c984f050ce85b2f8c1ce7`.
+`eceb8e6b60fe19cc5d52849121bf4408ceef028f5ab7197e9db706867fda1b66`.
 
 Homebrew and Ruby are reused from the existing prefix. `tools/runtime-pack`
-creates the reviewed source/file inventory and packages only the attestation
-helper and inventory. Before collecting evidence, the adapter checks and copies
+creates the reviewed source/file inventory and packages only the inventory. Before collecting evidence, the adapter checks and copies
 inventoried Homebrew files into an empty private inspection prefix. Unexpected
 versions or changed required files hold. No Homebrew bootstrap or update occurs.
 The empty prefix prevents an installed old SBOM from selecting the wrong version
@@ -41,8 +40,8 @@ that older signed packages cannot contain malicious code.
   tag. Its complete runtime dependency names must match the selected signed API
   closure. Historical dependency versions are lower bounds; Homebrew owns version
   ordering and installation compatibility. Index bytes are frozen with the cache.
-- The [attestation adapter](../attestation/README.md) verifies the exact bottle
-  subject, expected Homebrew publisher and workflow using a maintained verifier.
+- The [attestation adapter](../attestation/README.md) uses installed public gh
+  to verify the exact bottle digest, Homebrew publisher and workflow.
 - `brew vulns --json` scans explicit candidates in the empty prefix. Missing,
   skipped, untrusted or unsupported subjects hold. A clean supported scan means
   no known applicable findings. No historical advisory witness is required.
@@ -51,10 +50,9 @@ that older signed packages cannot contain malicious code.
   Candidate identity must match; Homebrew's API owns applicability comparisons.
   Responses are attributed HTTPS observations, not signed metadata. The compressed
   full feed, formula result and scanner result are retained by digest.
-- Bottle age follows official recipe history at the authenticated tap commit,
-  locating the selected digest's registration. Changed bottle bytes receive a new
-  age even when the version is unchanged. A bounded older matching snapshot can
-  establish a conservative lower bound on age; it is not an upload timestamp.
+- Bottle age uses the chronologically earliest verified attestation timestamp
+  for the selected digest. Missing timestamps hold, including under age waivers;
+  changed bottle bytes require new age evidence even at the same version.
 
 The signed cache location `cache/api/internal/packages.arm64_tahoe.jws.json`, OCI
 annotation fields and cache naming are version-specific data contracts. They are
@@ -102,7 +100,7 @@ upgrade, multiple targets, unchanged reruns, unrelated-package preservation,
 age exceptions, tampering, cancellation, partial failure and recovery. See
 [verification](../../../docs/verification.md) for repeatable entrypoints.
 
-Validated attestation bundles and bottle registration facts are cached privately
-by artifact identity. Cache hits still undergo signature verification and recipe
-binding; advisory status is collected afresh. HTTP failures identify the provider
-and status, with a retry time when GitHub supplies its rate-limit reset.
+The collector retains the verified gh response only within the pending workspace
+and does not use attestation or registration caches. Advisory status is
+collected afresh. The inventory-based inspection prefix and reconciliation
+workflow remain migration work.

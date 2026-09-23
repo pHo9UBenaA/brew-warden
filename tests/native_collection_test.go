@@ -10,7 +10,6 @@ import (
 	"testing"
 	"time"
 
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/attestation"
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
@@ -31,9 +30,7 @@ func TestLiveCandidateCollection(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log("retained collection", directory)
-	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, Verifier: func(path string, digest domain.Digest) ports.ProvenanceVerifier {
-		return attestation.Verifier{Path: path, SHA256: digest}
-	}}
+	collector := homebrew.Collector{Runtime: homebrew.Runtime{Root: source, ManifestSHA256: domain.Digest(hex.EncodeToString(sum[:]))}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	now := time.Now().Unix()
 	result, err := collector.Collect(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, now)
 	if err != nil {

@@ -20,7 +20,7 @@ func eligibleAssessment() domain.Assessment {
 				Claim: claim, Subject: nodes[i].Artifact, Status: domain.Verified,
 				Provider: domain.Homebrew, Source: "fixture-provider", ProviderVersion: "test-1",
 				RawSHA256: digest, ObservedAt: now - 60, ExpiresAt: now + 60,
-				PublishedAt: now - 10*86400, Publication: domain.BottleRegistration,
+				PublishedAt: now - 10*86400, Publication: domain.VerifiedAttestation,
 				Applicability: domain.NoKnownApplicableFindings,
 			})
 			if err != nil {
@@ -46,12 +46,12 @@ func TestEvidenceDecisions(t *testing.T) {
 		edit func(*domain.Assessment)
 		want domain.Outcome
 	}{
-		{"old release on first observation", func(*domain.Assessment) {}, domain.Allow},
+		{"old attestation on first observation", func(*domain.Assessment) {}, domain.Allow},
 		{"young dependency", func(a *domain.Assessment) { a.Nodes[1].Evidence[3].PublishedAt = a.Now - 120 }, domain.Hold},
 		{"missing publication", func(a *domain.Assessment) { a.Nodes[1].Evidence[3].PublishedAt = 0 }, domain.Hold},
 		{"future publication", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].PublishedAt = a.Now + 1 }, domain.Hold},
 		{"observed before publication", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].PublishedAt = a.Now - 1 }, domain.Hold},
-		{"legacy upstream date cannot age a rebuilt bottle", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].Publication = domain.UpstreamPublication }, domain.Hold},
+		{"legacy registration cannot age a bottle", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].Publication = domain.BottleRegistration }, domain.Hold},
 		{"unsupported publication event", func(a *domain.Assessment) { a.Nodes[0].Evidence[3].Publication = 99 }, domain.Hold},
 		{"unknown advisory applicability", func(a *domain.Assessment) { a.Nodes[1].Evidence[4].Applicability = domain.Unknown }, domain.Hold},
 		{"known dependency vulnerability", func(a *domain.Assessment) { a.Nodes[1].Evidence[4].Applicability = domain.Affected }, domain.Deny},
@@ -83,7 +83,7 @@ func TestEvidenceDecisions(t *testing.T) {
 		{"emergency invalid signature", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[0].Evidence[2].Status = domain.Failed }, domain.Deny},
 		{"emergency integrity unavailable", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[0].Evidence[1].Status = domain.Unavailable }, domain.Hold},
 		{"emergency vulnerability", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[1].Evidence[4].Applicability = domain.Affected }, domain.Deny},
-		{"emergency unknown age", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[0].Evidence[3].Status = domain.Unavailable }, domain.Allow},
+		{"emergency missing attestation time", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[0].Evidence[3].Status = domain.Unavailable }, domain.Hold},
 		{"dependency not waived", func(a *domain.Assessment) { waiveYoung(a); a.Exception.Waivers = a.Exception.Waivers[:1] }, domain.Hold},
 		{"expired waiver", func(a *domain.Assessment) { waiveYoung(a); a.Exception.ExpiresAt = a.Now }, domain.Hold},
 		{"replayed attempt", func(a *domain.Assessment) { waiveYoung(a); a.AttemptAlreadyStarted = true }, domain.Hold},

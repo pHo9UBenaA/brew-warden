@@ -158,7 +158,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	for _, f := range actual {
 		i := slices.Index(names, f.Name)
 		c := candidates[i]
-		if f.artifact() != c.artifact() || f.SourceSHA256 != c.SourceSHA256 || f.SourceURL != c.SourceURL || f.RecipeSHA256 != c.RecipeSHA256 || !slices.Equal(f.Dependencies, c.Dependencies) {
+		if f.artifact() != c.artifact() || !slices.Equal(f.Dependencies, c.Dependencies) {
 			return fail(errors.New("advisory candidate metadata changed"))
 		}
 	}

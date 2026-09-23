@@ -3,8 +3,8 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
-if [ "$#" -ne 3 ] || [ "$1" != darwin/arm64 ]; then
-  printf 'Usage: scripts/build-product.sh darwin/arm64 RUNTIME VERIFIER_SOURCE\n' >&2
+if [ "$#" -ne 2 ] || [ "$1" != darwin/arm64 ]; then
+  printf 'Usage: scripts/build-product.sh darwin/arm64 RUNTIME\n' >&2
   exit 1
 fi
 if [ "$(go env GOVERSION)" != "go$(cat .go-version)" ]; then
@@ -16,7 +16,6 @@ if [ -n "$(git status --porcelain --untracked-files=all)" ]; then
   exit 1
 fi
 runtime_root=$(CDPATH= cd -- "$2" && pwd -P)
-verifier_source=$(CDPATH= cd -- "$3" && pwd -P)
 source_revision=$(git rev-parse HEAD)
 product_version="0.1.0+$source_revision"
 runtime_digest=$(shasum -a 256 "$runtime_root/manifest.json" | cut -d ' ' -f 1)
@@ -25,8 +24,6 @@ printf 'Distribution build evidence: %s\n' "$build_root"
 printf '%s\n' "$source_revision" > "$build_root/source-revision"
 go version > "$build_root/toolchain"
 go list -m all > "$build_root/modules"
-go -C "$verifier_source" mod verify > "$build_root/verifier-module-verification"
-go -C "$verifier_source" list -m -json all > "$build_root/verifier-modules.json"
 git archive "$source_revision" > "$build_root/source.tar"
 module=github.com/pHo9UBenaA/brew-warden
 go_license="$(go env GOROOT)/LICENSE"
@@ -37,8 +34,7 @@ for pass in first second; do
     -ldflags="-s -w -X $module/internal/cli.Version=$product_version -X $module/internal/composition.RuntimeSHA256=$runtime_digest" \
     -o "$build_root/$pass/bwd" ./cmd/bwd)
   go run ./tools/release-pack "$build_root/$pass/bwd" "$runtime_root" \
-    "$build_root/verifier-modules.json" "$go_license" "$source_revision" \
-    "$build_root/$pass/brewwarden-darwin-arm64.tar.gz"
+    "$go_license" "$source_revision" "$build_root/$pass/brewwarden-darwin-arm64.tar.gz"
 done
 cmp "$build_root/first/bwd" "$build_root/second/bwd"
 cmp "$build_root/first/brewwarden-darwin-arm64.tar.gz" "$build_root/second/brewwarden-darwin-arm64.tar.gz"

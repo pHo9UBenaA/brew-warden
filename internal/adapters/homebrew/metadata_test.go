@@ -9,10 +9,9 @@ import (
 
 func metadataFixture() metadataDocument {
 	digest := domain.Digest(strings.Repeat("a", 64))
-	f := formulaMetadata{BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2", Rebuild: 1, SourceURL: "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", SourceSHA256: digest, RecipeSHA256: digest, RecipePath: "Formula/j/jq.rb", TapCommit: strings.Repeat("b", 40), BottleURL: "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:" + string(digest), BottleSHA256: digest, Cellar: ":any", Dependencies: []string{"oniguruma"}, BuildDependencies: []string{}}
+	f := formulaMetadata{BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2", Rebuild: 1, BottleURL: "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:" + string(digest), BottleSHA256: digest, Cellar: ":any", Dependencies: []string{"oniguruma"}}
 	dep := f
 	dep.Name = "oniguruma"
-	dep.RecipePath = "Formula/o/oniguruma.rb"
 	dep.BottleURL = strings.Replace(f.BottleURL, "/jq/", "/oniguruma/", 1)
 	dep.Dependencies = []string{}
 	return metadataDocument{1, "arm64_tahoe", []formulaMetadata{f, dep}}
@@ -26,7 +25,7 @@ func TestMetadataClosureAndIdentity(t *testing.T) {
 	for _, mutate := range []func(*metadataDocument){
 		func(d *metadataDocument) { d.Formulae = d.Formulae[:1] },
 		func(d *metadataDocument) { d.Formulae[1].Dependencies = []string{"jq"} },
-		func(d *metadataDocument) { d.Formulae[0].RecipePath = "../../injected.rb" },
+		func(d *metadataDocument) { d.Formulae[0].BottleTag = "arm64_linux" },
 		func(d *metadataDocument) { d.Formulae[0].BottleURL = "https://attacker.invalid/bottle" },
 		func(d *metadataDocument) { d.Formulae[0].BottleSHA256 = "" },
 		func(d *metadataDocument) { d.Formulae[0].Dependencies = nil },
