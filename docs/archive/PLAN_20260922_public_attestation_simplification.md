@@ -16,8 +16,11 @@ bwd [policy options] brew install|upgrade [formulae]
 
 The supported initial product remains official `homebrew/core` bottles on the
 tested Apple Silicon macOS/Homebrew range. Formula names do not select special
-code paths. Casks, source builds, third-party taps, and other platforms require
-separate demonstrated capabilities.
+code paths, source-host conventions, or build-system recognizers. The goal is a
+general-purpose tool for every official-core bottle whose required public
+capabilities pass; the initial platform boundary is not a package allowlist.
+Casks, source builds, third-party taps, and other platforms require separate
+demonstrated capabilities.
 
 ```text
 request
@@ -32,13 +35,20 @@ request
 Verification may run concurrently where its inputs are independent. Installation
 starts only after every requested formula and required dependency passes. Do not
 mix verification with installation, and do not launch competing Homebrew mutation
-commands against the same prefix.
+commands against the same prefix. Pass a supported target set to one bound public
+Homebrew invocation where its command semantics permit; otherwise serialize the
+bound mutations. Never run parallel `brew install` processes against one prefix.
 
 ## Fixed decisions
 
 - Prefer public Homebrew and GitHub CLI commands. Do not call Homebrew private
   Ruby APIs, generate Ruby installer programs, inspect upstream project tags, or
   query package-specific upstream repositories.
+- Do not use source URLs, source checksums, upstream release identities, recipe
+  shapes, build-system recognition, source reconstruction, or installed-payload
+  reconstruction as official-bottle eligibility evidence. Keep only bounded
+  archive safety checks needed to consume the selected bottle without treating
+  them as build provenance.
 - Trust the supported Homebrew implementation. Homebrew compromise is out of
   scope. BrewWarden still accounts for every required subject and binds verified
   inputs to its own execution.
@@ -50,9 +60,16 @@ commands against the same prefix.
   signatures are not required for official Homebrew bottles.
 - Use `brew vulns --json` as the OSV scanner and the official Homebrew Advisory
   Database as the Homebrew-specific supplement. Do not maintain another OSV
-  client or require a historical advisory as proof of database coverage.
+  client or require a historical advisory as proof of database coverage. The two
+  sources have overlapping provenance and do not prove exhaustive vulnerability
+  coverage; report only "no known applicable findings" after both required
+  lookups complete.
 - Only age may be waived. Integrity, provenance, vulnerability, closure, and
   execution-binding failures remain non-waivable.
+- Retain the seven-day (`168h`) default minimum age, explicit CLI override,
+  optional configuration, and one-attempt artifact-bound age exceptions. A
+  supported mutation invocation is authorization to proceed after verification;
+  do not add a second BrewWarden confirmation prompt.
 - There is no resume, rollback, or saved-plan replay. A retry performs fresh
   discovery and verification. Keep only the durable in-flight state needed to
   distinguish a still-running Homebrew process from an interrupted operation.
@@ -60,6 +77,11 @@ commands against the same prefix.
   The user must not mutate the same prefix concurrently with a BrewWarden run.
 - Do not modify the maintainer's Homebrew installation in tests. Use disposable
   environments. Do not push, publish, sign, or notarize without separate approval.
+- Use the installed supported `brew` and `gh`. Remove the bundled Homebrew,
+  portable Ruby, generated Ruby, and custom verifier distribution paths. The
+  repository's ignored `.cache` may be used only as disposable, untracked work;
+  it is not a product source or durable acceptance record. Homebrew's own cache
+  may hold the exact verified bottles used by execution.
 
 ## Evidence sources
 
@@ -69,7 +91,7 @@ commands against the same prefix.
 | Bottle acquisition and checksum | `brew fetch --formula --bottle-tag=...` and `brew --cache` | Hash the actual bytes and match authenticated metadata; reject omissions, extras, source fallback, and cache escape |
 | Provenance | `gh attestation verify` on each local bottle | Require successful verification for every exact digest and validate bounded JSON coverage |
 | Minimum age | Verified attestation timestamps for the exact bottle digest | Use the chronologically earliest valid timestamp; a new digest starts a new age |
-| Upstream vulnerabilities | `brew vulns --json` on the explicit candidate closure | Treat findings as deny and skipped, malformed, incomplete, or unavailable results as hold |
+| Upstream vulnerabilities | `brew vulns --json` on the explicit candidate closure in an isolated inspection prefix | Prove the command scans planned candidates rather than installed versions; treat findings as deny and skipped, malformed, incomplete, or unavailable results as hold |
 | Homebrew-specific vulnerabilities | `https://formulae.brew.sh/api/advisories.json` and authenticated formula identity | Apply Homebrew version/revision and patch status; retain source attribution |
 | Execution | Public `brew install` / `brew upgrade` with frozen verified inputs | Revalidate the plan and deny network, source fallback, new dependencies, or changed inputs during execution |
 
@@ -129,9 +151,10 @@ durable record that can safely handle process loss:
 4. Never infer success, replay the old plan, restore an exception, or roll back.
 
 Remove `history`, `status`, and `reconcile` from the normal interface when their
-remaining behavior is only an implementation detail of the old workflow. Report
-the current interruption directly and keep detailed evidence in bounded diagnostic
-output rather than maintaining a second user workflow.
+remaining behavior only supports saved attempts, replay, or reconciliation that
+the new contract removes. Retain a command only if it has demonstrated user value
+independent of that old workflow. Report a current interruption directly and keep
+the minimum evidence needed for diagnosis in bounded output.
 
 ## Code migration
 
@@ -146,10 +169,14 @@ output rather than maintaining a second user workflow.
    pending operation.
 4. Delete the custom attestation-only helper, its build template and packaging,
    direct attestation-bundle downloader/cache, GitHub commits registration
-   provider/cache, and their obsolete tests and documentation.
+   provider/cache, bundled Homebrew/portable-Ruby runtime and inventory builder,
+   generated Ruby paths, and their obsolete tests and documentation.
 5. Keep the accepted public Homebrew metadata, fetch, advisory, and execution
-   paths. Remove duplicate provider interfaces and compatibility machinery after
-   their final callers disappear; keep the enforced inward dependency direction.
+   paths. Remove source-release, source-checksum, recipe-shape, build-recognition,
+   reconstruction, GPG, and obsolete payload-proof fields and providers from the
+   candidate contract. Remove duplicate interfaces and compatibility machinery
+   after their final callers disappear; keep the enforced inward dependency
+   direction.
 6. Reduce recovery state and CLI commands to the in-flight contract above. Test
    actual parent death where Homebrew continues and where it has already stopped.
 7. Update README, design, architecture, threat model, dependency inventory,
@@ -164,6 +191,9 @@ output rather than maintaining a second user workflow.
 - A same-version rebottle with a new digest receives a new age.
 - Every requested formula and required runtime dependency has metadata, bytes,
   provenance/age, OSV, and Homebrew advisory evidence before mutation.
+- Public `brew vulns` acceptance proves planned-version selection in an isolated
+  inspection prefix and accounts for every requested closure subject; an empty
+  findings list or zero exit status alone is insufficient.
 - Missing `gh`, authentication/rate-limit failure, missing attestation, saturated
   results, skipped vulnerability subjects, network failure, and malformed output
   all stop before installation.
@@ -176,6 +206,12 @@ output rather than maintaining a second user workflow.
   fresh retry behave according to the minimal in-flight contract.
 - The distribution contains no Homebrew/Ruby runtime and no custom attestation
   verifier. It uses the installed supported `brew` and `gh` commands.
+- Representative official-core formulae with unrelated source hosts and build
+  systems follow the same bottle-only path without source-specific providers,
+  build fingerprints, formula-name exceptions, or payload reconstruction.
+- Repository verification confirms ignored `.cache` contents are disposable and
+  untracked, and are neither source inputs nor the only copy of acceptance
+  evidence.
 - `./scripts/verify.sh`, broader race/fuzz/lint/vulnerability checks, isolated
   native acceptance, and two-build reproducibility pass before product-ready is
   claimed.
@@ -194,3 +230,12 @@ Use coherent Conventional Commits after each verified boundary:
 Do not preserve obsolete code solely for compatibility with unreleased local
 records. If a safe automatic migration is not smaller than rejecting the old
 schema with an actionable message, reject it explicitly.
+
+## Previously completed repository decisions
+
+The root `.gitignore` remains ignore-by-default while unignoring tracked source
+trees recursively as whole directories. It does not use a global `!*/` traversal
+rule or enumerate every `internal` subdirectory. This is already implemented and
+is not another migration work package. README and current design documents must
+still be rewritten in work package 7 because they describe the superseded
+runtime, age, and recovery behavior.
