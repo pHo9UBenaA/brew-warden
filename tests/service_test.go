@@ -75,6 +75,16 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 		t.Fatal(code, out.String(), planner)
 	}
 }
+func TestRuntimeReportsPreflightHoldWithoutInventingExecutionOutcome(t *testing.T) {
+	planner := &servicePlanner{err: io.ErrUnexpectedEOF}
+	s := application.Service{Planner: planner, Clock: &executionClock{now: 1000}}
+	var out bytes.Buffer
+	code := cli.RunWithRuntime(context.Background(), []string{"brew", "install", "jq"}, &out, &out, nil, &s)
+	if code == 0 || planner.calls != 1 || !strings.Contains(out.String(), "outcome=not_started") {
+		t.Fatal("preflight failure was misreported as execution", code, out.String())
+	}
+}
+
 func TestAgeReasonRejectsControlsAndInvisibleText(t *testing.T) {
 	for _, reason := range []string{"", "   ", "\x1b[31m", "a\nb", "a\u202eb", "a\u200bb", string([]byte{255}), strings.Repeat("x", 513)} {
 		if domain.ValidAgeReason(reason) {

@@ -161,6 +161,6 @@ after the actual install starts, verifies its owned-process record, refuses a
 new mutation while the child is active, then performs a fresh, fully checked
 retry after the child stops. It never infers success from a stale record.
 
-When GitHub's anonymous quota is exhausted, native acceptance holds. The
+When gh authentication or GitHub quota is unavailable, native acceptance holds. The
 attestation and registration caches have been removed. A retry must query gh
 and the advisory providers again; no cached-provider exception is available.

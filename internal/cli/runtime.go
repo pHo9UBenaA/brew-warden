@@ -113,7 +113,11 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		for _, r := range result.Decision.Reasons {
 			_, _ = fmt.Fprintf(errOut, "%s: %s (%s)\n", r.Artifact.Name, claimName(r.Claim), r.Code)
 		}
-		_, _ = fmt.Fprintf(errOut, "execution_stopped: %q; outcome=%s\n", err.Error(), result.Outcome)
+		outcome := string(result.Outcome)
+		if outcome == "" {
+			outcome = "not_started"
+		}
+		_, _ = fmt.Fprintf(errOut, "execution_stopped: %q; outcome=%s\n", err.Error(), outcome)
 		if result.ExitKnown && result.ExitCode > 0 && result.ExitCode <= 255 {
 			return result.ExitCode
 		}
