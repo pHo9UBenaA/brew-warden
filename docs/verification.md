@@ -141,9 +141,18 @@ by fresh verification. A partially poured jq initially produced a false
 success on retry; the linked-keg check and regression test now reject it.
 An unauthenticated guest held before mutation. The coverage survey held hello
 and wget because Homebrew skipped required advisory subjects; this is not a
-formula allowlist or evidence of their safety. These are exercised local cases,
-not a universal compatibility proof. No host Homebrew was changed. Signing,
-notarization and public release provenance are not implied by local test success.
+formula allowlist or evidence of their safety. Separate authenticated acceptance
+installed libuv and gmp together with the default policy, then verified an
+unchanged rerun and unaffected installed state. Reviewed Homebrew/core recipes
+at `98cbed4ac9edc9e40b82ac087ddd95bd2bd2e751` identify libuv's
+`dist.libuv.org` source with CMake and gmp's GNU mirror with Autotools. These
+different source hosts and build systems exercise the same bottle-only path;
+source identities are not product eligibility evidence. The additional survey
+held libpng by evidence or age policy rather than counting it as successful
+execution. These are
+exercised local cases, not a universal compatibility proof. No host Homebrew was
+changed. Signing, notarization and public release provenance are not implied
+by local test success.
 
 `TestLiveExplicitUpgradeChangesSelectedVersion` takes an older installed
 standard-prefix formula selected by `BREWWARDEN_VM_UPGRADE_TARGET`. It requires

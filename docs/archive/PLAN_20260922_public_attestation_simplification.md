@@ -1,6 +1,8 @@
 # Simplify BrewWarden around public commands
 
-Date: 2026-09-22. Status: approved direction, implementation pending.
+Date: 2026-09-22. Status: implemented and locally accepted on 2026-09-23 for
+the initial supported scope. Actual exercised cases and bounded holds are in
+[verification](../verification.md). Signing and publication remain separate.
 This plan supersedes the provenance, bottle-age, and recovery mechanisms recorded
 in `PLAN_20260922_completion.md`. `docs/design.md` remains authoritative and must
 be updated with the implementation. Repository content and diagnostics stay in

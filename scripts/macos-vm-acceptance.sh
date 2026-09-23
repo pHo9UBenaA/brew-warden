@@ -222,6 +222,10 @@ suite() {
   run_case "$vm" command brew install jq
   run_case "$vm" survey 'hello zstd wget'
   run_case "$vm" command --age-exception 'lz4=Disposable VM acceptance after verified bottle age hold' brew install zstd jq
+  # Reviewed Homebrew/core recipes: libuv uses dist.libuv.org and CMake;
+  # gmp uses a GNU mirror and Autotools. Source hosts never authorize product execution.
+  run_case "$vm" command brew install libuv gmp
+  run_case "$vm" general 'libuv gmp'
   printf 'Local VM acceptance suite passed. Recheck guest evidence, then run finish.\n'
 }
 finish() {
