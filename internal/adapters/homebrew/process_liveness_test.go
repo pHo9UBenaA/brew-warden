@@ -18,18 +18,44 @@ func TestProcessInventoryIncludesOtherUsers(t *testing.T) {
 	if os.Getuid() == 0 {
 		t.Skip("requires an unprivileged process to test a different user's PID")
 	}
-	output, err := exec.Command("/bin/ps", "-p", "1", "-o", "uid=").Output()
-	uid, parseErr := strconv.Atoi(strings.TrimSpace(string(output)))
-	if err != nil || parseErr != nil || uid == os.Getuid() {
-		t.Skip("no observable process owned by another user")
+	own, err := exec.Command("/bin/ps", "-U", strconv.Itoa(os.Getuid()), "-o", "pid=").Output()
+	if err != nil {
+		t.Fatal(err)
 	}
-	session, err := processSessionID(1)
-	if err != nil || session < 0 {
-		t.Skip("other user's process session is not observable")
+	ownSessions := map[int]bool{}
+	for _, field := range strings.Fields(string(own)) {
+		pid, err := strconv.Atoi(field)
+		if err != nil {
+			t.Fatal(err)
+		}
+		if sid, err := processSessionID(pid); err == nil {
+			ownSessions[sid] = true
+		}
 	}
-	if active, err := processSessionActive(session); err != nil || !active {
-		t.Fatal("another user's session was invisible to the process guard", err)
+	all, err := exec.Command("/bin/ps", "-A", "-o", "pid=,uid=").Output()
+	if err != nil {
+		t.Fatal(err)
 	}
+	for _, line := range strings.Split(string(all), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) != 2 {
+			continue
+		}
+		uid, uidErr := strconv.Atoi(fields[1])
+		pid, pidErr := strconv.Atoi(fields[0])
+		if uidErr != nil || pidErr != nil || uid == os.Getuid() || pid <= 1 {
+			continue
+		}
+		sid, err := processSessionID(pid)
+		if err != nil || sid != pid || ownSessions[sid] {
+			continue
+		}
+		if active, err := processSessionActive(sid); err != nil || !active {
+			t.Fatal("a session owned exclusively by another user was invisible to the process guard", pid, err)
+		}
+		return
+	}
+	t.Skip("no isolated other-user process session available")
 }
 
 func TestProcessInventoryDistinguishesAbsentSession(t *testing.T) {
