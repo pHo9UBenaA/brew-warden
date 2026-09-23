@@ -11,8 +11,8 @@ bwd brew install jq
 bwd brew upgrade jq
 ```
 
-The public-gh migration has not passed native Apple Silicon acceptance or
-removed the legacy distribution/state workflow; do not treat it as product-ready.
+Native Apple Silicon installation and interruption acceptance still requires an
+authenticated disposable VM; do not treat the local build as product-ready.
 All required checks finish before installation starts. Missing or unsupported
 evidence stops the command. Successful checks lead directly to ordinary public
 `brew install` or `brew upgrade`, using the verified downloads and dependency plan.
@@ -45,15 +45,13 @@ BrewWarden is running. BrewWarden does not monitor or intercept ordinary `brew`
 commands. It does not claim to authenticate files previously installed outside
 its own verified execution.
 
-## Policy and history
+## Policy
 
 Set a different minimum age or make an explicit, one-attempt age exception:
 
 ```sh
 bwd --minimum-release-age 336h brew install jq
 bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
-bwd history
-bwd status
 ```
 
 An age exception waives only a verified but too-young timestamp. Missing or
@@ -69,15 +67,13 @@ Optional policy configuration lives at
 {"schemaVersion":1,"age":{"minimumHours":168}}
 ```
 
-Use `--config PATH` to select another policy file. It does not redirect history.
-Verification records are private and retained beside the default configuration.
-Collections can be large; preserve records while an attempt is unresolved.
-
-If `status` reports an interrupted attempt, run `bwd reconcile`. It waits for
-BrewWarden's owned operation to stop and records the actual selected-package
-state. It does not rerun installation, invent a successful exit or roll back
-packages. A fresh command performs fresh checks. Inconsistent installations may
-need ordinary Homebrew repair while BrewWarden is idle.
+Use `--config PATH` to select another policy file. Evidence is bound to the
+current command, not stored as execution history. If the wrapper stops while its
+Homebrew child is still running, another BrewWarden mutation is refused until
+the child stops. Then retry the complete command for fresh discovery and checks;
+no old plan or age exception is replayed, and no success or rollback is inferred.
+An inconsistent installation may need ordinary Homebrew repair while BrewWarden
+is idle.
 
 ## Development
 
@@ -90,8 +86,8 @@ Use the Go version in `.go-version`, then:
 ./scripts/check.sh all
 ```
 
-Development binaries are diagnostic-only until built with a trusted distribution
-inventory. Mutation acceptance requires a disposable macOS VM; tests never change
+Development binaries are diagnostic-only until built as a distribution from
+reviewed source. Mutation acceptance requires a disposable macOS VM; tests never change
 the maintainer's Homebrew installation. See [verification](docs/verification.md),
 [design](docs/design.md), [architecture](docs/architecture.md),
 [threat model](docs/threat-model.md) and [contributing](CONTRIBUTING.md).

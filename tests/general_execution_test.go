@@ -11,7 +11,6 @@ import (
 	"time"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
@@ -50,7 +49,6 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 		before[rack.Name()] = snapshot
 	}
 	collector := &homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
-	journal := localstate.Journal{Path: filepath.Join(directory, "attempts")}
 	log, err := os.Create(filepath.Join(directory, "native.log"))
 	if err != nil {
 		t.Fatal(err)
@@ -58,7 +56,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	defer log.Close()
 	engine := homebrew.Engine{Collector: collector, Streams: homebrew.Streams{Out: io.MultiWriter(os.Stdout, log), Err: io.MultiWriter(os.Stderr, log)}}
 	planned := map[string]bool{}
-	service := application.Service{Planner: engine, Journal: journal, Clock: nativeClock{}, Present: func(p ports.Prepared) error {
+	service := application.Service{Planner: engine, Clock: nativeClock{}, Present: func(p ports.Prepared) error {
 		for _, node := range p.Assessment.Nodes {
 			planned[node.Artifact.Name] = true
 			t.Log("candidate", node.Artifact.Name, node.Artifact.Version, node.Artifact.SHA256)
@@ -103,15 +101,6 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	after, err := kegSnapshot("/opt/homebrew/Cellar")
 	if err != nil || installed != after {
 		t.Fatal("unchanged rerun modified installed payload", err)
-	}
-	records, err := journal.Attempts()
-	if err != nil || len(records) != 2 {
-		t.Fatal(records, err)
-	}
-	for _, record := range records {
-		if record.Finish.Outcome != domain.AttemptSucceeded || !record.Finish.AfterState.Valid() {
-			t.Fatal(record)
-		}
 	}
 	t.Log("verified complete closure, unchanged unrelated packages and idempotent rerun", targets)
 }

@@ -30,13 +30,9 @@ func Main() {
 	if base, err := os.UserConfigDir(); err == nil {
 		configPath = filepath.Join(base, "brewwarden", "config.json")
 	}
-	statePath := ""
-	if configPath != "" {
-		statePath = filepath.Join(filepath.Dir(configPath), "history")
-	}
-	files := localstate.Files{ConfigPath: configPath, StatePath: statePath}
+	files := localstate.Files{ConfigPath: configPath}
 	ctx, stop := signal.NotifyContext(context.Background(), os.Interrupt, syscall.SIGTERM)
-	code := cli.RunWithRuntime(ctx, os.Args[1:], os.Stdout, os.Stderr, files, files, service(configPath))
+	code := cli.RunWithRuntime(ctx, os.Args[1:], os.Stdout, os.Stderr, files, service(configPath))
 	stop()
 	os.Exit(code)
 }
@@ -46,11 +42,11 @@ func service(configPath string) *application.Service {
 	}
 	gh, _ := attestation.InstalledGH() // Missing/incompatible gh holds doctor and collection.
 	collector := &homebrew.Collector{
-		Runtime:   homebrew.Runtime{},
-		Directory: filepath.Join(filepath.Dir(configPath), "collections"),
-
+		Runtime:        homebrew.Runtime{},
+		Directory:      filepath.Join(filepath.Dir(configPath), "collections"),
 		BottleVerifier: gh,
+		LegacyState:    filepath.Join(filepath.Dir(configPath), "attempts"),
 	}
 	engine := homebrew.Engine{Collector: collector, Streams: homebrew.Streams{In: os.Stdin, Out: os.Stdout, Err: os.Stderr}}
-	return &application.Service{Planner: engine, Recovery: engine, Diagnostics: engine, Journal: localstate.Journal{Path: filepath.Join(filepath.Dir(configPath), "attempts")}, Clock: clock{}}
+	return &application.Service{Planner: engine, Diagnostics: engine, Clock: clock{}}
 }

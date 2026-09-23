@@ -12,8 +12,8 @@ covered all required subjects or that preflight and execution use the same input
 | Artifact bytes and metadata | Bind a real digest to authenticated metadata and expected identity |
 | API and verifier output | Bound size/time/depth, validate schemas, distinguish missing and failed |
 | Package names and URLs | Validate identifiers; no command strings; constrain network destinations |
-| Saved plans and exceptions | Revalidate contents, policy, evidence, expiry, environment, and identity |
-| Filesystem state | Private paths, no traversal/symlink escape, atomic records, crash reconciliation |
+| Pending plans and exceptions | Revalidate contents, policy, evidence, expiry, environment, and identity; never replay after interruption |
+| Filesystem state | Private paths, no traversal/symlink escape, durable owned-process record, conservative liveness check after parent death |
 | Terminal and logs | Escape control sequences, redact credentials, preserve useful failure evidence |
 | Dependencies | Evaluate the complete execution closure; reject unsupported resolution paths |
 | Toolchain and CI | Record versions, minimize dependencies, avoid implicit downloads and secrets |

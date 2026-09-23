@@ -22,6 +22,7 @@ type Collector struct {
 	Runtime        Runtime
 	Directory      string
 	BottleVerifier ports.BottleVerifier
+	LegacyState    string
 	client         *http.Client
 }
 type Collection struct {
@@ -62,11 +63,12 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 	}
 	result := &Collection{root: root, observedAt: now}
 	if err := c.collect(ctx, result, request); err != nil {
-		// Preserve incomplete inputs for diagnosis. They cannot become a session.
+		_ = os.RemoveAll(root) // No mutation can start before collection succeeds.
 		return nil, fmt.Errorf("candidate collection stopped: %w", err)
 	}
 	result.frozen, err = (workspace{result.root}).freezeInputs()
 	if err != nil {
+		_ = os.RemoveAll(root)
 		return nil, err
 	}
 	return result, nil

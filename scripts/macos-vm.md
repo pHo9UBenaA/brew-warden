@@ -57,8 +57,8 @@ fingerprint.
 For final acceptance, transfer the complete reproducible distribution archive.
 
 Run the cases in [verification](../docs/verification.md), then verify archive
-checksums and exercise the packaged doctor, install, upgrade, status, history and
-reconcile commands. Fixtures must be confined to the disposable guest. Copy logs
+checksums and exercise packaged doctor, install, upgrade, parent-death,
+active-child exclusion and fresh retry. Fixtures must be confined to the disposable guest. Copy logs
 and observations back with `tart exec ... tar -cf -`, preserving failures as well
 as successes. Stop the clone when finished; do not delete the base or unrelated
 VMs. Historical probe code remains recoverable from Git history, not as a second

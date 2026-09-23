@@ -23,6 +23,12 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	if e.Collector == nil || !domain.ValidRequest(request.Operation, request.Targets) {
 		return ports.Prepared{}, nil, errors.New("native planner unavailable")
 	}
+	if e.Collector.LegacyState != "" {
+		_, err := os.Lstat(e.Collector.LegacyState)
+		if err == nil || !errors.Is(err, os.ErrNotExist) {
+			return ports.Prepared{}, nil, errors.New("legacy attempt journal requires the matching older build for recovery before this version can run; archive it only after confirming no owned process remains")
+		}
+	}
 	seen := map[string]bool{}
 	for _, override := range overrides {
 		if !domain.ValidRequest("install", []string{override.Name}) || !domain.ValidAgeReason(override.Reason) || seen[override.Name] {
@@ -51,6 +57,17 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	if err := os.MkdirAll(e.Collector.Directory, 0700); err != nil {
 		return ports.Prepared{}, nil, err
 	}
+	// Refuse an owned active child before running a new Homebrew preflight.
+	// Prepare checks again under its own lock before reserving a new plan.
+	lock, err := acquireOperationLock(e.Collector.Directory)
+	if err != nil {
+		return ports.Prepared{}, nil, err
+	}
+	guardErr := clearStoppedInFlight(e.Collector.Directory)
+	closeErr := lock.Close()
+	if guardErr != nil || closeErr != nil {
+		return ports.Prepared{}, nil, errors.Join(guardErr, closeErr)
+	}
 	collection, err := e.Collector.Collect(ctx, request, now)
 	if err != nil {
 		return ports.Prepared{}, nil, err
@@ -65,6 +82,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 			}
 		}
 		if !found {
+			_ = removeCollection(e.Collector.Directory, filepath.Base(collection.root))
 			return ports.Prepared{}, nil, errors.New("age exception is outside the complete candidate plan")
 		}
 	}

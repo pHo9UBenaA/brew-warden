@@ -59,7 +59,7 @@ annotation fields and cache naming are version-specific data contracts. They are
 not private Ruby calls, nor are they presumed stable across Homebrew updates.
 Review and retest them before expanding the supported inventory.
 
-## Execution and recovery
+## Execution and interruption
 
 All checks finish before any package installation. A short-lived plan binds the
 policy, exact candidate artifacts, complete dependency graph, frozen inputs,
@@ -82,24 +82,26 @@ The user must not concurrently modify the same Homebrew prefix outside
 BrewWarden. A private lock coordinates BrewWarden itself; no monitoring or private
 Homebrew locks are added to enforce that usage condition. A fixed startup gate
 records each owned POSIX session before allowing its command to execute. Normal
-cancellation interrupts Homebrew, which manages its children. Completion and
-recovery confirm that the entire recorded session is absent, including children
-Homebrew places in separate process groups. Recovery also requires the operation
-lock; PID reuse conservatively holds rather than signalling
-an unrelated process. It inventories selected racks and opt links without
-following symlinks or requiring complete receipts. Reconciliation records facts,
-not success, rollback or authorization to replay. Legacy internal-API attempts
-require the matching older build to reconcile their different process protocol.
+cancellation interrupts Homebrew, which manages its children. A private,
+durably synchronized in-flight record binds the process session and collection
+to the pending attempt before the gate opens. Completion and fresh retry check
+the whole session, including children in separate process groups. An active or
+unobservable session holds new mutations; PID reuse conservatively holds rather
+than signalling another process. Normal closure removes the workspace; after
+parent death a new invocation removes stale state only once the child stops.
+This never infers success, replays the plan or restores an exception. Older
+attempt journals require the matching older build for recovery before mutation.
 
 ## Validation
 
 Unit tests cover strict metadata, OCI digest/closure mismatch, archive extraction,
 input substitution, private operation locks, process-session liveness and partial
-state snapshots. Explicit VM tests exercise public collection, actual install and
+execution outcomes. Explicit VM tests exercise public collection, actual install and
 upgrade, multiple targets, unchanged reruns, unrelated-package preservation,
-age exceptions, tampering, cancellation, partial failure and recovery. See
+age exceptions, tampering, cancellation, partial failure and fresh retry. See
 [verification](../../../docs/verification.md) for repeatable entrypoints.
 
 The collector retains the verified gh response only within the pending workspace
 and does not use attestation or registration caches. Advisory status is
-collected afresh. The legacy reconciliation workflow remains migration work.
+collected afresh. No execution history, cached provider proof, or saved-plan reconciliation is
+used.

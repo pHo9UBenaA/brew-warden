@@ -17,6 +17,18 @@ func (d Digest) Valid() bool {
 var formulaName = regexp.MustCompile(`^[a-z0-9][a-z0-9+_.@-]{0,127}$`)
 var versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
 
+func ValidRequest(operation string, targets []string) bool {
+	if (operation != "install" && operation != "upgrade") || len(targets) > 128 || (operation == "install" && len(targets) == 0) {
+		return false
+	}
+	for _, target := range targets {
+		if !formulaName.MatchString(target) {
+			return false
+		}
+	}
+	return true
+}
+
 // Artifact identifies bytes, including same-version bottle rebuilds and platform.
 // Exported values are revalidated when evaluated; serialization is not trust.
 type Artifact struct {

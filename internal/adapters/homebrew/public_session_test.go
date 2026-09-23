@@ -1,8 +1,6 @@
 package homebrew
 
 import (
-	"context"
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"testing"
@@ -10,43 +8,41 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-func TestPublicRecoveryWaitsForActiveOperation(t *testing.T) {
+func TestPublicOperationLockExcludesConcurrentMutation(t *testing.T) {
 	directory := t.TempDir()
-	if err := os.Chmod(directory, 0700); err != nil {
+	lock, err := acquireOperationLock(directory)
+	if err != nil {
 		t.Fatal(err)
 	}
-	root := filepath.Join(directory, "collection-public")
+	if _, err := acquireOperationLock(directory); err == nil {
+		t.Fatal("second mutation acquired the active operation lock")
+	}
+	if err := lock.Close(); err != nil {
+		t.Fatal(err)
+	}
+	fresh, err := acquireOperationLock(directory)
+	if err != nil {
+		t.Fatal("stopped operation prevented fresh retry", err)
+	}
+	defer fresh.Close()
+}
+
+func TestPublicSessionCloseRemovesCurrentWorkspace(t *testing.T) {
+	directory := t.TempDir()
+	root := filepath.Join(directory, "collection-12345")
 	if err := os.Mkdir(root, 0700); err != nil {
 		t.Fatal(err)
-	}
-	plan := planFixture()
-	plan.Schema = 3
-	raw, err := json.Marshal(plan)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if err := writeRecord(filepath.Join(root, "plan.json"), raw); err != nil {
-		t.Fatal(err)
-	}
-	prepared, err := plan.prepared(digestBytes(raw))
-	if err != nil {
-		t.Fatal(err)
-	}
-	engine := Engine{Collector: &Collector{Directory: directory}}
-	if _, _, err := engine.savedPlan(prepared.Assessment.Binding); err != nil {
-		t.Fatal("fixture must resolve to a valid saved plan", err)
 	}
 	lock, err := acquireOperationLock(directory)
 	if err != nil {
 		t.Fatal(err)
 	}
-	defer lock.Close()
-	if _, err := engine.Snapshot(context.Background(), prepared.Assessment.Binding); err == nil || err.Error() != "another BrewWarden execution is active" {
-		t.Fatal("recovery accepted an active public attempt", err)
+	s := &publicSession{w: workspace{root}, lock: lock}
+	if err := s.Close(); err != nil {
+		t.Fatal(err)
 	}
-	entries, err := os.ReadDir(directory)
-	if err != nil || len(entries) != 2 {
-		t.Fatal("recovery launched before capability rejection", err)
+	if _, err := os.Lstat(root); !os.IsNotExist(err) {
+		t.Fatal("completed session retained execution inputs", err)
 	}
 }
 

@@ -1,4 +1,4 @@
-// Package localstate owns the local JSON configuration and history boundary.
+// Package localstate owns strict local JSON policy configuration.
 package localstate
 
 import (

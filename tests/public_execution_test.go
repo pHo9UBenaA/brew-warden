@@ -33,7 +33,6 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log("retained public execution", directory)
-	seedVMEvidenceCache(t, directory)
 	collector := homebrew.Collector{Runtime: homebrew.Runtime{}, Directory: directory, BottleVerifier: installedBottleVerifier(t)}
 	operation := os.Getenv("BREWWARDEN_VM_PUBLIC_OPERATION")
 	if operation == "" {
@@ -65,7 +64,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			if err != nil || len(profiles) != 1 {
 				t.Fatal("execution profile missing", err)
 			}
-			for _, protected := range []string{profiles[0], filepath.Join(filepath.Dir(profiles[0]), "process-0.json")} {
+			for _, protected := range []string{profiles[0], filepath.Join(filepath.Dir(profiles[0]), "plan.json")} {
 				command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-f", profiles[0], "/bin/sh", "-c", `printf changed >> "$1"`, "protection-test", protected)
 				if output, err := command.CombinedOutput(); err == nil || !strings.Contains(string(output), "Operation not permitted") {
 					t.Fatal("installer could rewrite execution controls", string(output), err)
@@ -87,20 +86,26 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
 				t.Fatal("interrupted execution changed unrelated packages")
 			}
-			engine := homebrew.Engine{Collector: &collector}
-			if _, err := engine.Snapshot(ctx, prepared.Assessment.Binding); err == nil {
-				t.Fatal("recovery accepted an open execution session")
-			}
-			if err := session.Close(); err != nil {
+			if err := session.Close(); err != nil && !strings.Contains(err.Error(), "owned Homebrew process") {
 				t.Fatal(err)
 			}
-			state, err := engine.Snapshot(ctx, prepared.Assessment.Binding)
-			if err != nil || !state.Valid() {
-				t.Fatal("interrupted state could not be reconciled", err)
-			}
-			again, err := engine.Snapshot(ctx, prepared.Assessment.Binding)
-			if err != nil || again != state {
-				t.Fatal("recovery changed or replayed the installation", err)
+			// There is no saved-plan replay. An active descendant can outlive
+			// the cancelled parent. Wait for exclusion to end, then re-collect.
+			engine := homebrew.Engine{Collector: &collector}
+			deadline := time.Now().Add(2 * time.Minute)
+			for {
+				newPlan, next, err := engine.Prepare(ctx, ports.Request{Operation: operation, Targets: names}, domain.DefaultPolicy(), nil, time.Now().Unix())
+				if err == nil {
+					defer next.Close()
+					if newPlan.Assessment.Binding.Attempt == prepared.Assessment.Binding.Attempt {
+						t.Fatal("interrupted plan was replayed")
+					}
+					break
+				}
+				if time.Now().After(deadline) || (!strings.Contains(err.Error(), "owned Homebrew process") && !strings.Contains(err.Error(), "another BrewWarden execution")) {
+					t.Fatal("fresh collection after interruption failed", err)
+				}
+				time.Sleep(200 * time.Millisecond)
 			}
 			return
 		}

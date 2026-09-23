@@ -11,7 +11,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, attempt-record, public advisory, provenance-result and Homebrew metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, in-flight-process record, public advisory, provenance-result and Homebrew metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
@@ -42,7 +42,7 @@ and substitute only the recursive verification invocation. Coverage percentages
 do not include code exercised in those separately built subprocesses.
 
 Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
-configuration, attempt records, public advisory responses, template comments, and control-byte rejection. Preserve discovered regressions
+configuration, owned-process records, public advisory responses, template comments, and control-byte rejection. Preserve discovered regressions
 as seed cases or reviewed corpus files under the test directories. Add fuzz targets for actual
 product parsers as they appear. Coverage has no arbitrary percentage gate; race
 and fuzz checks cover only exercised behavior. Do not treat a clean advisory
@@ -100,14 +100,12 @@ binary path and `XDG_CONFIG_HOME/brewwarden`; the integration test now separates
 executable and user-state directories. These results validate exercised Linux
 code paths, not macOS Homebrew bottle compatibility or a Linux product release.
 
-The container also provides a dedicated 64 KiB `/full` tmpfs, with no execution
-permission or host mount. The journal test checks its size before exhausting it,
-requires an actual `ENOSPC` failure, and verifies that no start was committed.
-The host suite skips only this explicit full-filesystem test. Both host and
-container suites kill a writer after a durable start and require reconciliation
-before any new attempt. Application tests use the real journal to verify launch
-ordering, replay rejection, stale evidence, cancellation, partial outcomes and
-unknown outcome durability. They do not substitute for native Homebrew execution.
+The container also provides a dedicated 64 KiB `/full` tmpfs for isolated
+storage-failure fixtures; it has no host mount. Host and container tests kill a
+writer after a durable owned-process record, verify another mutation is refused
+while its child remains, and require fresh checks once it stops. Application
+tests verify session binding, stale evidence, cancellation and partial/unknown
+outcomes. They do not substitute for native Homebrew execution.
 
 ## Native product acceptance
 
@@ -116,13 +114,12 @@ Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
 VM, with supported Homebrew and installed `gh` in the guest. The test checks the hardware
 model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
 fixtures must provision an older target and the intended existing dependencies.
-The default path checks actual execution, BrewWarden operation exclusion, candidate installation, durable outcomes and unchanged installed dependency bytes.
+The default path checks actual execution, BrewWarden operation exclusion, candidate installation, actual outcomes and unchanged installed dependency bytes.
 
 `BREWWARDEN_VM_FAULT` selects `age`, `age-exception`, `changed-input`,
-`exception-changed-input`, `recovery` or `link-conflict`.
-Recovery attempts reconciliation while the BrewWarden operation lock is held, terminates the
-owned session, then requires a durable observed-state reconciliation with no keg
-changes. Link conflict requires absent jq/oniguruma and exercises a real partial
+`exception-changed-input` or `link-conflict`.
+Process continuation and fresh retry are checked by the distribution parent-crash
+test, not by a saved-plan reconciliation command. Link conflict requires absent jq/oniguruma and exercises a real partial
 installation while preserving an existing shared-prefix file. These tests never
 silently prepare or reset the host Homebrew installation.
 
@@ -130,8 +127,8 @@ For this migration, a disposable Tahoe VM clone passed packaged `doctor`; an
 actual `brew install jq` stopped before mutation because the installed gh lacked
 authentication. No guest credentials were supplied. This exercises the required
 hold, not successful native installation or product readiness. The packaged CLI
-must still pass `doctor`, a real install/upgrade, `history` and `status` in the
-VM. Offline tests, Docker tests and payload-only probes cannot
+must still pass `doctor` and real install/upgrade and interruption acceptance in
+the VM. Offline tests, Docker tests and payload-only probes cannot
 substitute for this native product-path acceptance. Signing/notarization and
 public release provenance are not implied by local test success.
 
@@ -139,16 +136,18 @@ public release provenance are not implied by local test success.
 space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
 Provision absent targets to test fresh installation. It uses live authenticated
 metadata, release and advisory providers, provenance verification, the real public-command
-engine and durable journal. It checks the complete candidate closure, unchanged
+engine and one-use execution sessions. It checks the complete candidate closure, unchanged
 unrelated Cellar racks, then a second successful run with unchanged Cellar bytes.
-It does not reset fixtures implicitly. Retained workspaces include public command diagnostics and frozen inputs.
+It does not reset fixtures implicitly. Normal execution workspaces are removed
+after their owned process session stops.
 
 `TestLivePublicCommandExecution` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
 space-separated `BREWWARDEN_VM_PUBLIC_TARGETS`. It checks multiple targets,
 unrelated installed-package preservation, unchanged reruns and replay refusal.
 `BREWWARDEN_VM_PUBLIC_OPERATION=upgrade` selects upgrade. Fault modes are
 `changed-input`, `missing-cache`, `cancel` and `interrupt`; the last cancels after
-the real command starts and checks stopped-session recovery without replay.
+the real command starts and checks that a fresh collection, not a saved plan,
+is required before retry.
 
 `TestLivePublicCoverageSurvey` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
 `BREWWARDEN_VM_SURVEY_TARGETS`. It collects each root's complete evidence without
@@ -158,8 +157,9 @@ use actual execution acceptance for supported representative packages.
 
 `TestLiveDistributionParentCrash` takes `BREWWARDEN_VM_DISTRIBUTION_BINARY` pointing
 to an extracted `bwd`. Provision absent xz in the VirtualMac. It kills that parent
-after the actual install starts, requires unfinished status, waits for safe
-reconciliation and checks that history does not invent success or replay work.
+after the actual install starts, verifies its owned-process record, refuses a
+new mutation while the child is active, then performs a fresh, fully checked
+retry after the child stops. It never infers success from a stale record.
 
 When GitHub's anonymous quota is exhausted, native acceptance holds. The
 attestation and registration caches have been removed. A retry must query gh

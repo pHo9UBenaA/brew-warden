@@ -42,9 +42,10 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 
 ## Preflight investigation
 
-The public product path is tested in a disposable macOS VM for installation,
+The public product path requires disposable macOS VM acceptance for installation,
 upgrade, unchanged dependencies, age exceptions, input refusal, partial outcomes
-and recovery. The [Homebrew adapter](../internal/adapters/homebrew/README.md) owns
+and interruption with fresh retry. Authenticated final-path acceptance remains
+outstanding. The [Homebrew adapter](../internal/adapters/homebrew/README.md) owns
 exact guarantees and pins; [verification](verification.md) lists the entrypoints.
 
 Before expanding support, inspect the selected upstream revision and test both
@@ -69,7 +70,7 @@ hide them in generic shell helpers. No capability framework is needed in advance
 Return typed evidence identifying the claim, subject/digest, provider, provider
 version, status, and evidence reference. Record whether a claim is established by
 Homebrew or an additional BrewWarden check; expose that attribution in diagnostics
-and history. "Option enabled" and process exit zero are not, by themselves,
+without saving a history. "Option enabled" and process exit zero are not, by themselves,
 proof that every required check covered every artifact.
 
 Core policy decides which evidence is required. A replacement provider must

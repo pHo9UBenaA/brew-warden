@@ -6,7 +6,6 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
-	"fmt"
 	"io"
 	"os"
 	"os/exec"
@@ -286,7 +285,11 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	}
 	s := &publicSession{w: workspace{c.root}, streams: streams}
 	fail := func(err error) (ports.Prepared, ports.ExecutionSession, error) {
-		s.Close()
+		if s.lock == nil {
+			_ = removeCollection(filepath.Dir(c.root), filepath.Base(c.root))
+		} else if closeErr := s.Close(); closeErr != nil {
+			err = errors.Join(err, closeErr)
+		}
 		return ports.Prepared{}, nil, err
 	}
 	files, err := s.w.freezeInputs()
@@ -300,12 +303,11 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if err != nil {
 		return fail(err)
 	}
-	immutable := []string{filepath.Join(s.w.root, "public-execution.sb"), filepath.Join(s.w.root, "runtime"), filepath.Join(s.w.root, "cache/api"), filepath.Join(s.w.root, "cache/downloads"), filepath.Join(s.w.root, "plan.json")}
-	// Installer descendants must not rewrite the confinement of later commands
-	// or the durable process identities used after a wrapper crash.
-	for i := 0; i < 128; i++ {
-		immutable = append(immutable, filepath.Join(s.w.root, fmt.Sprintf("process-%d.json", i)))
+	if err := clearStoppedInFlight(filepath.Dir(c.root)); err != nil {
+		return fail(err)
 	}
+	immutable := []string{filepath.Join(s.w.root, "public-execution.sb"), filepath.Join(s.w.root, "runtime"), filepath.Join(s.w.root, "cache/api"), filepath.Join(s.w.root, "cache/downloads"), filepath.Join(s.w.root, "plan.json")}
+	// Installer descendants must not rewrite confinement or frozen inputs.
 	for _, file := range files {
 		immutable = append(immutable, filepath.Join(s.w.root, file.Path))
 	}
@@ -386,7 +388,6 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 			remaining[action.Name] = action
 		}
 	}
-	sequence := 0
 	for len(remaining) != 0 {
 		var selected plannedAction
 		for _, node := range s.plan.Nodes {
@@ -417,11 +418,10 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 			args = append(args, "--as-dependency")
 		}
 		args = append(args, "homebrew/core/"+selected.Name)
-		result, err := s.runCommand(ctx, sequence, args)
+		result, err := s.runCommand(ctx, args)
 		if err != nil || !result.ExitKnown || result.ExitCode != 0 {
 			return result, err
 		}
-		sequence++
 		delete(remaining, selected.Name)
 	}
 	states, after, err := s.w.publicState(ctx, s.profile, s.plan.Nodes)
@@ -432,7 +432,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	matches := err == nil && slices.IndexFunc(actions, func(a plannedAction) bool { return a.Operation != "keep" }) < 0
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }
-func (s *publicSession) runCommand(ctx context.Context, sequence int, args []string) (ports.ExecutionResult, error) {
+func (s *publicSession) runCommand(ctx context.Context, args []string) (ports.ExecutionResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
 	gate, release, err := os.Pipe()
@@ -454,8 +454,8 @@ func (s *publicSession) runCommand(ctx context.Context, sequence int, args []str
 	if err := command.Start(); err != nil {
 		return ports.ExecutionResult{}, err
 	}
-	raw, _ := json.Marshal(processRecord{PID: command.Process.Pid, Session: command.Process.Pid})
-	if err := writeRecord(filepath.Join(s.w.root, fmt.Sprintf("process-%d.json", sequence)), raw); err != nil {
+	owned := inFlight{Schema: 1, Plan: s.prepared.Assessment.Binding.Plan, Attempt: s.prepared.Assessment.Binding.Attempt, PID: command.Process.Pid, Session: command.Process.Pid, Collection: filepath.Base(s.w.root)}
+	if err := saveInFlight(filepath.Dir(s.w.root), owned); err != nil {
 		_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
 		_ = command.Wait()
 		return ports.ExecutionResult{}, err
@@ -476,8 +476,8 @@ func (s *publicSession) runCommand(ctx context.Context, sequence int, args []str
 		code = 128 + int(status.Signal())
 	}
 	result := ports.ExecutionResult{ExitKnown: code >= 0 && code <= 255, ExitCode: code}
-	if active, err := processSessionActive(command.Process.Pid); err != nil || active {
-		return result, errors.New("owned subprocesses are still active or unavailable; reconcile before retrying")
+	if err := finishInFlight(filepath.Dir(s.w.root), owned); err != nil {
+		return result, errors.New("owned subprocesses are still active or unavailable; retry after they stop")
 	}
 	if waitErr != nil {
 		observe, stop := context.WithTimeout(context.Background(), 5*time.Second)
@@ -489,10 +489,16 @@ func (s *publicSession) runCommand(ctx context.Context, sequence int, args []str
 }
 func (s *publicSession) Close() error {
 	s.consumed = true
-	if s.lock != nil {
-		err := s.lock.Close()
-		s.lock = nil
-		return err
+	if s.lock == nil {
+		return nil
 	}
-	return nil
+	// A continued child keeps its workspace until a later fresh invocation
+	// establishes that the whole session stopped. No saved plan is replayed.
+	err := clearStoppedInFlight(filepath.Dir(s.w.root))
+	if err == nil {
+		err = removeCollection(filepath.Dir(s.w.root), filepath.Base(s.w.root))
+	}
+	closeErr := s.lock.Close()
+	s.lock = nil
+	return errors.Join(err, closeErr)
 }

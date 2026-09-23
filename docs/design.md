@@ -1,9 +1,9 @@
 # Product design
 
-Status: partial migration to public gh attestation age. Distribution
+Status: simplified public-command implementation; authenticated native
+install/upgrade and interruption acceptance remains outstanding. Distribution
 builds connect authenticated candidate collection, full-closure policy evaluation,
-public-command execution binding and durable attempts; attempt reconciliation
-remains pending replacement with a minimal in-flight record. Official core bottle eligibility
+public-command execution binding and minimal owned-process state. Official core bottle eligibility
 is determined by verified capabilities on Apple Silicon macOS Tahoe with the
 standard prefix. Unsupported required capabilities hold execution. Development builds without
 the distribution build marker stay read-only. See [distribution](distribution.md) for build and publication boundaries.
@@ -12,7 +12,7 @@ the distribution build marker stay read-only. See [distribution](distribution.md
 
 Provide one Homebrew security CLI and policy configuration for release-age
 controls, artifact and signature verification, vulnerability checks,
-dependency-aware install/upgrade plans, emergency updates, and evidence history.
+dependency-aware install/upgrade plans, and emergency updates.
 Feature overlap with other OSS is acceptable. The product is not limited to an
 audit viewer. Shared policy, consistent explanations, and reliable execution are
 valuable even when individual checks already exist elsewhere.
@@ -35,7 +35,7 @@ and authenticated metadata, without formula-name allowlists or per-package build
 fingerprints. Required unsupported evidence still holds the entire operation.
 Acceptance must exercise multiple unrelated source/release conventions, dependency
 graphs, installed states and install/upgrade operations in disposable environments.
-Keep detailed security records internally; ordinary use should require only the
+Keep bounded current-operation diagnostics; ordinary use should require only the
 requested Homebrew command and an actionable explanation if it cannot proceed.
 Reduce duplicate execution paths and runtime dependencies where equivalent binding
 can be demonstrated. Casks, other taps and source builds remain separate explicit
@@ -53,15 +53,12 @@ bwd brew upgrade
 bwd --minimum-release-age 168h brew install jq
 bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
 bwd doctor
-bwd history
-bwd status
-bwd reconcile
 ```
 
 Only age is waivable, separately for each named candidate. Reasons are bounded,
 printable UTF-8; waived artifact hashes and reasons are displayed before execution.
-Normal output shows formula names and versions. Detailed binding identifiers stay
-in the journal and diagnostic history. `status` lists only unresolved attempts.
+Normal output shows formula names and versions. Bound process identity is held
+privately only while an owned Homebrew session may still be running.
 
 Follow the prefix interaction documented by
 [Socket Firewall Free](https://docs.socket.dev/docs/socket-firewall-free): users
@@ -70,18 +67,17 @@ execution binding remain its own contracts, including cached artifacts.
 
 Invoking a supported mutation authorizes that operation and its required
 dependency changes. Internally resolve a plan, verify evidence, revalidate the
-exact execution target, execute, and record the result. If checks pass, proceed
+exact execution target, execute, and report the observed result. If checks pass, proceed
 without a BrewWarden confirmation prompt, including in noninteractive use.
 Holds, denials, and unavailable required evidence stop execution with a reason.
 Homebrew's own prompts and privilege requirements remain separate. Resolve all
 requested targets and their complete dependency closure before any installation
 begins. If any target or required dependency is held or denied, stop the entire
 operation; do not silently skip targets. This does not make execution atomic:
-record partial results if a failure occurs after installation starts.
+report partial or unknown outcomes if a failure occurs after installation starts.
 
-Plans are internal records, not a public `plan`/`apply` workflow. Do not initially
-add BrewWarden `--yes`, `--dry-run`, or universal `--force` options. Diagnostic
-commands (`status`, `history`, `doctor`) may expose evidence without authorizing
+Plans are private, short-lived inputs for one command, not a public `plan`/`apply` workflow. Do not initially
+add BrewWarden `--yes`, `--dry-run`, or universal `--force` options. The read-only `doctor` command checks environment support without authorizing
 mutations. Emergency age exceptions require explicit, bounded user intent;
 ordinary install/upgrade commands never grant them automatically. Their syntax
 must be designed with the exception implementation, not as a generic bypass.
@@ -100,7 +96,7 @@ must be designed with the exception implementation, not as a generic bypass.
   read-only operations may bypass the mutation flow. An unrestricted brew call
   after a preflight check is not verified-plan execution.
 - Preserve child standard input/output, terminal behavior, and exit status when
-  executed; send wrapper diagnostics to stderr. Propagate cancellation and record
+  executed; send wrapper diagnostics to stderr. Propagate cancellation and report
   partial/unknown outcomes. Wrapper failures exit nonzero without launching the
   protected mutation; do not fall back to unwrapped execution.
 
@@ -156,8 +152,8 @@ recipe history, source-release dates, or download times as age evidence.
 Expose `--minimum-release-age <duration>` before `brew`; `168h` means seven days
 and remains the default. An explicit argument overrides optional configuration.
 A first invocation does not start a new waiting period for an old bottle.
-Unrelated recipe edits must not reset the clock when history demonstrates that
-the bottle digest is unchanged. Age exceptions remain explicit and artifact-bound;
+Unrelated recipe edits must not reset the clock when verified attestations
+establish the same bottle digest. Age exceptions remain explicit and artifact-bound;
 they never waive integrity, provenance, vulnerabilities or execution binding.
 Legacy upstream/distribution publication observations cannot satisfy this policy.
 
@@ -223,8 +219,9 @@ user assertion and does not become a verified advisory.
 An age exception binds to the plan ID, full package identity, digest, dependency
 graph, policy digest, reason, expiry, and one execution attempt. Identify and
 justify dependency age exceptions individually. Do not update unrelated packages
-as part of an emergency. After failure, reconcile state and create a new plan
-rather than replaying an exception or marking the package permanently trusted.
+as part of an emergency. After failure, inspect the current installation and retry with fresh discovery,
+verification and a new plan rather than replaying an exception or marking a
+package permanently trusted.
 
 ## Architecture and data
 
@@ -242,7 +239,7 @@ no I/O. Do not interpret external prose as execution instructions.
 | Decision | allow, hold, deny; all reasons and explicitly waivable rules |
 | Plan | Tool/brew/verifier versions, targets, closure, artifacts, environment, policy, evidence, expiry |
 | AgeException | Plan- and artifact-specific age waiver |
-| Attempt | Before state, start record, exit status, after state, partial/unknown outcomes |
+| Owned process | One operation identity, process/session identity, short-lived workspace; no saved result or authorization |
 
 Zero and unrecognized values must never mean allow. Keep stable reason codes
 alongside explanations. Deserialized `authorized: true` is not authorization.
@@ -250,8 +247,9 @@ alongside explanations. Deserialized `authorized: true` is not authorization.
 The initial domain evaluator accepts explicit time, complete reachable dependency
 graphs, exact artifact subjects and attributed evidence. An eligibility `Allow`
 is not an execution permit. Callers must derive binding digests from the actual
-plan, policy, graph and environment and obtain prior-attempt state from a durable
-journal. Distribution builds connect this evaluator through the application
+plan, policy, graph and environment and acquire an exclusive operation lock. Before Homebrew
+launches, durably record the owned child process session; a lost wrapper cannot
+authorize another mutation while its child may remain active. Distribution builds connect this evaluator through the application
 execution workflow and the public-command session.
 
 State flow: draft -> evidence collected -> allow/hold/deny -> revalidated ->
@@ -281,10 +279,10 @@ records the fixed input, cache and actual execution checks. No private Ruby API
 or generated executable recipe is used by BrewWarden. A new unsupported path
 must remain unavailable until its relevant binding is demonstrated.
 
-An upgrade can partially succeed. Record both exit status and actual state.
+An upgrade can partially succeed. Report both exit status and actual state.
 Post-install matching does not prevent prior code execution. Do not automatically
-roll back: applications and their data may not support downgrades. Recovery is a
-separate plan. Interrupted executing attempts become unknown until reconciled.
+roll back: applications and their data may not support downgrades. Interrupted commands have unknown outcomes. A fresh retry rediscovers and
+revalidates the entire closure; no saved plan is replayed or marked successful.
 
 ## Configuration and storage
 
@@ -321,67 +319,37 @@ default file uses defaults; an explicitly requested missing file fails. Final
 symlinks, nonregular files, and group/other-writable files are rejected. Parent
 directories follow the trusted-user filesystem boundary in the threat model.
 
-Store separate immutable JSON records for observations, plans, and attempts in
-private directories. Use a single writer, temporary files, synchronization,
-same-filesystem rename, and required directory synchronization. Prevent path and
-symlink escape; never use raw external names as storage paths. Indexes must be
-rebuildable. Do not invent a database or JSON canonicalization protocol.
+Observations and frozen plans are private, short-lived files for the pending
+operation. Their exact stored bytes are hashed and revalidated before execution;
+a hash does not authenticate a local administrator. Normal session closure removes
+the collection. An owned Homebrew child that survives its wrapper retains the
+workspace until that entire session stops. Incomplete collections cannot execute.
 
-An ID can hash the exact stored bytes. Revalidate their schema and contents when
-reading. A hash is not a signature or protection against the local administrator.
-If an execution record cannot be persisted, do not begin a mutation. Read-only
-reconciliation diagnostics should remain available.
+### Owned-process interruption state
 
-The `history` command lists execution attempts and legacy pre-execution refusals.
-In diagnostic-only builds, supported install/upgrade request shapes
-produce immutable refusal records under `history` beside the default user
-configuration. Distribution builds record execution attempts separately; policy
-holds before reservation do not create an attempt. Changing `--config` does not
-redirect history. Other unsupported arguments are not logged. Records use random
-event IDs, SHA-256 IDs over exact stored bytes, mode 0600 files in a 0700 directory,
-a nonblocking single-writer lock, file synchronization, same-directory rename,
-and directory synchronization. Reads revalidate schema and content digests.
-History remains readable with invalid policy configuration. A history failure is
-reported and never enables execution. Uncommitted `.pending-*` refusal files are
-ignored; they cannot represent an executing attempt. This refusal store does not consume emergency exceptions or reconcile interrupted
-installations; the separate attempt journal owns those transitions. The directory
-inventory is bounded to 10,000 entries and rejects an oversized/corrupt inventory
-rather than dropping old records. The separate attempt journal has real full-filesystem (isolated Linux tmpfs) and
-abrupt-process termination tests. Its contract is documented below.
+A nonblocking operation lock covers plan preparation and every mutation. Before
+a launched child passes the startup gate, persist its plan/attempt identity,
+collection name and process/session ID in a strict, private `inflight.json` record
+with file and directory synchronization. Its pending rename state is treated as
+potentially active, not ignored. If recording fails, kill the gated child; never
+start Homebrew without the record. Malformed, unsafe or unreadable state holds new
+mutations. Parent death does not stop a surviving child or authorize another
+mutation. Check the whole owned session, including child process groups, before
+removing a stopped record and its workspace under the operation lock.
 
-### Execution attempt journal
-
-The application revalidates an execution session and its original binding, policy,
-before-state and expiry. It reevaluates evidence using an explicit clock both
-before durable reservation and immediately before launch. A failed start write
-never permits execution. A cancellation or expiry after reservation consumes the
-attempt as `not_started`, without inventing a child exit status.
-
-The journal stores immutable, hash-linked start and outcome documents in a
-separate private directory. A nonblocking OS lock covers validation plus append;
-reads take a shared lock. Strict schemas, content digests, chain continuity and
-one-time attempt/exception identity are checked on every access. Unknown or
-unfinished attempts prevent new execution. Explicit `bwd reconcile` selects the
-sole unresolved attempt; an optional attempt ID remains available when selection
-is needed. It does not run automatically on
-install or upgrade. Reconciliation appends observed state
-and permits a fresh plan; it never marks a lost process successful or restores an
-exception. Old records cannot be overwritten, and inventory exhaustion fails.
-
-Exit status, actual state and policy eligibility remain separate. A zero exit
-with an unexpected state is unknown. A nonzero exit with changed state is partial.
-Outcome persistence failure leaves an unresolved attempt requiring reconciliation.
-Distribution builds use the public-command session. Reconciliation acquires the
-BrewWarden operation lock, confirms recorded process sessions are absent, inventories
-selected racks and links, and records the result without inventing an exit status.
-It does not invoke Homebrew or run an installer. Legacy internal-API attempts
-require their matching older build for reconciliation.
+Do not save an execution outcome, interpret a stale record as success, restore an
+age exception, replay a plan, or roll back. Report current failure or interruption
+as partial/unknown when appropriate. A retry after the child stops starts fresh
+discovery, attestation, advisory scanning, policy evaluation and binding. The
+`history`, `status` and `reconcile` commands are unsupported; `doctor` remains a
+read-only environment check. Legacy attempt-journal directories are rejected
+with an actionable hold rather than silently migrated.
 
 ## Implementation and acceptance
 
 1. Probe Homebrew plan binding, authenticated publication metadata, existing
    verification capabilities and their gaps, delegated helpers, and advisory coverage.
-2. Implement typed evidence, strict configuration, pure decisions, and history;
+2. Implement typed evidence, strict configuration, and pure decisions;
    model normal and emergency decisions together.
 3. Integrate official bottle planning and checks; enable normal and emergency
    execution only for demonstrated paths.
@@ -389,7 +357,7 @@ require their matching older build for reconciliation.
 5. Improve presentation/performance and design optional automation separately.
 
 The public-command path is exercised through candidate, installation, upgrade,
-unchanged-dependency, exception and recovery tests in a disposable macOS VM.
+unchanged-dependency, exception and interruption tests in a disposable macOS VM.
 The [integration contract](homebrew-integration.md#preflight-investigation)
 continues to apply whenever support expands. Future casks, taps, signatures and
 platforms are separate capabilities, never unchecked fallbacks.

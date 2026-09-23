@@ -67,7 +67,6 @@ type Assessment struct {
 	Now       int64
 	Exception *AgeException
 	// Supplied from the trusted attempt journal, not serialized authorization.
-	AttemptAlreadyStarted bool
 }
 
 // Evaluate requires the full reachable graph, exactly one current evidence item
@@ -80,7 +79,7 @@ func Evaluate(a Assessment) Decision {
 		}
 		d.Reasons = append(d.Reasons, Reason{code, artifact, claim})
 	}
-	if !a.Policy.Valid() || a.Now <= 0 || !a.Binding.Valid() || a.AttemptAlreadyStarted {
+	if !a.Policy.Valid() || a.Now <= 0 || !a.Binding.Valid() {
 		add(Hold, "assessment_invalid_or_replayed", Artifact{}, 0)
 		return d
 	}

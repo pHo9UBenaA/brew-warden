@@ -11,9 +11,8 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-// RunWithRuntime keeps wrapper options separate from literal Homebrew arguments.
-// A build without the distribution marker remains diagnostic-only.
-func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, history ports.History, service *application.Service) int {
+// Unsupported commands never fall through to an unchecked brew process.
+func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, service *application.Service) int {
 	if len(args) == 1 && args[0] == "--version" {
 		if _, err := fmt.Fprintln(out, "BrewWarden "+Version); err != nil {
 			return 1
@@ -22,12 +21,12 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
 		if service == nil {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd history\n       bwd brew install|upgrade ... (disabled)\nThis build cannot enable execution.")
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd brew install|upgrade ... (disabled)\nThis build cannot enable execution.")
 			if err != nil {
 				return 1
 			}
 		} else {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor | history | status | reconcile [ATTEMPT_ID]\nSupported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
+			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor\nSupported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
 			if err != nil {
 				return 1
 			}
@@ -49,32 +48,6 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		_, _ = fmt.Fprintln(errOut, "invocation_invalid: "+err.Error())
 		return 1
 	}
-	if service == nil && len(rest) == 1 && rest[0] == "history" {
-		return showHistory(out, errOut, history, true)
-	}
-	if service != nil && len(rest) == 1 && (rest[0] == "history" || rest[0] == "status") && len(overrides) == 0 {
-		if rest[0] == "history" && history != nil {
-			if showHistory(out, errOut, history, false) != 0 {
-				return 1
-			}
-		}
-		return showAttempts(out, errOut, service.Journal, rest[0] == "status")
-	}
-	if service != nil && (len(rest) == 1 || len(rest) == 2) && rest[0] == "reconcile" && len(overrides) == 0 {
-		var id domain.Digest
-		if len(rest) == 2 {
-			id = domain.Digest(rest[1])
-		}
-		if err := service.Reconcile(ctx, id); err != nil {
-			_, _ = fmt.Fprintln(errOut, "reconciliation_failed: "+err.Error())
-			return 1
-		}
-		_, err := fmt.Fprintln(out, "Current state recorded. Retry with a new install or upgrade command.")
-		if err != nil {
-			return 1
-		}
-		return 0
-	}
 	policy := domain.DefaultPolicy()
 	if source != nil {
 		policy, err = source.LoadConfig(location)
@@ -93,7 +66,8 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 			_, _ = fmt.Fprintf(errOut, "minimum_release_age_seconds: %d\n%s\nNo live Homebrew checks were run. This build cannot enable execution.\n", policy.MinimumAgeSeconds(), executionUnavailable)
 			return 1
 		}
-		return refuseUnavailable(rest, policy, errOut, history)
+		_, _ = fmt.Fprintln(errOut, executionUnavailable)
+		return 1
 	}
 	if len(rest) == 1 && rest[0] == "doctor" && len(overrides) == 0 {
 		if service.Diagnostics == nil {
@@ -139,7 +113,6 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		for _, r := range result.Decision.Reasons {
 			_, _ = fmt.Fprintf(errOut, "%s: %s (%s)\n", r.Artifact.Name, claimName(r.Claim), r.Code)
 		}
-		// Errors can contain local paths. Quoting prevents terminal control injection.
 		_, _ = fmt.Fprintf(errOut, "execution_stopped: %q; outcome=%s\n", err.Error(), result.Outcome)
 		if result.ExitKnown && result.ExitCode > 0 && result.ExitCode <= 255 {
 			return result.ExitCode
@@ -156,6 +129,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	return 0
 }
+
 func ageOptions(args []string) ([]string, []ports.AgeOverride, error) {
 	filtered := []string{}
 	overrides := []ports.AgeOverride{}
@@ -177,44 +151,6 @@ func ageOptions(args []string) ([]string, []ports.AgeOverride, error) {
 		args = args[2:]
 	}
 	return append(filtered, args...), overrides, nil
-}
-func showAttempts(out, errOut io.Writer, journal ports.Attempts, status bool) int {
-	if journal == nil {
-		_, _ = fmt.Fprintln(errOut, "attempt_history_unavailable")
-		return 1
-	}
-	records, err := journal.Attempts()
-	if err != nil {
-		_, _ = fmt.Fprintln(errOut, "attempt_history_invalid: cannot validate durable records.")
-		return 1
-	}
-	unresolved := 0
-	for _, a := range records {
-		if !a.Valid() {
-			_, _ = fmt.Fprintln(errOut, "attempt_history_invalid")
-			return 1
-		}
-		if a.Unresolved() {
-			unresolved++
-		}
-		if status && !a.Unresolved() {
-			continue
-		}
-		outcome := string(a.Finish.Outcome)
-		if outcome == "" {
-			outcome = "unfinished"
-		}
-		if _, err := fmt.Fprintf(out, "%s %s plan=%s before=%s after=%s exit_known=%t exit_code=%d exception=%s\n", a.Start.Binding.Attempt, outcome, a.Start.Binding.Plan, a.Start.BeforeState, a.Finish.AfterState, a.Finish.ExitKnown, a.Finish.ExitCode, a.Start.Exception); err != nil {
-			return 1
-		}
-	}
-	if _, err := fmt.Fprintf(out, "%d attempts; %d require reconciliation.\n", len(records), unresolved); err != nil {
-		return 1
-	}
-	if status && unresolved > 0 {
-		return 1
-	}
-	return 0
 }
 
 func claimName(claim domain.Claim) string {

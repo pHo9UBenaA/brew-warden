@@ -12,9 +12,6 @@ type AgeOverride struct{ Name, Reason string }
 type Planner interface {
 	Prepare(context.Context, Request, domain.Policy, []AgeOverride, int64) (Prepared, ExecutionSession, error)
 }
-type Recovery interface {
-	Snapshot(context.Context, domain.Binding) (domain.Digest, error)
-}
 type Diagnostics interface{ Check(context.Context) error }
 
 // PresentPlan explains the exact selected artifacts and individually requested

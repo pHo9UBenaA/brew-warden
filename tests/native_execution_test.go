@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/adapters/homebrew"
-	"github.com/pHo9UBenaA/brew-warden/internal/adapters/localstate"
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
@@ -97,7 +96,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	}
 	fault := os.Getenv("BREWWARDEN_VM_FAULT")
 	switch fault {
-	case "", "age", "age-exception", "changed-input", "exception-changed-input", "recovery", "link-conflict":
+	case "", "age", "age-exception", "changed-input", "exception-changed-input", "link-conflict":
 	default:
 		t.Fatal("unsupported VM fault")
 	}
@@ -158,34 +157,7 @@ func TestLiveNativeExecution(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
-	journal := localstate.Journal{Path: filepath.Join(directory, "attempts")}
-	if fault == "recovery" {
-		if err := journal.StartAttempt(domain.AttemptStart{Binding: prepared.Assessment.Binding, BeforeState: prepared.BeforeState, StartedAt: time.Now().Unix()}); err != nil {
-			t.Fatal(err)
-		}
-		engine := homebrew.Engine{Collector: &collector}
-		service := application.Service{Journal: journal, Recovery: engine, Clock: nativeClock{}}
-		if err := service.Reconcile(context.Background(), prepared.Assessment.Binding.Attempt); err == nil {
-			t.Fatal("reconciled while original session still held its operation lock")
-		}
-		if err := session.Close(); err != nil {
-			t.Fatal(err)
-		}
-		if err := service.Reconcile(context.Background(), prepared.Assessment.Binding.Attempt); err != nil {
-			t.Fatal(err)
-		}
-		records, err := journal.Attempts()
-		if err != nil || len(records) != 1 || records[0].Unresolved() || records[0].Finish.Outcome != domain.AttemptReconciled || records[0].Finish.ExitKnown {
-			t.Fatal(records, err)
-		}
-		after, err := kegSnapshot("/opt/homebrew/Cellar")
-		if err != nil || after != completeBefore {
-			t.Fatal("recovery changed packages", err)
-		}
-		t.Log("BrewWarden active-lock refusal and stopped-session reconciliation verified")
-		return
-	}
-	result, err := application.Execute(context.Background(), prepared, session, journal, nativeClock{})
+	result, err := application.Execute(context.Background(), prepared, session, nativeClock{})
 	if fault == "link-conflict" {
 		if err == nil || result.Outcome != domain.AttemptPartial || !result.ExitKnown || result.ExitCode == 0 {
 			t.Fatal("partial native failure was misclassified", result, err)
@@ -193,10 +165,6 @@ func TestLiveNativeExecution(t *testing.T) {
 		raw, readErr := os.ReadFile("/opt/homebrew/bin/jq")
 		if readErr != nil || string(raw) != "owned acceptance conflict\n" {
 			t.Fatal("existing shared file replaced", readErr)
-		}
-		records, readErr := journal.Attempts()
-		if readErr != nil || len(records) != 1 || records[0].Finish.Outcome != domain.AttemptPartial || !records[0].Finish.AfterState.Valid() {
-			t.Fatal(records, readErr)
 		}
 		if _, err := os.Stat("/opt/homebrew/Cellar/oniguruma/6.9.10"); err != nil {
 			t.Fatal("did not exercise partial dependency installation", err)
@@ -207,10 +175,6 @@ func TestLiveNativeExecution(t *testing.T) {
 	if fault == "changed-input" || fault == "exception-changed-input" || fault == "age" {
 		if err == nil {
 			t.Fatal("held request executed", fault)
-		}
-		attempts, readErr := journal.Attempts()
-		if readErr != nil || len(attempts) != 0 {
-			t.Fatal("held request started", attempts, readErr)
 		}
 		after, stateErr := kegSnapshot("/opt/homebrew/Cellar")
 		if stateErr != nil || after != completeBefore {
@@ -224,10 +188,6 @@ func TestLiveNativeExecution(t *testing.T) {
 	}
 	if result.Outcome != domain.AttemptSucceeded || !result.ExitKnown || result.ExitCode != 0 {
 		t.Fatal(result)
-	}
-	attempts, err := journal.Attempts()
-	if err != nil || len(attempts) != 1 || attempts[0].Unresolved() {
-		t.Fatal(attempts, err)
 	}
 	if before != "" {
 		after, err := kegSnapshot(dep)

@@ -1,7 +1,6 @@
 package tests
 
 import (
-	"bytes"
 	"context"
 	"encoding/json"
 	"io"
@@ -10,12 +9,13 @@ import (
 	"path/filepath"
 	"strings"
 	"sync"
+	"syscall"
 	"testing"
 	"time"
 )
 
-// Exercise the shipped executable, including a lost parent after a durable start.
-// The caller provisions an absent xz inside the explicitly selected VirtualMac.
+// Exercise the shipped binary after real parent death in a disposable VM.
+// The caller provisions an absent xz and authorized gh credentials in that VM.
 func TestLiveDistributionParentCrash(t *testing.T) {
 	binary := os.Getenv("BREWWARDEN_VM_DISTRIBUTION_BINARY")
 	if binary == "" {
@@ -37,60 +37,63 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	defer cancel()
 	newCommand := func(args ...string) *exec.Cmd {
 		c := exec.CommandContext(ctx, binary, args...)
-		c.Env = []string{"HOME=" + home, "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "LC_ALL=C"}
+		c.Env = []string{"HOME=" + home, "PATH=" + os.Getenv("PATH"), "LC_ALL=C"}
+		if token := os.Getenv("BREWWARDEN_VM_GH_TOKEN"); token != "" {
+			c.Env = append(c.Env, "GH_TOKEN="+token)
+		}
 		c.WaitDelay = 3 * time.Second
 		return c
 	}
 	if output, err := newCommand("doctor").CombinedOutput(); err != nil {
 		t.Fatal(string(output), err)
 	}
-	cache := filepath.Join(home, "Library/Application Support/brewwarden/collections")
-	if err := os.MkdirAll(cache, 0700); err != nil {
-		t.Fatal(err)
-	}
-	seedVMEvidenceCache(t, cache)
 	command := newCommand("brew", "install", "xz")
 	trigger := &killOnInstall{destination: os.Stdout, kill: func() error { return command.Process.Kill() }}
 	command.Stdout, command.Stderr = trigger, trigger
 	if err := command.Run(); err == nil || !trigger.triggered {
 		t.Fatal("parent crash fixture not reached", err)
 	}
-	output, err := newCommand("status").CombinedOutput()
-	if err == nil || !bytes.Contains(output, []byte("unfinished")) {
-		t.Fatal("lost parent was not recorded as unfinished", string(output), err)
+	file := filepath.Join(home, "Library/Application Support/brewwarden/collections/inflight.json")
+	raw, err := os.ReadFile(file)
+	if err != nil {
+		t.Fatal("lost parent did not leave bounded process identity", err)
 	}
-	// A surviving Homebrew child may still be finishing. Recovery must refuse until
-	// it is absent, and must never signal or replay it from a remembered PID.
-	deadline := time.Now().Add(30 * time.Second)
+	var owned struct {
+		Schema, PID, Session int
+		Plan, Attempt        string
+	}
+	if err := json.Unmarshal(raw, &owned); err != nil || owned.Schema != 1 || owned.PID <= 1 || owned.Session != owned.PID || len(owned.Plan) != 64 || len(owned.Attempt) != 64 {
+		t.Fatal("invalid owned process record", err)
+	}
+	// If the child continues, another BrewWarden mutation must hold. The child
+	// may finish first; in that case only the fresh retry may proceed.
+	if err := syscall.Kill(owned.PID, 0); err == nil {
+		output, err := newCommand("brew", "install", "xz").CombinedOutput()
+		if err == nil || !strings.Contains(string(output), "another BrewWarden execution") && !strings.Contains(string(output), "may still be running") {
+			t.Fatal("continued child was not excluded", string(output), err)
+		}
+	}
+	deadline := time.Now().Add(2 * time.Minute)
+	for syscall.Kill(owned.PID, 0) == nil && time.Now().Before(deadline) {
+		time.Sleep(200 * time.Millisecond)
+	}
+	if syscall.Kill(owned.PID, 0) == nil {
+		t.Fatal("owned child did not finish")
+	}
+	// No status/reconcile/replay: a new invocation rediscovers and rechecks
+	// the installed prefix. It cannot report the lost command as successful.
 	for {
-		output, err = newCommand("reconcile").CombinedOutput()
-		if err == nil {
+		output, err := newCommand("brew", "install", "xz").CombinedOutput()
+		if err == nil && strings.Contains(string(output), "Installation verified.") {
 			break
 		}
-		if time.Now().After(deadline) {
-			t.Fatal("stopped attempt did not reconcile", string(output), err)
+		if time.Now().After(deadline) || err == nil || (!strings.Contains(string(output), "owned Homebrew process") && !strings.Contains(string(output), "another BrewWarden execution")) {
+			t.Fatal("fresh retry failed", string(output), err)
 		}
 		time.Sleep(200 * time.Millisecond)
 	}
-	before, err := kegSnapshot("/opt/homebrew/Cellar")
-	if err != nil {
-		t.Fatal(err)
-	}
-	if output, err = newCommand("status").CombinedOutput(); err != nil {
-		t.Fatal(string(output), err)
-	}
-	output, err = newCommand("history").CombinedOutput()
-	if err != nil || !bytes.Contains(output, []byte("reconciled")) || bytes.Contains(output, []byte("succeeded")) {
-		t.Fatal("recovery invented an execution result", string(output), err)
-	}
-	after, err := kegSnapshot("/opt/homebrew/Cellar")
-	if err != nil || before != after {
-		t.Fatal("history/status changed installed state", err)
-	}
-	// Retain public CLI output for acceptance evidence, not only the test verdict.
-	raw, _ := json.Marshal(struct{ Binary, History string }{binary, string(output)})
-	if err := os.WriteFile(filepath.Join(home, "acceptance.json"), raw, 0600); err != nil {
-		t.Fatal(err)
+	if _, err := os.Lstat(file); !os.IsNotExist(err) {
+		t.Fatal("stale in-flight record survived fresh retry", err)
 	}
 }
 

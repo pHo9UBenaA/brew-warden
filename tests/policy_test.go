@@ -86,7 +86,6 @@ func TestEvidenceDecisions(t *testing.T) {
 		{"emergency missing attestation time", func(a *domain.Assessment) { waiveYoung(a); a.Nodes[0].Evidence[3].Status = domain.Unavailable }, domain.Hold},
 		{"dependency not waived", func(a *domain.Assessment) { waiveYoung(a); a.Exception.Waivers = a.Exception.Waivers[:1] }, domain.Hold},
 		{"expired waiver", func(a *domain.Assessment) { waiveYoung(a); a.Exception.ExpiresAt = a.Now }, domain.Hold},
-		{"replayed attempt", func(a *domain.Assessment) { waiveYoung(a); a.AttemptAlreadyStarted = true }, domain.Hold},
 		{"policy changed", func(a *domain.Assessment) { waiveYoung(a); a.Binding.Policy = domain.Digest(strings.Repeat("b", 64)) }, domain.Hold},
 		{"dependency graph changed", func(a *domain.Assessment) { waiveYoung(a); a.Binding.Graph = domain.Digest(strings.Repeat("b", 64)) }, domain.Hold},
 		{"attempt changed", func(a *domain.Assessment) { waiveYoung(a); a.Binding.Attempt = domain.Digest(strings.Repeat("b", 64)) }, domain.Hold},

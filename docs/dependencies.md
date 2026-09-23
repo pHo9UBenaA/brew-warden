@@ -9,7 +9,7 @@ The public module identity is `github.com/pHo9UBenaA/brew-warden`.
 - Prefer the standard library. Additional modules require a documented rationale
   and an updated dependency gate. Count transitive libraries, external commands,
   native/runtime components, and build/CI tools as part of the trust surface.
-- Start with standard-library CLI handling, JSON configuration, and file records.
+- Start with standard-library CLI handling, JSON configuration, and minimal owned-process state.
   No application cgo, unsafe, plugins, dynamic loading, or executable configuration.
 - Prefer demonstrated Homebrew capabilities before adding verification libraries
   or executables. Follow [Homebrew integration](homebrew-integration.md) for

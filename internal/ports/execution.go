@@ -6,12 +6,6 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-type Attempts interface {
-	StartAttempt(domain.AttemptStart) error
-	FinishAttempt(domain.AttemptFinish) error
-	Attempts() ([]domain.Attempt, error)
-}
-
 type Clock interface{ Now() int64 }
 
 type Request struct {
