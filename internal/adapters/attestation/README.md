@@ -31,7 +31,7 @@ verified but too-young timestamp can be waived by the age exception policy.
 
 Subprocess tests check digest binding, multiple attestations and timestamps,
 oldest-time selection, `all` bottles, result limits, invalid output, version
-checks, failed commands, changed bytes and cancellation. This migration has not
-undergone native Apple Silicon distribution acceptance. The current distribution
-bundles neither a verifier nor Homebrew runtime. Recovery simplification and
-successful native acceptance remain pending.
+checks, failed commands, changed bytes and cancellation. The distribution
+bundles neither a verifier nor Homebrew runtime. Representative authenticated
+Apple Silicon distribution acceptance passed for the supported scope; see
+[verification](../../../docs/verification.md) for exercised cases and limits.

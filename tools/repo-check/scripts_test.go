@@ -45,3 +45,38 @@ func TestCheckRequiresPinnedTools(t *testing.T) {
 	}
 	run("lint", "Wrong staticcheck version")
 }
+
+func TestFuzzCheckRejectsMissingTarget(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"go.mod":                   "module example.org/isolated-fuzz-check\n\ngo 1.24.0\n",
+		"tools/repo-check/main.go": "package main\nfunc main() {}\n",
+	} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	for _, name := range []string{"check.sh", "env.sh", "tool-versions.env"} {
+		raw, err := os.ReadFile(filepath.Join("../../scripts", name))
+		if err != nil {
+			t.Fatal(err)
+		}
+		if err := os.MkdirAll(filepath.Join(root, "scripts"), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(filepath.Join(root, "scripts", name), raw, 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command := exec.Command("sh", "./scripts/check.sh", "fuzz")
+	command.Dir = root
+	command.Env = append(os.Environ(), "FUZZTIME=1x", "GOTOOLCHAIN=local", "GOPROXY=off", "GOWORK=off")
+	out, err := command.CombinedOutput()
+	if err == nil || !strings.Contains(string(out), "Required fuzz target FuzzCommitMessage is missing") {
+		t.Fatalf("missing fuzz target was treated as a successful check: %v: %s", err, out)
+	}
+}

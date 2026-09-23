@@ -2,6 +2,8 @@ package attestation
 
 import (
 	"context"
+	"crypto/sha256"
+	"encoding/hex"
 	"encoding/json"
 	"os"
 	"path/filepath"
@@ -62,6 +64,55 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 	if _, err := oldestVerifiedTimestamp([]byte("["+one+"]"), b, now); err == nil {
 		t.Fatal("rebottled bytes inherited old age")
 	}
+}
+
+// Changing the subject digest or signer must never borrow the time from a
+// valid result; permutation of valid results must never change the oldest time.
+func FuzzVerifiedSubject(f *testing.F) {
+	for _, seed := range [][]byte{nil, []byte("{"), []byte("[]"), []byte("arbitrary bottle bytes"), {0xff, 0x00}} {
+		f.Add(seed)
+	}
+	f.Fuzz(func(t *testing.T, data []byte) {
+		if len(data) > 4096 {
+			return
+		}
+		a := artifactFixture()
+		sum := sha256.Sum256(data)
+		a.SHA256 = domain.Digest(hex.EncodeToString(sum[:]))
+		// Exercise the untrusted parser as well as constructed valid results.
+		_ = verifiedSubject(data, a)
+		valid := []byte(resultFixture(a))
+		if err := verifiedSubject(valid, a); err != nil {
+			t.Fatal("matching verified subject was refused", err)
+		}
+		other := a
+		digest := []byte(a.SHA256)
+		if digest[0] == 'a' {
+			digest[0] = 'b'
+		} else {
+			digest[0] = 'a'
+		}
+		other.SHA256 = domain.Digest(digest)
+		if err := verifiedSubject(valid, other); err == nil {
+			t.Fatal("different bottle digest borrowed the attestation")
+		}
+		wrongSigner := strings.Replace(string(valid), `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`, 1)
+		if err := verifiedSubject([]byte(wrongSigner), a); err == nil {
+			t.Fatal("untrusted signer borrowed the attestation")
+		}
+		const now = int64(1800000000)
+		oneTime := now - int64(len(data)%4096+1)*60
+		twoTime := now - int64(sum[0]+1)*30
+		one := ghResult(a, time.Unix(oneTime, 0).UTC().Format(time.RFC3339))
+		two := ghResult(a, time.Unix(twoTime, 0).UTC().Format(time.RFC3339))
+		want := min(oneTime, twoTime)
+		for _, raw := range []string{"[" + one + "," + two + "]", "[" + two + "," + one + "]"} {
+			got, err := oldestVerifiedTimestamp([]byte(raw), a, now)
+			if err != nil || got != want {
+				t.Fatalf("attestation order changed the oldest verified time: got %d, want %d: %v", got, want, err)
+			}
+		}
+	})
 }
 
 func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {

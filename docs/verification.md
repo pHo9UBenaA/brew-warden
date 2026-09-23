@@ -11,7 +11,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, in-flight-process record, public advisory, provenance-result and Homebrew metadata parser fuzzing; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, in-flight-process record, public advisory, verified attestation, Homebrew metadata and dependency-evidence closure fuzzing; explicitly refuses missing targets; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
@@ -46,8 +46,10 @@ Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
 configuration, owned-process records, public advisory responses, template comments, and control-byte rejection. Preserve discovered regressions
 as seed cases or reviewed corpus files under the test directories. Add fuzz targets for actual
 product parsers as they appear. Coverage has no arbitrary percentage gate; race
-and fuzz checks cover only exercised behavior. Do not treat a clean advisory
-result as proof that code is safe.
+and fuzz checks cover only exercised behavior. The normal coverage report does
+not instrument opt-in native VM cases; those run separately in the disposable
+Apple Silicon guest. Tests cannot prove the absence of vulnerabilities. Do not
+treat a clean advisory result as proof that code is safe.
 
 ## CI and maintenance
 

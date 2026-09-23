@@ -92,12 +92,11 @@ capabilities visible through `doctor`; fail only operations requiring those
 capabilities. Retire redundant BrewWarden checks when an upstream improvement
 satisfies their complete contract and equivalent tests pass.
 
-### Reconciliation
+### Interrupted operations
 
 A private operation lock coordinates BrewWarden sessions. The startup gate records
-owned process sessions before launching commands. Reconciliation requires that lock
-and absent recorded sessions, then inventories selected racks and opt links without
-following symlinks. It does not call Homebrew, rerun installers, signal remembered
-IDs, infer an exit code, restore exceptions or roll back packages. The application
-records a `reconciled` transition and requires a fresh plan. Ordinary independent
-Homebrew mutations are excluded by the documented usage condition, not intercepted.
+an owned process session before launching a public Homebrew command. A new
+mutation refuses an active or unobservable session. After the whole session
+stops, a retry inspects installed state and starts fresh candidate collection;
+the old record cannot authorize success, replay, rollback or an age exception.
+Ordinary independent Homebrew mutations remain outside the wrapper's control.

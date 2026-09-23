@@ -49,9 +49,8 @@ type AgeWaiver struct {
 	Reason   string
 }
 
-// An exception is explicitly requested by the user. Checking its use against a
-// durable attempt journal belongs to the application; a saved Used flag is not
-// evidence. Until that journal is wired, product execution remains unavailable.
+// An exception is explicitly requested by the user and bound to one current
+// plan, attempt and expiry. It cannot be replayed from saved process state.
 type AgeException struct {
 	Binding   Binding
 	IssuedAt  int64

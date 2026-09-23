@@ -20,6 +20,20 @@ require_tool() {
     exit 1
   fi
 }
+run_fuzz() {
+  package=$1
+  target=$2
+  listed=$(go test "$package" -list "^$target$") || {
+    printf 'Cannot enumerate fuzz target %s in %s.\n' "$target" "$package" >&2
+    exit 1
+  }
+  if ! printf '%s\n' "$listed" | grep -Fxq "$target"; then
+    printf 'Required fuzz target %s is missing from %s.\n' "$target" "$package" >&2
+    exit 1
+  fi
+  go test "$package" -run='^$' -fuzz="^$target$" \
+    -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+}
 case "$1" in
   all)
     if [ "$(go env GOVERSION)" != "go$(cat .go-version)" ]; then
@@ -48,18 +62,13 @@ case "$1" in
     go tool cover -func=.cache/coverage.out
     ;;
   fuzz)
-    go test ./tools/repo-check -run='^$' -fuzz='^FuzzCommitMessage$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
-    go test ./internal/adapters/localstate -run='^$' -fuzz='^FuzzConfig$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
-    go test ./internal/adapters/homebrew -run='^$' -fuzz='^FuzzInFlightRecord$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
-    go test ./internal/adapters/homebrew -run='^$' -fuzz='^FuzzPublicAdvisoryStatus$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
-    go test ./internal/adapters/attestation -run='^$' -fuzz='^FuzzVerifiedSubject$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
-    go test ./internal/adapters/homebrew -run='^$' -fuzz='^FuzzNativeMetadata$' \
-      -fuzztime="${FUZZTIME:-10s}" -parallel=2 -timeout=5m
+    run_fuzz ./tools/repo-check FuzzCommitMessage
+    run_fuzz ./internal/adapters/localstate FuzzConfig
+    run_fuzz ./internal/adapters/homebrew FuzzInFlightRecord
+    run_fuzz ./internal/adapters/homebrew FuzzPublicAdvisoryStatus
+    run_fuzz ./internal/adapters/attestation FuzzVerifiedSubject
+    run_fuzz ./internal/adapters/homebrew FuzzNativeMetadata
+    run_fuzz ./tests FuzzPolicyRequiresCompleteEvidence
     ;;
   lint)
     require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"
