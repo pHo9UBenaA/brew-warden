@@ -73,6 +73,35 @@ the temporary GitHub CLI OAuth authorization from the account afterward.
 Evidence under ignored `.cache/` is disposable, not the sole record of results.
 Never upload VM output containing credentials or copy host credentials into it.
 
+## Local product-readiness gate
+
+Use the two-phase local `scripts/product-ready.sh` to reproduce the full release
+readiness checks from a **clean, committed** tree. It requires pinned Go and the
+explicit reviewed guest inputs above; tools are never installed implicitly:
+
+```sh
+export PATH="$PWD/.cache/sdk/go/bin:$PATH"
+./scripts/product-ready.sh start brewwarden-tahoe-base brewwarden-ready-01 \
+  "$REVIEWED_HOMEBREW_TREE" "$GH_ARM64"
+# Human: approve the guest-only short-lived GitHub device code.
+./scripts/product-ready.sh complete brewwarden-ready-01
+```
+
+`start` runs `check.sh all` (baseline unit/integration tests, race, coverage,
+fuzz, Staticcheck and govulncheck), then vets, lints, scans and cross-compiles
+the opt-in native tests. It repeats the committed `darwin/arm64` distribution
+build, fingerprints its archive, provisions a fresh guest and requests human
+device approval. `complete` refuses a changed source or archive, requires guest
+authentication and runs the **entire** VM suite. It removes guest credentials and
+stops the VM on success or failed execution. Only after all checks, VM cases and
+cleanup pass does it write `product-ready.txt` under a private, ignored
+`.cache/product-ready.VM/` evidence directory and report **local product-ready
+for the tested initial scope**. A failed run is not resumable as proof of
+success; use a new VM name and fresh evidence. If the guest agent is unavailable
+for cleanup, intervene manually before using the VM again. Revoke the temporary
+GitHub CLI OAuth grant in account settings after acceptance. This gate does not
+sign, notarize or publish a release, and never runs inside GitHub Actions.
+
 ## Provision the guest
 
 Use `tart exec` through the guest agent. Before prefix changes, check `sw_vers`,

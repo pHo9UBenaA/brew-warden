@@ -16,7 +16,7 @@ guest_path="$guest_root/gh:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 
 usage() {
   printf 'Usage: %s prepare BASE NEW_VM REVIEWED_BREW_TREE GH_BINARY PRODUCT_ARCHIVE\n' "$0" >&2
-  printf '       %s auth|suite|finish VM\n' "$0" >&2
+  printf '       %s auth|auth-status|suite|finish VM\n' "$0" >&2
   printf '       %s run VM doctor|native|general|public|survey|upgrade|crash|command [CASE_ARGS...]\n' "$0" >&2
   printf '       %s fixture VM absent-jq|absent-xz|older-xz|repair-jq\n' "$0" >&2
   exit 2
@@ -118,6 +118,25 @@ auth() {
   done
   fail 'Device authorization code unavailable; inspect guest device.log without copying credentials'
 }
+run_test() {
+  expected=$1; shift
+  result_log=$(mktemp "$PWD/.cache/vm-result.XXXXXXXX")
+  if guest "$@" > "$result_log" 2>&1; then
+    /bin/cat "$result_log"
+  else
+    code=$?
+    /bin/cat "$result_log"
+    rm -f "$result_log"
+    return "$code"
+  fi
+  if ! /usr/bin/grep -Fq -- "--- PASS: $expected (" "$result_log" ||
+    /usr/bin/grep -q '^--- SKIP:' "$result_log" ||
+    /usr/bin/grep -q 'no tests to run' "$result_log"; then
+    rm -f "$result_log"
+    fail "Required native test $expected did not run and pass"
+  fi
+  rm -f "$result_log"
+}
 run_case() {
   [ "$#" -ge 2 ] || usage
   vm=$1; mode=$2; shift 2
@@ -143,28 +162,28 @@ run_case() {
   case "$mode" in
     native)
       [ "$#" -le 1 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLiveNativeExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_FAULT="${1:-}" "$guest_test" -test.run '^TestLiveNativeExecution$' -test.v -test.timeout=20m ;;
     general)
       [ "$#" -eq 1 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLiveGeneralBottleExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_GENERAL_TARGETS="$1" "$guest_test" -test.run '^TestLiveGeneralBottleExecution$' -test.v -test.timeout=20m ;;
     public)
       [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLivePublicCommandExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_PUBLIC_TARGETS="$1" BREWWARDEN_VM_PUBLIC_FAULT="${2:-}" \
         "$guest_test" -test.run '^TestLivePublicCommandExecution$' -test.v -test.timeout=20m ;;
     survey)
       [ "$#" -eq 1 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLivePublicCoverageSurvey "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_SURVEY_TARGETS="$1" "$guest_test" -test.run '^TestLivePublicCoverageSurvey$' -test.v -test.timeout=40m ;;
     upgrade)
       [ "$#" -eq 1 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLiveExplicitUpgradeChangesSelectedVersion "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_UPGRADE_TARGET="$1" "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m ;;
     crash)
       [ "$#" -eq 0 ] || usage
-      guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLiveDistributionParentCrash "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_DISTRIBUTION_BINARY="$guest_bwd" BREWWARDEN_VM_GH_CONFIG_DIR="$guest_home/.config/gh" \
         "$guest_test" -test.run '^TestLiveDistributionParentCrash$' -test.v -test.timeout=20m ;;
     *) usage ;;
@@ -244,6 +263,12 @@ command=$1; shift
 case "$command" in
   prepare) prepare "$@" ;;
   auth) auth "$@" ;;
+  auth-status)
+    [ "$#" -eq 1 ] || usage
+    valid_name "$1"
+    require_guest "$1"
+    guest_auth "$1" || fail 'Guest gh is not authenticated'
+    printf 'Guest gh authentication available.\n' ;;
   suite) suite "$@" ;;
   run) run_case "$@" ;;
   fixture) fixture "$@" ;;

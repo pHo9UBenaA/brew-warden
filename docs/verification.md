@@ -17,6 +17,7 @@ also requires a C compiler; it does not enable cgo in product code.
 | `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
 | `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
 | `./scripts/build-product.sh darwin/arm64` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
+| `./scripts/product-ready.sh start BASE VM BREW_TREE GH` then `complete VM` | Local-only release-readiness gate: pinned full checks (including tests, race, coverage, fuzz, lint and vulnerability scans), tagged VM test vet/lint/vulnerability/compilation, repeated archive build, fresh authenticated Tart acceptance, and guest credential cleanup | Advisory, public bottle and attestation sources |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 
 ## Boundaries
@@ -69,8 +70,10 @@ wire the real execution engine. Their native acceptance tests are explicit and
 separate from the baseline; see Native product acceptance below.
 
 The distribution build checks repeatability of both binaries and complete license/documentation archives. Product installation enforcement and distribution
-packaging are implemented for the supported scope. Public release signing and
-notarization have not been performed. Go may add a linker ad-hoc signature on
+packaging are implemented for the supported scope. The local product-ready gate
+requires an unchanged committed revision through its two human-mediated VM phases;
+passing ordinary CI alone never claims native product readiness. Public release
+signing and notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
 notarize, or establish provenance of the compiler.
 

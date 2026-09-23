@@ -89,8 +89,11 @@ Use the Go version in `.go-version`, then:
 ```
 
 Development binaries are diagnostic-only until built as a distribution from
-reviewed source. Native acceptance uses an explicit local Tart VM runner and opt-in test tag,
-not GitHub Actions; tests never change the maintainer's Homebrew installation. See [verification](docs/verification.md),
+reviewed source. For local product readiness, run the two-phase
+[`scripts/product-ready.sh`](scripts/macos-vm.md#local-product-readiness-gate): it
+includes the full checks, reproducible build and guest-only native suite. The VM
+cases use an opt-in tag and never run in GitHub Actions or modify the host
+Homebrew installation. See [verification](docs/verification.md),
 [design](docs/design.md), [architecture](docs/architecture.md),
 [threat model](docs/threat-model.md) and [contributing](CONTRIBUTING.md).
 
