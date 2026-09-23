@@ -85,7 +85,7 @@ records each owned POSIX session before allowing its command to execute. Normal
 cancellation interrupts Homebrew, which manages its children. A private,
 durably synchronized in-flight record binds the process session and collection
 to the pending attempt before the gate opens. Completion and fresh retry check
-the whole session, including children in separate process groups. An active or
+the whole session across process groups and user-ID changes. An active or
 unobservable session holds new mutations; PID reuse conservatively holds rather
 than signalling another process. Normal closure removes the workspace; after
 parent death a new invocation removes stale state only once the child stops.

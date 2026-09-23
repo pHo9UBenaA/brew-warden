@@ -335,7 +335,9 @@ potentially active, not ignored. If recording fails, kill the gated child; never
 start Homebrew without the record. Malformed, unsafe or unreadable state holds new
 mutations. Parent death does not stop a surviving child or authorize another
 mutation. Check the whole owned session, including child process groups, before
-removing a stopped record and its workspace under the operation lock.
+removing a stopped record and its workspace under the operation lock. Inventory
+all process owners: a Homebrew descendant can change user ID without leaving its
+session. An unavailable process inventory holds mutation.
 
 Do not save an execution outcome, interpret a stale record as success, restore an
 age exception, replay a plan, or roll back. Report current failure or interruption

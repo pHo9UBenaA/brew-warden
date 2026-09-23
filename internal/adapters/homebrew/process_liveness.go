@@ -3,7 +3,6 @@ package homebrew
 import (
 	"context"
 	"errors"
-	"os"
 	"os/exec"
 	"strconv"
 	"strings"
@@ -11,22 +10,23 @@ import (
 	"time"
 )
 
-// Observe all user-owned PIDs for a recorded process session. A reused PID or
-// unavailable process table conservatively holds rather than signalling it.
+// Observe all PIDs, not only the wrapper's UID: an owned Homebrew child can
+// change user while retaining its session. A reused PID or unavailable process
+// table conservatively holds rather than signalling it.
 func processSessionActive(session int) (bool, error) {
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
 	for attempt := 0; attempt < 3; attempt++ {
-		command := exec.CommandContext(ctx, "/bin/ps", "-U", strconv.Itoa(os.Getuid()), "-o", "pid=")
+		command := exec.CommandContext(ctx, "/bin/ps", "-A", "-o", "pid=")
 		command.Env = []string{"PATH=/usr/bin:/bin", "LC_ALL=C"}
 		output, diagnostics := &processOutput{}, &processOutput{}
 		command.Stdout, command.Stderr = output, diagnostics
 		if err := command.Run(); err != nil || output.overflow || diagnostics.overflow {
-			return false, errors.New("owned process inventory unavailable")
+			return false, errors.New("process inventory unavailable")
 		}
 		fields := strings.Fields(output.String())
 		if len(fields) == 0 || len(fields) > 100000 {
-			return false, errors.New("invalid owned process inventory")
+			return false, errors.New("invalid process inventory")
 		}
 		active, changed, err := sessionInProcesses(session, command.Process.Pid, fields)
 		if err != nil || active {
@@ -54,7 +54,7 @@ func sessionInProcesses(session, observer int, fields []string) (active, changed
 			continue
 		}
 		if err != nil {
-			return false, false, errors.New("owned process session unavailable")
+			return false, false, errors.New("process session unavailable")
 		}
 		if sid == session {
 			return true, changed, nil

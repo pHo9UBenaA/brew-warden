@@ -12,6 +12,33 @@ import (
 	"testing"
 )
 
+// A session can contain privileged descendants. User-only ps inventories
+// would report that session as stopped after its unprivileged parent exits.
+func TestProcessInventoryIncludesOtherUsers(t *testing.T) {
+	if os.Getuid() == 0 {
+		t.Skip("requires an unprivileged process to test a different user's PID")
+	}
+	output, err := exec.Command("/bin/ps", "-p", "1", "-o", "uid=").Output()
+	uid, parseErr := strconv.Atoi(strings.TrimSpace(string(output)))
+	if err != nil || parseErr != nil || uid == os.Getuid() {
+		t.Skip("no observable process owned by another user")
+	}
+	session, err := processSessionID(1)
+	if err != nil || session < 0 {
+		t.Skip("other user's process session is not observable")
+	}
+	if active, err := processSessionActive(session); err != nil || !active {
+		t.Fatal("another user's session was invisible to the process guard", err)
+	}
+}
+
+func TestProcessInventoryDistinguishesAbsentSession(t *testing.T) {
+	active, err := processSessionActive(1 << 29)
+	if err != nil || active {
+		t.Fatal("could not establish an absent session without signalling processes", active, err)
+	}
+}
+
 func TestProcessSessionHelper(t *testing.T) {
 	mode := os.Getenv("BREWWARDEN_SESSION_HELPER")
 	if mode == "member" {
