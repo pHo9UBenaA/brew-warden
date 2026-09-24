@@ -116,11 +116,10 @@ Separate isolated arm64 guest probes exercised signed metadata, exact bottles
 and complete scanner subjects at 6.0.19, 6.0.22, 7.0.2, 7.0.3, 7.0.5 and 7.0.6.
 Actual bound jq/dependency installation and unchanged rerun on 6.0.19, and jq
 installation and xz upgrade on 7.0.6, used a guest-only verifier wrapper
-with real gh cryptographic verification of public bundles. The authenticated
-packaged **17-case gate on 7.0.6 with gh 2.101.0** passed for commit `cf86592`,
-including age refusal/waiver, input tampering, partial link, interruption and
-fresh retry. Its revision-bound readiness result does not transfer to later
-test-only commits. See [verification](../../../docs/verification.md) for
+with real gh cryptographic verification of public bundles. The authenticated packaged **17-case gate on 7.0.6** passed with gh 2.101.0
+for commit `cf86592` and with gh 2.66.0 for commit `df5eb49`, including age
+refusal/waiver, input tampering, partial link, interruption and fresh retry.
+These revision-bound readiness results do not transfer to later commits. See [verification](../../../docs/verification.md) for
 repeatable entrypoints.
 
 The collector retains the verified gh response only within the pending workspace

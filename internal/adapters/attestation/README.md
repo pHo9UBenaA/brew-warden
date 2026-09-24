@@ -14,10 +14,13 @@ claims. Real native arm64 gh 2.66.0, 2.70.0, 2.74.0, 2.80.0, 2.97.0 and 2.101.0
 binaries verified signed public bundles for the same exact jq bottle. Their
 complete captured output is parsed by ordinary Go contract tests, including
 negative changed-subject, future-time and unknown-log-URI cases. Offline-bundle
-verification does not establish authenticated GitHub API acquisition in every
-old client. The normal online path and authenticated final distribution gate
-passed with gh 2.101.0 on commit `cf86592`; a later test-only revision does not
-inherit that revision-bound readiness result.
+verification alone does not establish authenticated GitHub API acquisition.
+The normal `--repo` API path and authenticated 17-case distribution gate passed
+with gh 2.101.0 on commit `cf86592` and independently with gh **2.66.0** on
+commit `df5eb49`, each using Homebrew 7.0.6 in a disposable native Tahoe guest.
+Intermediate gh releases have offline signed-result/output contract coverage,
+not a full online product gate for each version. Both gates are revision-bound;
+later documentation commits do not inherit product-ready status.
 It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
 --predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
 GitHub CLI owns Sigstore verification, public trust roots and the user's normal
