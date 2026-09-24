@@ -4,6 +4,11 @@ Date: 2026-09-24. Status: investigated; additional product compatibility is **no
 implemented or accepted** by this document. `docs/design.md` remains the
 product contract. This is a bounded investigation and an implementation/acceptance
 plan, not an authorization to remove version, prefix or verifier checks.
+Follow-up user direction on 2026-09-24 supersedes this plan's x86_64/Rosetta
+support proposals: retain native arm64-only product support, do not modify the
+host Homebrew installation, and treat the x86_64 observations below as a
+read-only explanation of why that host installation is not supported. The
+verified-timestamp version analysis is in a separate archived review.
 
 ## Read-only integration probes
 
@@ -32,9 +37,11 @@ receipt/link paths, sandbox permissions and frozen plan's prefix.
 
 The installed gh 2.62.0 accepts the public `attestation verify --format json`
 syntax, but its upstream `v2.62.0` verify help does not state the later
-`verifiedTimestamps` trust contract. Upstream `v2.80.0` and `v2.101.0` help
-describe that contract; this is only source evidence, not live bottle verification
-or a safe continuous version range. The product uses verified Rekor time for
+`verifiedTimestamps` trust contract. Later source inspection established the
+specific incompatibility: gh 2.62.0's sigstore-go 0.6.2 serializes even a
+verified Tlog time with `uri: "TODO"`. gh 2.66.0 first includes sigstore-go
+0.7.0 with a verified Tlog URI; gh 2.70.0 first documents this JSON contract.
+These milestones do not establish a safe continuous product version range. The product uses verified Rekor time for
 the **exact digest**; a process exit code, unsigned JSON or an attestation
 predicate's time cannot replace it. No guest or host credential was copied or
 used for this investigation. Sources inspected: the locally installed official

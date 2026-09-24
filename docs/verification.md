@@ -2,7 +2,10 @@
 
 Scripts are the source of truth; optional Task v3 aliases call the same scripts.
 Use the Go version pinned in `.go-version`, Git, and a POSIX shell. Race detection
-also requires a C compiler; it does not enable cgo in product code.
+also requires a C compiler; it does not enable cgo in product code. The product
+mutation path is supported only on native Apple Silicon arm64 macOS Tahoe with
+its reviewed `/opt/homebrew` runtime; Linux and x86_64 test runs are development
+checks, not product acceptance.
 
 | Command | Checks or output | Network |
 | --- | --- | --- |

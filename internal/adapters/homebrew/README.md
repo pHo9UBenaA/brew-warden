@@ -7,7 +7,9 @@ private installer APIs or reconstruct installed payloads with Homebrew internals
 
 The supported installed implementation is Homebrew 7.0.4 at
 `edb70f031e4170c780799633a1226ff73e1077f4`, using its portable Ruby 4.0.7 on Apple
-Silicon macOS Tahoe at `/opt/homebrew`. The adapter fingerprints its installed
+Silicon arm64 macOS Tahoe at `/opt/homebrew`. Intel macOS, x86_64/Rosetta
+Homebrew on Apple Silicon, and Linux are not supported execution targets. The
+adapter fingerprints its installed
 `bin/brew` and `Library/Homebrew` tree (SHA-256
 `e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c`)
 while copying it into an empty private inspection prefix. Missing, changed,
@@ -16,6 +18,9 @@ in source, not a distributed runtime or file inventory. Homebrew and Ruby are
 reused from the existing prefix; no bootstrap or update occurs.
 The empty prefix prevents an installed old SBOM from selecting the wrong version
 for candidate vulnerability scanning. Execution uses `/opt/homebrew/bin/brew`.
+The exact reviewed runtime is currently the only accepted Homebrew build, even
+if another arm64 installation prints a nearby `brew --version` such as 7.0.6;
+version strings alone do not establish signed-input or execution binding.
 
 The private HOME, cache, config, logs and temporary directory do not inherit user
 credentials or Homebrew settings. Collection cannot write to the installed prefix.

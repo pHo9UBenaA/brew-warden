@@ -2,10 +2,16 @@
 
 The archive contains `bwd`, its `brewwarden` alias, checksums, documentation
 and licenses. No Homebrew source, portable Ruby, runtime inventory or attestation
-verifier executable is bundled. Users need an installed supported Homebrew and
-GitHub CLI (`gh` 2.101.0). BrewWarden does not install or upgrade either command.
+verifier executable is bundled. Users need the reviewed native arm64
+Homebrew 7.0.4 installation at `/opt/homebrew` on macOS Tahoe and GitHub CLI
+(`gh` 2.101.0). The product
+archive targets **darwin/arm64 only**; Intel macOS, Rosetta/x86_64 Homebrew
+on Apple Silicon, Linux, and unreviewed runtime builds cannot execute a
+protected mutation. BrewWarden does not install or upgrade either command.
 Add the extracted directory to PATH; no privileged installation or automatic
-update is performed.
+update is performed. Do not relocate an x86_64 Homebrew tree to `/opt/homebrew`
+or bypass the runtime fingerprint to make an unsupported installation appear
+compatible.
 
 ## Trust and verification
 

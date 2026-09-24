@@ -29,11 +29,17 @@ Homebrew, Ruby and the attestation verifier are not bundled. BrewWarden
 checks the installed Homebrew tree before copying it to an isolated inspection
 prefix; an unsupported or changed implementation holds execution.
 
-The current target is **Apple Silicon macOS Tahoe**, with Homebrew at
-`/opt/homebrew`. See the [Homebrew contract](internal/adapters/homebrew/README.md)
-for the tested version and boundaries, and [distribution](docs/distribution.md)
-for building and verifying an archive. Local build results are not published or
-notarized releases.
+Product install/upgrade support is **Apple Silicon arm64 on macOS Tahoe
+(26.x) only**, with the reviewed Homebrew 7.0.4 implementation at
+`/opt/homebrew` and installed gh 2.101.0. Intel Macs, x86_64/Rosetta Homebrew
+on Apple Silicon (including `/usr/local`), Linux, other Homebrew runtime bytes
+and other gh versions are not supported for mutation. A different shell such as
+zsh does not change these requirements. See the
+[Homebrew contract](internal/adapters/homebrew/README.md) for the tested
+runtime and boundaries, and [distribution](docs/distribution.md)
+for building and verifying an archive. Do not replace or change an existing
+unsupported Homebrew installation just to satisfy these checks. Local build
+results are not published or notarized releases.
 
 Official core bottles are eligible when their complete dependency plan has the
 required evidence. There is no package-name allowlist. Casks, third-party taps,

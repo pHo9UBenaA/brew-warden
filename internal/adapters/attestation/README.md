@@ -4,6 +4,12 @@ Capability: `homebrew.core.provenance.v2` and `homebrew.core.age.v2`.
 
 The collector uses an already-installed, absolute GitHub CLI 2.101.0 path;
 other versions hold until their output contracts have been reviewed and tested.
+The installed gh 2.62.0 uses sigstore-go 0.6.2, which serializes a verified
+Tlog time with `uri: "TODO"`, not the verified Rekor URI required by our age
+contract. gh 2.66.0 first uses sigstore-go 0.7.0 with the verified Tlog URI;
+2.70.0 first documents the verified-timestamp JSON contract in the inspected
+releases. These are upstream source milestones, **not** an accepted gh version
+range: only 2.101.0 has passed this product's full native acceptance.
 It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
 --predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
 GitHub CLI owns Sigstore verification, public trust roots and the user's normal

@@ -18,9 +18,14 @@ Feature overlap with other OSS is acceptable. The product is not limited to an
 audit viewer. Shared policy, consistent explanations, and reliable execution are
 valuable even when individual checks already exist elsewhere.
 
-Start with official core bottles on macOS. Design for casks, third-party taps,
-upstream signatures, and Linux, enabling each only after its guarantees have
-been tested. Unsupported paths must not fall through to an unchecked brew call.
+The enabled product path is official core bottles on native Apple Silicon
+arm64 macOS Tahoe at `/opt/homebrew`. Intel macOS, x86_64/Rosetta Homebrew on
+Apple Silicon, Linux, and other prefixes are unsupported for mutation even when
+a `brew` executable appears on `PATH`. A read-only Linux test container is not
+Linux product support. Non-arm64 platforms are not a current product goal;
+casks, third-party taps, upstream signatures and Linux are separate proposals
+that require their own demonstrated guarantees before being enabled.
+Unsupported paths must not fall through to an unchecked brew call.
 
 Go is the product language and is used by the harness. Follow the
 [dependency and implementation rules](dependencies.md). See
