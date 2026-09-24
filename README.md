@@ -1,9 +1,10 @@
 # BrewWarden
 
-Check Homebrew packages before installing them. BrewWarden verifies bottle
-checksums and publisher provenance, checks known vulnerabilities through
-Homebrew's public commands and advisory data, and waits seven days from the
-oldest verified attestation for the exact bottle digest. New bytes start a new age.
+Check official Homebrew bottles before installing or upgrading them. BrewWarden
+verifies the selected bytes and publisher, checks known vulnerabilities, and
+applies a seven-day age policy to the exact bottle digest. It evaluates the
+complete dependency plan before allowing Homebrew to run; missing required
+evidence holds rather than becoming success.
 
 ```sh
 bwd doctor
@@ -11,81 +12,35 @@ bwd brew install jq
 bwd brew upgrade jq
 ```
 
-Representative authenticated Apple Silicon installation, upgrade and
-interruption cases passed in a disposable VM. Other required evidence or
-unsupported formulae still hold. Local archives are not signed, notarized or
-published releases.
-All required checks finish before installation starts. Missing or unsupported
-evidence stops the command. Successful checks lead directly to ordinary public
-`brew install` or `brew upgrade`, using the verified downloads and dependency plan.
+The supported product path is **native Apple Silicon macOS Tahoe** with an
+existing reviewed Homebrew installation and authenticated installed `gh`.
+See the [current compatibility and eligibility matrix](docs/support.md) for
+version bounds, unsupported platforms and required evidence. `doctor` checks
+the environment, not individual package eligibility. BrewWarden does not
+replace `brew` or intercept calls made directly to Homebrew.
 
-## Install
+## Use
 
-Extract a verified distribution archive into a user-owned directory and add that
-directory to `PATH`. Keep `bwd` and its `brewwarden` alias together.
-Users need an existing supported Homebrew installation and an installed supported
-`gh` (reviewed cohort 2.66.0–2.101.0), but not Go. The installed `gh`
-must be authenticated to github.com for online attestation lookup (`gh auth
-status` checks this); missing authentication holds before mutation. Both the
-oldest admitted gh 2.66.0 and gh 2.101.0 passed authenticated native
-acceptance. BrewWarden does not install or update `gh`. Homebrew, Ruby and
-the attestation verifier are not bundled. BrewWarden
-checks the installed Homebrew tree before copying it to an isolated inspection
-prefix; an unsupported or changed implementation holds execution.
+Extract a verified distribution archive into a user-owned directory and add
+its directory to `PATH`; keep `bwd` and its `brewwarden` alias together. The
+archive does not bundle Homebrew, portable Ruby or GitHub CLI, and no Go
+installation is needed to use the product. Local archives are not signed,
+notarized or published releases. See [distribution](docs/distribution.md) for
+build and trust requirements.
 
-Product install/upgrade support is **Apple Silicon arm64 on macOS Tahoe
-(26.x) only**, with a reviewed Homebrew 6.0.19–7.0.6 release source at
-`/opt/homebrew` and installed gh 2.66.0–2.101.0. Intel Macs, x86_64/Rosetta
-Homebrew on Apple Silicon (including `/usr/local`), Linux, other Homebrew
-release sources and other gh versions are not supported for mutation. A different shell such as
-zsh does not change these requirements. See the
-[Homebrew contract](internal/adapters/homebrew/README.md) for the tested
-runtime and boundaries, and [distribution](docs/distribution.md)
-for building and verifying an archive. Do not replace or change an existing
-unsupported Homebrew installation just to satisfy these checks. Local build
-results are not published or notarized releases.
-
-Official core bottles are eligible when their complete dependency plan has the
-required evidence. There is no package-name allowlist. Casks, third-party taps,
-source builds and unsupported evidence are held. An empty advisory result means
-no known applicable findings, not proof that the package is harmless. Homebrew's
-scanner does not cover every formula; an unsupported dependency also holds its
-parent. `doctor` checks the environment, not individual package eligibility.
-
-Do not run another command that changes the same Homebrew installation while
-BrewWarden is running. BrewWarden does not monitor or intercept ordinary `brew`
-commands. It does not claim to authenticate files previously installed outside
-its own verified execution.
-
-## Policy
-
-Set a different minimum age or make an explicit, one-attempt age exception:
+To change the minimum age or explicitly waive **only** the age rule for one
+verified artifact:
 
 ```sh
 bwd --minimum-release-age 336h brew install jq
 bwd --age-exception 'jq=Urgent upstream fix' brew upgrade jq
 ```
 
-An age exception waives only a verified but too-young timestamp. Missing or
-invalid timestamps, checksums, provenance, advisory checks and dependency
-binding cannot be waived. Dependencies need their own exception reasons. Formulae and versions are
-shown before execution; exceptions also show the exact digest and reason.
-`bwd brew upgrade` without names checks the installed formula inventory.
-
-Optional policy configuration lives at
-`~/Library/Application Support/brewwarden/config.json`:
-
-```json
-{"schemaVersion":1,"age":{"minimumHours":168}}
-```
-
-Use `--config PATH` to select another policy file. Evidence is bound to the
-current command, not stored as execution history. If the wrapper stops while its
-Homebrew child is still running, another BrewWarden mutation is refused until
-the child stops. Then retry the complete command for fresh discovery and checks;
-no old plan or age exception is replayed, and no success or rollback is inferred.
-An inconsistent installation may need ordinary Homebrew repair while BrewWarden
-is idle.
+Unknown or skipped evidence, including a missing verified timestamp, cannot be
+waived. BrewWarden does not infer success or replay approval after an interrupted
+or partial installation. See [usage](docs/usage.md) for login, configuration,
+held operations and repair instructions. Previously installed payloads are not
+cryptographically authenticated by invoking BrewWarden.
 
 ## Development
 
@@ -99,12 +54,11 @@ Use the Go version in `.go-version`, then:
 ```
 
 Development binaries are diagnostic-only until built as a distribution from
-reviewed source. For local product readiness, run the two-phase
-[`scripts/product-ready.sh`](scripts/macos-vm.md#local-product-readiness-gate): it
-includes the full checks, reproducible build and guest-only native suite. The VM
-cases use an opt-in tag and never run in GitHub Actions or modify the host
-Homebrew installation. See [verification](docs/verification.md),
-[design](docs/design.md), [architecture](docs/architecture.md),
-[threat model](docs/threat-model.md) and [contributing](CONTRIBUTING.md).
+reviewed source. The [local product-readiness gate](scripts/macos-vm.md#local-product-readiness-gate)
+uses reproducible builds and an authenticated disposable Apple Silicon VM; it
+never mutates the host Homebrew installation. For implementation and review,
+see [design](docs/design.md), [verification](docs/verification.md),
+[architecture](docs/architecture.md), [threat model](docs/threat-model.md)
+and [contributing](CONTRIBUTING.md).
 
 Licensed under [MIT](LICENSE). Distributed dependencies retain their own licenses.

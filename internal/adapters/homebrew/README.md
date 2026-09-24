@@ -5,11 +5,12 @@ private installer APIs or reconstruct installed payloads with Homebrew internals
 
 ## Supported runtime
 
-The supported source cohort comprises the inspected official Homebrew release
-commits **6.0.19 through 7.0.6** listed in `runtime.go`, with an installed
-native Apple Silicon arm64 Tahoe prefix at `/opt/homebrew`. Git HEAD must be a
-reviewed release; installed executable/Library source must be clean at that
-revision. A printable version or a forged local tag does not select a cohort.
+The installed native Apple Silicon Tahoe prefix must be `/opt/homebrew` at
+one of the reviewed official release commits listed in `runtime.go`; the
+[current supported range](../../../docs/support.md) is the user-facing matrix.
+Git HEAD must be reviewed and installed executable/Library source must be
+clean at that revision. A printable version or a forged local tag does not
+select a cohort.
 The existing tar-only 7.0.4 native fixture remains accepted only with its exact
 installed `bin/brew` and `Library/Homebrew` fingerprint (SHA-256
 `e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c`).
@@ -80,8 +81,8 @@ fetch or source download during installation.
 Existing selected kegs must have supported public installed metadata, an active
 opt link, no custom options and recorded bottle installation. Non-keg-only
 formulae must also have Homebrew's matching `var/homebrew/linked` record:
-Homebrew's public `brew link --dry-run` distinguishes this from a partial
-pour that created an opt link but failed to link files into the prefix. This
+Homebrew's linked-keg record distinguishes this from a partial pour that
+created an opt link but failed to link files into the prefix. This
 version-specific record is read as a symlink, not through a private Ruby API.
 Receipts and versions are observed; neither link proves existing payload hashes. The
 user-owned installed state is trusted under the threat model. Newly introduced
@@ -105,22 +106,18 @@ attempt journals require the matching older build for recovery before mutation.
 
 ## Validation
 
-Unit tests cover strict metadata, OCI digest/closure mismatch, archive extraction,
-input substitution, private operation locks, process-session liveness and partial
-execution outcomes. Captured real public info/scanner results from 6.0.19, 7.0.2,
-7.0.3, 7.0.5 and 7.0.6 now exercise the parsers and negative missing/skip cases
-in ordinary Go tests. An optional offline test materializes and binds **all 11**
-reviewed upstream Git release commits from an explicitly supplied object store.
-Neither a JSON fixture nor a source copy proves that Homebrew verified its JWS.
-Separate isolated arm64 guest probes exercised signed metadata, exact bottles
-and complete scanner subjects at 6.0.19, 6.0.22, 7.0.2, 7.0.3, 7.0.5 and 7.0.6.
-Actual bound jq/dependency installation and unchanged rerun on 6.0.19, and jq
-installation and xz upgrade on 7.0.6, used a guest-only verifier wrapper
-with real gh cryptographic verification of public bundles. The authenticated packaged **17-case gate on 7.0.6** passed with gh 2.101.0
-for commit `cf86592` and with gh 2.66.0 for commit `df5eb49`, including age
-refusal/waiver, input tampering, partial link, interruption and fresh retry.
-These revision-bound readiness results do not transfer to later commits. See [verification](../../../docs/verification.md) for
-repeatable entrypoints.
+Package tests cover strict metadata, OCI digest/closure mismatch, archive
+extraction, input substitution, operation locks, liveness and partial
+outcomes. Captured public info/scanner outputs exercise representative release
+cohorts, including missing dependency and skipped-subject refusals. An optional
+offline source-matrix test binds every reviewed release commit from an
+explicitly supplied upstream Git checkout. A fixture or source copy alone does
+not prove that Homebrew authenticated its JWS, consumed the frozen plan or
+completed an installation. Disposable native adapter probes and authenticated
+packaged install/upgrade, failure and retry acceptance exercise those distinct
+boundaries; every readiness result is revision-bound. See
+[verification](../../../docs/verification.md) for reproducible checks and the
+VM runner.
 
 The collector retains the verified gh response only within the pending workspace
 and does not use attestation or registration caches. Advisory status is

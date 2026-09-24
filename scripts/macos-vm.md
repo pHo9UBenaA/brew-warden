@@ -79,6 +79,37 @@ the temporary GitHub CLI OAuth authorization from the account afterward.
 Evidence under ignored `.cache/` is disposable, not the sole record of results.
 Never upload VM output containing credentials or copy host credentials into it.
 
+## Focused native cases
+
+The runner builds the tagged tests and sets their guest-only runtime, gh
+configuration and temporary paths. Select `run VM MODE [ARGS]` after guest
+authentication; `suite` is the complete fixed-order acceptance gate.
+
+- `run VM native [FAULT]` checks actual execution and unchanged installed
+  dependencies. Faults include `age`, `age-exception`, `changed-input`,
+  `exception-changed-input` and `link-conflict`. A link conflict leaves a real
+  partial pour: a new attempt must hold until explicit `fixture VM repair-jq`
+  while the operation is idle, then collect fresh evidence.
+- `run VM public TARGETS [FAULT]` checks one-use public execution, multiple
+  targets and preservation of unrelated kegs. Faults are `changed-input`,
+  `changed-metadata`, `installed-state`, `missing-cache`, `cancel` and
+  `interrupt`; interruption requires fresh discovery, not saved-plan replay.
+- `run VM general TARGETS` checks the complete closure, real installation and
+  an idempotent rerun; `run VM upgrade TARGET` requires an explicitly
+  provisioned older active keg and verifies the exact newer one is linked.
+- `run VM survey TARGETS` collects evidence without installing. Its successful
+  exit means the survey ran, **not** that every requested formula was eligible.
+- `run VM crash` kills the packaged parent after launch, verifies the owned
+  child excludes another mutation, then retries with fresh checks once it
+  stops. The runner confines authenticated gh configuration to the guest.
+  If compiling and invoking the tagged test binary directly with a different
+  test HOME, set `BREWWARDEN_VM_GH_CONFIG_DIR` to that guest-owned gh config
+  directory; never copy host credentials to satisfy the test.
+
+Fixtures `absent-jq`, `absent-xz`, `older-xz` and `repair-jq` mutate **only the
+disposable guest** and must be selected deliberately, without independent
+concurrent Homebrew mutations. Tagged cases are excluded from normal CI.
+
 ## Local product-readiness gate
 
 Use the two-phase local `scripts/product-ready.sh` to reproduce the full release
@@ -140,10 +171,10 @@ Homebrew or Ruby bytes; the guest installation must match the reviewed runtime
 fingerprint.
 For final acceptance, transfer the complete reproducible distribution archive.
 
-Run the cases in [verification](../docs/verification.md), then verify archive
-checksums and exercise packaged doctor, install, upgrade, parent-death,
-active-child exclusion and fresh retry. Fixtures must be confined to the disposable guest. Copy logs
-and observations back with `tart exec ... tar -cf -`, preserving failures as well
-as successes. Stop the clone when finished; do not delete the base or unrelated
+Run the suite or the focused cases above, then verify archive checksums and
+exercise packaged doctor, install, upgrade, parent-death, active-child
+exclusion and fresh retry. Fixtures must be confined to the disposable guest.
+Copy logs and observations back with `tart exec ... tar -cf -`, preserving
+failures as well as successes. Stop the clone when finished; do not delete the base or unrelated
 VMs. Historical probe code remains recoverable from Git history, not as a second
 maintained Ruby execution path.

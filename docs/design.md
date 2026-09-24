@@ -19,18 +19,18 @@ audit viewer. Shared policy, consistent explanations, and reliable execution are
 valuable even when individual checks already exist elsewhere.
 
 The enabled product path is official core bottles on native Apple Silicon
-arm64 macOS Tahoe at `/opt/homebrew`, using reviewed Homebrew release sources
-6.0.19–7.0.6 and an installed gh 2.66.0–2.101.0 with trusted timestamps.
-Homebrew's release Git source and executable/Library bytes are bound to the
-operation, not authorized by a printable version alone; the prior exact 7.0.4
-runtime fingerprint remains a legacy tar-only native fixture. An unsupported
-or changed runtime, unverified gh output or missing capability holds. Intel
-macOS, x86_64/Rosetta Homebrew on Apple Silicon, Linux, and other prefixes are
-unsupported for mutation even when a `brew` executable appears on `PATH`. A read-only Linux test container is not
-Linux product support. Non-arm64 platforms are not a current product goal;
-casks, third-party taps, upstream signatures and Linux are separate proposals
-that require their own demonstrated guarantees before being enabled.
-Unsupported paths must not fall through to an unchecked brew call.
+arm64 macOS Tahoe at `/opt/homebrew`. The [supported scope](support.md) owns
+the current admitted Homebrew and gh version bounds and user-facing exclusions.
+Homebrew's reviewed release source and executable/Library bytes are bound to
+the operation, not authorized by a printable version alone; a legacy tar-only
+runtime requires its exact reviewed fingerprint. An unsupported or changed
+runtime, unverified gh output or missing capability holds. Intel macOS,
+x86_64/Rosetta Homebrew on Apple Silicon, Linux, and other prefixes are
+unsupported for mutation even when a `brew` executable appears on `PATH`. A
+read-only Linux test container is not Linux product support. Non-arm64
+platforms are not a current product goal; casks, third-party taps, upstream
+signatures and Linux require their own demonstrated guarantees before being
+enabled. Unsupported paths must not fall through to an unchecked brew call.
 
 Go is the product language and is used by the harness. Follow the
 [dependency and implementation rules](dependencies.md). See

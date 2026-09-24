@@ -2,12 +2,11 @@
 
 The archive contains `bwd`, its `brewwarden` alias, checksums, documentation
 and licenses. No Homebrew source, portable Ruby, runtime inventory or attestation
-verifier executable is bundled. Users need the reviewed native arm64
-Homebrew 6.0.19–7.0.6 release source at `/opt/homebrew` on macOS Tahoe and
-GitHub CLI (`gh` 2.66.0–2.101.0). The product
-archive targets **darwin/arm64 only**; Intel macOS, Rosetta/x86_64 Homebrew
-on Apple Silicon, Linux, and unreviewed runtime builds cannot execute a
-protected mutation. BrewWarden does not install or upgrade either command.
+verifier executable is bundled. Users need an existing Homebrew installation
+and authenticated installed gh within the [current supported scope](support.md).
+The product archive targets
+**darwin/arm64 only**; an unsupported installation cannot execute a protected
+mutation. BrewWarden does not install or upgrade either command.
 Add the extracted directory to PATH; no privileged installation or automatic
 update is performed. Do not relocate an x86_64 Homebrew tree to `/opt/homebrew`
 or bypass the runtime fingerprint to make an unsupported installation appear
@@ -43,8 +42,7 @@ Run the archive with the [local-only Tart acceptance runner](../scripts/macos-vm
 in a disposable Apple Silicon macOS VM with supported installed Homebrew and gh,
 including doctor, installation, upgrade, exceptions, interruption, failure and
 fresh retry. The VM cases are explicitly build-tagged out of baseline CI.
-Representative authenticated local cases passed; see [verification](verification.md)
-for their scope. Changes to the installed-runtime fingerprint or execution
-binding require renewed native acceptance. The application Go module uses the
-standard library; Homebrew and gh remain external compatibility and security
+For reproducible checks and their limits, see [verification](verification.md).
+Changes to the installed-runtime identity or execution binding require renewed
+native acceptance. The application Go module uses the standard library; Homebrew and gh remain external compatibility and security
 dependencies. Local acceptance is not publisher authentication.

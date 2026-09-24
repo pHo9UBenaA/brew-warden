@@ -2,29 +2,15 @@
 
 Capability: `homebrew.core.provenance.v2` and `homebrew.core.age.v2`.
 
-The collector uses an already-installed, absolute GitHub CLI path. The reviewed
-version cohort is **2.66.0 through 2.101.0**, inclusive; versions outside the
-bounds or with missing required verified output hold. gh 2.62.0 through 2.65.0
-use sigstore-go 0.6.2, which serializes a verified Tlog time with
-`uri: "TODO"`, not the verified Rekor URI required by our age contract. gh
-2.66.0 first uses sigstore-go 0.7.0 with the verified Tlog URI; 2.70.0 first
-documents the verified-timestamp JSON contract. The executable is hashed before
-and after verification, and the observed version is attributed in both evidence
-claims. Real native arm64 gh 2.66.0, 2.70.0, 2.74.0, 2.80.0, 2.97.0 and 2.101.0
-binaries verified signed public bundles for the same exact jq bottle. Their
-complete captured output is parsed by ordinary Go contract tests, including
-negative changed-subject, future-time and unknown-log-URI cases. The captured
-gh 2.66.0 result is byte-identical to its later authenticated online `--repo`
-response; an additional subprocess test uses 2.66.0's real no-login diagnostic
-to ensure it holds without issuing evidence. Offline-bundle verification alone
-does not establish authenticated GitHub API acquisition.
-The normal `--repo` API path and authenticated 17-case distribution gate passed
-with gh 2.101.0 on commit `cf86592` and independently with gh **2.66.0** on
-commit `df5eb49`, each using Homebrew 7.0.6 in a disposable native Tahoe guest.
-Intermediate gh releases have offline signed-result/output contract coverage,
-not a full online product gate for each version. Both gates are revision-bound;
-later documentation commits do not inherit product-ready status.
-It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
+The collector uses an already-installed, absolute GitHub CLI path. The
+[product support matrix](../../../docs/support.md) owns the user-facing
+admitted interval; `gh.go` owns the exact version gate. The first accepted
+cohort uses sigstore-go 0.7.0, which emits a verified Rekor Tlog URI; older
+gh clients returned `uri: "TODO"`, which cannot satisfy bottle-age evidence.
+The executable is hashed before and after verification, and its checked
+version is attributed in both claims. Version acceptance never substitutes
+for the verified signer, exact subject and timestamp checks. The adapter
+invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
 --predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
 GitHub CLI owns Sigstore verification, public trust roots and the user's normal
 credentials. It is not installed, upgraded, bundled or invoked through a shell.
@@ -51,7 +37,10 @@ verified but too-young timestamp can be waived by the age exception policy.
 
 Subprocess tests check digest binding, multiple attestations and timestamps,
 oldest-time selection, `all` bottles, result limits, invalid output, version
-checks, failed commands, changed bytes and cancellation. The distribution
-bundles neither a verifier nor Homebrew runtime. Representative authenticated
-Apple Silicon distribution acceptance passed for the supported scope; see
-[verification](../../../docs/verification.md) for exercised cases and limits.
+checks, failed commands, changed bytes and cancellation. Real gh output from
+representative sigstore-go cohorts supplies parser regression cases, including
+wrong signer/subject and unknown-log refusals. Offline bundle verification
+alone does not prove authenticated online acquisition; both admitted endpoint
+cohorts also passed native authenticated product acceptance. The distribution
+bundles neither a verifier nor Homebrew runtime. See
+[verification](../../../docs/verification.md) for repeatable checks and limits.

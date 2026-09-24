@@ -1,11 +1,10 @@
 # Verification
 
 Scripts are the source of truth; optional Task v3 aliases call the same scripts.
-Use the Go version pinned in `.go-version`, Git, and a POSIX shell. Race detection
-also requires a C compiler; it does not enable cgo in product code. The product
-mutation path is supported only on native Apple Silicon arm64 macOS Tahoe with
-a reviewed `/opt/homebrew` release source; Linux and x86_64 test runs are
-development checks, not product acceptance.
+Use the Go version pinned in `.go-version`, Git and a POSIX shell. Race checks
+also require a C compiler; product code does not enable cgo. See the
+[supported scope](support.md): Linux and x86_64 development tests do not prove
+native macOS bottle compatibility.
 
 | Command | Checks or output | Network |
 | --- | --- | --- |
@@ -13,233 +12,109 @@ development checks, not product acceptance.
 | `./scripts/setup-tools.sh` / `task tools` | Install pinned Staticcheck and govulncheck under `.cache/tools` | Go proxy and checksum database |
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
-| `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage report at `.cache/coverage.out`, including domain decisions exercised by integration tests | None required |
-| `./scripts/check.sh fuzz` / `task fuzz` | Commit-message, strict configuration, in-flight-process record, public advisory, verified attestation, Homebrew metadata and dependency-evidence closure fuzzing; explicitly refuses missing targets; `FUZZTIME` defaults to 10s per target | None required |
+| `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage at `.cache/coverage.out` | None required |
+| `./scripts/check.sh fuzz` / `task fuzz` | Active named-target fuzzing, refusing missing targets; `FUZZTIME` defaults to 10s per target | None required |
 | `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
-| `./scripts/check.sh vuln` / `task vuln` | govulncheck on source/tests and freshly built checker plus both product binaries | Advisory database |
-| `./scripts/check.sh build` / `task build` | Development binaries at `bin/repo-check`, `bin/bwd`, and `bin/brewwarden` | None required |
-| `go build ./cmd/...` | Compile diagnostic-only product entrypoints | None required |
-| `./scripts/build-product.sh darwin/arm64` | Two forced rebuilds from committed source; compare complete runtime/notice archives and binaries; see [distribution](distribution.md) | None required |
-| `./scripts/product-ready.sh start BASE VM BREW_TREE GH` then `complete VM` | Local-only release-readiness gate: pinned full checks (including tests, race, coverage, fuzz, lint and vulnerability scans), tagged VM test vet/lint/vulnerability/compilation, repeated archive build, fresh authenticated Tart acceptance, and guest credential cleanup | Advisory, public bottle and attestation sources |
+| `./scripts/check.sh vuln` / `task vuln` | govulncheck on source, tests, checker and product binaries | Advisory database |
+| `./scripts/check.sh build` / `task build` | Diagnostic-only development binaries in `bin/` | None required |
+| `./scripts/build-product.sh darwin/arm64` | Two forced builds from committed source; compare complete archives and binaries | None required |
+| `./scripts/product-ready.sh start BASE VM BREW_TREE GH` then `complete VM` | Revision-bound full checks, repeat build, authenticated native suite and guest credential cleanup | Advisory, bottle and attestation sources |
 | `sh scripts/probe-container.sh [REVISION or --worktree]` | Linux arm64 baseline and race tests in a pinned disposable container | Image acquisition only; denied during tests |
 
-## Boundaries
+## Check boundaries
 
-Tools are installed only by explicit setup, never by checks or hooks. Versions
-live in `scripts/tool-versions.env`; execution checks installed module versions.
-Tool dependencies live outside product `go.mod`. Missing tools, unavailable
-advisories, or findings fail the relevant check, rather than silently skipping it.
+Checks never implicitly install tools. Explicit setup pins their versions in
+`scripts/tool-versions.env`; missing tools, unavailable advisory data or
+findings fail the relevant check. Go checks use `GOTOOLCHAIN=local`,
+`GOPROXY=off`, `GOSUMDB=off`, `GOWORK=off` and read-only module mode to disable
+implicit downloads and workspace inheritance. These are not a network sandbox.
+`go mod verify` checks cached module integrity, not publisher identity; the
+product currently has no external Go modules. The module's Go 1.24 directive
+is a compatibility floor, while full checks use the pinned toolchain.
 
-Checks disable implicit Go downloads and workspace inheritance using
-`GOTOOLCHAIN=local`, `GOPROXY=off`, `GOSUMDB=off`, `GOWORK=off`, and read-only module
-mode. Build caches default to `.cache/go-build`. These settings are not a network
-sandbox. `go mod tidy -diff` does not rewrite files; `go mod verify` checks cached
-module integrity, not publisher identity. The product currently has no external
-modules. The baseline remains compatible with the module's Go 1.24 floor; full
-checks use the supported pinned toolchain.
+[Architecture](architecture.md) defines import gates. Hygiene rejects invalid
+UTF-8, control characters, trailing whitespace, missing final newlines and
+symlinks. CJK rejection is a translation guard, not proof of English prose;
+binary fixtures need a policy extension. Hook tests use isolated Git repositories
+and replace only the recursive verification invocation. Normal coverage does
+not instrument separately built subprocesses or opt-in native cases. Fuzz seeds
+run in ordinary tests; active fuzzing covers only exercised properties. Preserve
+discovered regressions as reviewed corpus cases. A successful test or empty
+advisory response cannot prove absence of vulnerabilities.
 
-[Architecture](architecture.md) defines import/dependency gates. Hygiene rejects
-invalid UTF-8, control characters, trailing whitespace, missing final newlines,
-and symlinks. CJK rejection is a translation guard, not proof of English prose.
-Binary fixtures need a policy extension. Hook tests use isolated Git repositories
-and substitute only the recursive verification invocation. Coverage percentages
-do not include code exercised in those separately built subprocesses.
+## Test ownership and cohort contracts
 
-Fuzz seeds run in normal tests; active fuzzing exercises arbitrary commit text,
-configuration, owned-process records, public advisory responses, template comments, and control-byte rejection. Preserve discovered regressions
-as seed cases or reviewed corpus files under the test directories. Add fuzz targets for actual
-product parsers as they appear. Coverage has no arbitrary percentage gate; race
-and fuzz checks cover only exercised behavior. The normal coverage report does
-not instrument opt-in native VM cases; those run separately in the disposable
-Apple Silicon guest. Tests cannot prove the absence of vulnerabilities. Do not
-treat a clean advisory result as proof that code is safe.
+Tests follow their exercised boundary, not a claim of exclusive coverage:
 
-## CI and maintenance
+- `internal/<layer>/*_test.go` and `tools/<tool>/*_test.go` exercise their owning
+  package. Explicit live Homebrew probes remain next to the adapter and must
+  use a disposable guest, never the host prefix.
+- `tests/*_test.go` covers public policy, application and CLI contracts across
+  layers. Its shared fixtures include bound-execution tests.
+- `tests/vm/*_test.go` uses the `vmacceptance` tag and real packaged product in
+  a disposable native VM. Normal `go test ./...` and CI neither compile nor run
+  these cases.
 
-Linux and macOS run full checks on pull requests (the merge candidate), pushes
-to main/master, manual dispatch, and weekly schedules. Actions are pinned to
-commits and do not retain checkout credentials. Commit checks inspect actual PR
-commits, not GitHub's generated merge message. Required branch checks must be
-configured separately. See [Contributing](../CONTRIBUTING.md) for local hooks.
-
-Review Go security releases and update `.go-version` and tool pins promptly;
-rerun full checks and review tool transitive dependencies. Dependabot proposes
-GitHub Action updates; it does not maintain the custom Go/tool pin files.
-The [Go security guidance](https://go.dev/doc/security/best-practices) covers
-vulnerability scans, supported toolchains, fuzzing, races, vet, and release notices.
-Staticcheck is an additional analysis tool, not a Go security certification.
-
-The baseline tests development CLI binaries against a tripwire `brew` executable
-and checks refusal without a distribution build marker. Distribution builds additionally
-wire the real execution engine. Their native acceptance tests are explicit and
-separate from the baseline; see Native product acceptance below.
-
-The distribution build checks repeatability of both binaries and complete license/documentation archives. Product installation enforcement and distribution
-packaging are implemented for the supported scope. The local product-ready gate
-requires an unchanged committed revision through its two human-mediated VM phases;
-passing ordinary CI alone never claims native product readiness. Captured real Homebrew public info/scanner output from five representative
-release cohorts and verified gh output from six sigstore-go cohorts are exercised
-by ordinary adapter tests, with negative evidence changes. For an explicit
-read-only, non-VM source-object check of *every* admitted Homebrew release
-commit, use a separately obtained upstream checkout outside the host Homebrew
-prefix:
+Ordinary adapter tests parse captured upstream output from representative
+Homebrew and gh cohorts, including negative evidence changes. A captured JSON
+result is a parser fixture, not cryptographic or signed-metadata proof. The
+optional offline source-matrix test copies each reviewed Homebrew release
+commit from an explicitly supplied upstream checkout into a temporary clone;
+it does not run brew or require a VM:
 
 ```sh
 BREWWARDEN_REVIEWED_BREW_GIT=/path/to/offline/brew-checkout \
   go test ./internal/adapters/homebrew -run '^TestReviewedReleaseGitSourceMatrix$' -count=1
 ```
 
-The test copies sources into an isolated temporary clone; it does not run brew.
-The verified-output captures are parser fixtures, not signature proofs, and
-reviewed adapter-level cohort probes do not replace the committed-revision gate.
-The authenticated 17-case gate on Homebrew 7.0.6 passed with gh 2.101.0
-for `cf86592` and, independently, with gh 2.66.0 for `df5eb49`. The latter
-also verified an exact bottle using the normal authenticated `--repo` API
-path. Its verified JSON matched the earlier offline capture byte-for-byte;
-ordinary unit tests now guard both that response and the recorded no-login
-failure. An unauthenticated 2.66.0 invocation holds before verification;
-installed gh requires a valid github.com login for online checks. Neither
-revision-bound native result is transferred to a later commit. Public release
-signing and notarization have not been performed. Go may add a linker ad-hoc signature on
-macOS; this is not publisher authentication. Building does not publish, tag,
-notarize, or establish provenance of the compiler.
+Source inspection, unit/property contracts and representative native execution
+complement each other. They do not require a full VM run for every upstream
+patch release or every compatible tool combination.
+
+## CI, distribution and native acceptance
+
+Linux and macOS CI run full checks on pull requests, pushes to main/master,
+manual dispatch and weekly schedules. Actions are pinned to commits and do not
+retain checkout credentials; commit checks inspect actual PR commits. Required
+branch checks must be configured separately. See [contributing](../CONTRIBUTING.md)
+for local hooks. Maintain `.go-version` and tool pins as supported patched Go
+releases change. Staticcheck and govulncheck are analyses, not certifications.
+
+The baseline uses a tripwire `brew` to check refusal of mutations in
+unmarked development builds. The [distribution build](distribution.md) wires
+the product engine and checks both binaries plus complete license/documentation
+archives for reproducibility. Only a clean committed revision can pass the
+[two-phase local readiness gate](../scripts/macos-vm.md#local-product-readiness-gate).
+It adds tagged-test vet/lint/vulnerability/compilation checks and an
+**authenticated, disposable Apple Silicon Tahoe VM suite** for installation,
+upgrade, unchanged dependencies, age exceptions, changed inputs, partial
+outcomes, parent death and fresh retry. A survey completion is not a successful
+installation: inspect held reasons. [The VM runner](../scripts/macos-vm.md)
+owns exact modes, guest-only fixtures and cleanup instructions.
+
+Acceptance requires a valid guest gh login; GitHub quota or unavailable
+attestation evidence holds. A finished native gate applies only to its tested
+source revision and inputs. Ordinary CI or prior revision results cannot grant
+local product readiness. The guest must remove credentials and stop; neither
+this gate nor a reproducible local archive signs, notarizes or publishes a
+release. macOS may add an ad-hoc linker signature, not publisher authentication.
+No host Homebrew installation or host credentials are used by the VM harness.
 
 ## Disposable Linux container
 
-`probe-container.sh` uses the platform-specific official Go image pinned in
-`tests/container/Dockerfile`. It requires a running Docker engine; it does not
-start one or change its global configuration. The default source is committed
-`HEAD`; pass a Git revision to reproduce another commit, or `--worktree` to test
-tracked files and non-ignored untracked files. The current container harness
-is copied explicitly for pre-commit validation. Each run records its source archive,
-base revision, harness hashes, local image ID, stdout, stderr and exit status under
-a unique `.cache/container-probe.*` directory. Worktree runs also record status
-and the tracked diff. Ignored caches and private files are not build inputs.
+`probe-container.sh` uses a platform-specific official Go image pinned in
+`tests/container/Dockerfile`. It needs an already-running Docker engine; it does
+not start one or change global configuration. By default it copies committed
+`HEAD`; supply another revision or `--worktree` to test tracked and non-ignored
+untracked files. Every run records its source archive, base revision, harness
+hashes, local image ID, stdout, stderr and exit status in `.cache/container-probe.*`.
+Worktree runs also record status and tracked diffs. Private ignored caches are
+never build inputs.
 
-The container runs as UID/GID 10001, with a read-only root filesystem, no network,
-no host mounts, no passed credentials, no Docker socket, no capabilities, and no
-new privileges. CPU, memory, process and temporary-storage limits are explicit in
-the driver. Its temporary filesystem permits execution because Go tests build and
-execute child binaries there; the first no-exec run correctly failed this boundary.
-Images/build cache are retained for reuse; containers are removed after each run.
-This is an explicit developer command, never invoked by product code or hooks.
-
-Verified on OrbStack's Linux arm64 engine: offline baseline and race tests pass.
-The first Linux run exposed a real fixture collision between the `brewwarden`
-binary path and `XDG_CONFIG_HOME/brewwarden`; the integration test now separates
-executable and user-state directories. These results validate exercised Linux
-code paths, not macOS Homebrew bottle compatibility or a Linux product release.
-
-The container also provides a dedicated 64 KiB `/full` tmpfs for isolated
-storage-failure fixtures; it has no host mount. Host and container tests kill a
-writer after a durable owned-process record, verify another mutation is refused
-while its child remains, and require fresh checks once it stops. Application
-tests verify session binding, stale evidence, cancellation and partial/unknown
-outcomes. They do not substitute for native Homebrew execution.
-
-## Test ownership
-
-Tests are grouped by the boundary they exercise, not by a claim that every
-function is exclusively a unit or integration test:
-
-- `internal/<layer>/*_test.go` and `tools/<tool>/*_test.go` exercise their owning
-  package. Explicitly gated live Homebrew adapter probes remain next to the
-  unexported adapter implementation they test; they never mutate the host.
-- `tests/*_test.go` exercises public domain policy contracts, application and
-  CLI behavior across layers. Policy fixtures are shared with bound-execution
-  tests, so moving them into a second copied fixture would make both diverge.
-- `tests/vm/*_test.go` exercises the real packaged product and Homebrew only in
-  a disposable VM, with an explicit `vmacceptance` tag and separate local runner.
-  It is absent from normal test and CI package discovery.
-
-This is a responsibility/execution boundary, not a proof of exhaustive test
-coverage. Cross-layer integration and native acceptance complement package-local
-unit tests rather than counting the same mock as independent evidence.
-
-## Native product acceptance
-
-All optional `tests/vm/*` native acceptance files use the `vmacceptance` build
-tag; normal `go test ./...`, baseline CI and GitHub Actions do not compile or run
-them. Run them only through the local [Tart VM runner](../scripts/macos-vm.md)
-(or explicitly compile `go test -tags=vmacceptance -c ./tests/vm` for the guest).
-Human-approved GitHub device authentication stays inside the guest, never CI.
-
-Use `tests/vm/native_execution_test.go` only inside a disposable VirtualMac with
-`BREWWARDEN_VM_RUNTIME` set to a private test workspace in the disposable
-VM, with supported Homebrew and installed `gh` in the guest. The test checks the hardware
-model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
-fixtures must provision an older target and the intended existing dependencies.
-The default path checks actual execution, BrewWarden operation exclusion, candidate installation, actual outcomes and unchanged installed dependency bytes.
-
-`BREWWARDEN_VM_FAULT` selects `age`, `age-exception`, `changed-input`,
-`exception-changed-input` or `link-conflict`.
-Process continuation and fresh retry are checked by the distribution parent-crash
-test, not by a saved-plan reconciliation command. Link conflict requires absent jq/oniguruma and exercises a real partial
-installation while preserving an existing shared-prefix file. It then requires
-a new preflight to refuse the incomplete linked-keg record rather than invent
-success; manual Homebrew repair while idle precedes any successful retry. These
-tests never silently prepare or reset the host Homebrew installation.
-
-Local acceptance in an authenticated disposable Apple Silicon Tahoe VM passed
-packaged `doctor`, fresh jq/oniguruma installation, multi-target zstd/jq with a
-bounded lz4 age exception, unchanged reruns, explicit xz 5.8.3 -> 5.8.4
-upgrade, and upgrade-all with a real xz upgrade. The guest also exercised age
-holds, changed bottle/metadata/cache/installed inputs, cancellation, live
-parent death and child exclusion, partial link failure and manual repair followed
-by fresh verification. A partially poured jq initially produced a false
-success on retry; the linked-keg check and regression test now reject it.
-An unauthenticated guest held before mutation. The coverage survey held hello
-and wget because Homebrew skipped required advisory subjects; this is not a
-formula allowlist or evidence of their safety. Separate authenticated acceptance
-installed libuv and gmp together with the default policy, then verified an
-unchanged rerun and unaffected installed state. Reviewed Homebrew/core recipes
-at `98cbed4ac9edc9e40b82ac087ddd95bd2bd2e751` identify libuv's
-`dist.libuv.org` source with CMake and gmp's GNU mirror with Autotools. These
-different source hosts and build systems exercise the same bottle-only path;
-source identities are not product eligibility evidence. The additional survey
-held libpng by evidence or age policy rather than counting it as successful
-execution. These are
-exercised local cases, not a universal compatibility proof. No host Homebrew was
-changed. Signing, notarization and public release provenance are not implied
-by local test success.
-
-`TestLiveExplicitUpgradeChangesSelectedVersion` takes an older installed
-standard-prefix formula selected by `BREWWARDEN_VM_UPGRADE_TARGET`. It requires
-the public bound upgrade to activate the exact verified newer keg while all
-unrelated installed racks remain unchanged; fixture provisioning is explicit in
-the guest. `TestLiveGeneralBottleExecution` in `tests/vm/general_execution_test.go` accepts
-space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
-Provision absent targets to test fresh installation. It uses live authenticated
-metadata, release and advisory providers, provenance verification, the real public-command
-engine and one-use execution sessions. It checks the complete candidate closure, unchanged
-unrelated Cellar racks, then a second successful run with unchanged Cellar bytes.
-It does not reset fixtures implicitly. Normal execution workspaces are removed
-after their owned process session stops.
-
-`TestLivePublicCommandExecution` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
-space-separated `BREWWARDEN_VM_PUBLIC_TARGETS`. It checks multiple targets,
-unrelated installed-package preservation, unchanged reruns and replay refusal.
-`BREWWARDEN_VM_PUBLIC_OPERATION=upgrade` selects upgrade. Fault modes are
-`changed-input`, `changed-metadata`, `installed-state`, `missing-cache`,
-`cancel` and `interrupt`; the last cancels after
-the real command starts and checks that a fresh collection, not a saved plan,
-is required before retry.
-
-`TestLivePublicCoverageSurvey` accepts `BREWWARDEN_VM_PUBLIC_RUNTIME` and
-`BREWWARDEN_VM_SURVEY_TARGETS`. It collects each root's complete evidence without
-installing and retains a JSON classification. A passing survey test means the
-survey completed, not that every package was eligible. Read each held reason and
-use actual execution acceptance for supported representative packages.
-
-`TestLiveDistributionParentCrash` takes `BREWWARDEN_VM_DISTRIBUTION_BINARY` pointing
-to an extracted `bwd`. Provision absent xz in the VirtualMac. If the isolated
-test HOME differs from the guest's authenticated gh HOME, explicitly set
-`BREWWARDEN_VM_GH_CONFIG_DIR` to that guest-owned gh configuration directory;
-never copy host credentials into the VM. It kills that parent
-after the actual install starts, verifies its owned-process record, refuses a
-new mutation while the child is active, then performs a fresh, fully checked
-retry after the child stops. It never infers success from a stale record.
-
-When gh authentication or GitHub quota is unavailable, native acceptance holds. The
-attestation and registration caches have been removed. A retry must query gh
-and the advisory providers again; no cached-provider exception is available.
+The container uses UID/GID 10001, a read-only root, no network, host mounts,
+Docker socket, capabilities or new privileges. It has explicit CPU, memory,
+process and temporary-storage limits. A temporary filesystem permits running
+Go test binaries; a dedicated 64 KiB `/full` tmpfs exercises full-disk failure
+without touching a host mount. Images/build cache remain reusable and run
+containers are removed. This is an explicit developer check, not product Linux
+support or native Homebrew acceptance.
