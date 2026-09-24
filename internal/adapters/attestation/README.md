@@ -10,10 +10,14 @@ use sigstore-go 0.6.2, which serializes a verified Tlog time with
 2.66.0 first uses sigstore-go 0.7.0 with the verified Tlog URI; 2.70.0 first
 documents the verified-timestamp JSON contract. The executable is hashed before
 and after verification, and the observed version is attributed in both evidence
-claims. A real gh 2.66.0 binary verified an exact jq bottle and public signed
-bundles in a disposable arm64 guest, producing the expected signer, subject and
-Rekor URI. That offline-bundle probe does not itself establish authenticated
-GitHub API acquisition or a completed final-path product gate on this revision.
+claims. Real native arm64 gh 2.66.0, 2.70.0, 2.74.0, 2.80.0, 2.97.0 and 2.101.0
+binaries verified signed public bundles for the same exact jq bottle. Their
+complete captured output is parsed by ordinary Go contract tests, including
+negative changed-subject, future-time and unknown-log-URI cases. Offline-bundle
+verification does not establish authenticated GitHub API acquisition in every
+old client. The normal online path and authenticated final distribution gate
+passed with gh 2.101.0 on commit `cf86592`; a later test-only revision does not
+inherit that revision-bound readiness result.
 It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
 --predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
 GitHub CLI owns Sigstore verification, public trust roots and the user's normal

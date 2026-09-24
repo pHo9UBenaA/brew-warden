@@ -1,0 +1,2 @@
+gh version 2.70.0 (2025-04-15)
+https://github.com/cli/cli/releases/tag/v2.70.0

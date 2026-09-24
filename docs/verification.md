@@ -77,8 +77,23 @@ separate from the baseline; see Native product acceptance below.
 The distribution build checks repeatability of both binaries and complete license/documentation archives. Product installation enforcement and distribution
 packaging are implemented for the supported scope. The local product-ready gate
 requires an unchanged committed revision through its two human-mediated VM phases;
-passing ordinary CI alone never claims native product readiness. Reviewed
-adapter-level cohort probes do not replace that committed-revision gate. Public release
+passing ordinary CI alone never claims native product readiness. Captured real Homebrew public info/scanner output from five representative
+release cohorts and verified gh output from six sigstore-go cohorts are exercised
+by ordinary adapter tests, with negative evidence changes. For an explicit
+read-only, non-VM source-object check of *every* admitted Homebrew release
+commit, use a separately obtained upstream checkout outside the host Homebrew
+prefix:
+
+```sh
+BREWWARDEN_REVIEWED_BREW_GIT=/path/to/offline/brew-checkout \
+  go test ./internal/adapters/homebrew -run '^TestReviewedReleaseGitSourceMatrix$' -count=1
+```
+
+The test copies sources into an isolated temporary clone; it does not run brew.
+The verified-output captures are parser fixtures, not signature proofs, and
+reviewed adapter-level cohort probes do not replace the committed-revision gate.
+The authenticated 17-case gate on Homebrew 7.0.6 with gh 2.101.0 passed for
+`cf86592`; that result is not transferred to a later test-only revision. Public release
 signing and notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
 notarize, or establish provenance of the compiler.
