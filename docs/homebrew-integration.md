@@ -83,11 +83,19 @@ of the same upstream check is not an independent trust source.
 Test success, rejection, skipped/unsupported paths, conflicting environment,
 cached artifacts, helper bootstrap, and dependency changes where relevant. Use
 isolated integration environments; mocks alone do not demonstrate upstream
-behavior. Source inspection and empirical tests must support the claimed scope.
+behavior. Source inspection, unit and adapter contract tests, and representative
+native execution for materially different binding behavior must support the
+claimed scope. This does not require a full VM suite for every upstream patch
+release or every combination of otherwise compatible tool versions. Conversely,
+unit tests with synthetic success cannot prove an upstream installer consumed
+the frozen artifacts and complete plan.
 
-On brew updates, revisit affected records and tests before expanding supported
-versions. Removed flags, deprecated commands, changed output, or unrecognized
-versions must not silently produce successful evidence. Make unsupported
+On brew updates, review the upstream delta at affected capability boundaries
+and run the relevant contracts before expanding supported versions. Add native
+cases for a new platform or demonstrated change to trust or execution binding,
+not as an arbitrary per-version quota. Removed flags, deprecated commands,
+changed output, or unrecognized versions must not silently produce successful
+evidence. Make unsupported
 capabilities visible through `doctor`; fail only operations requiring those
 capabilities. Retire redundant BrewWarden checks when an upstream improvement
 satisfies their complete contract and equivalent tests pass.

@@ -9,6 +9,10 @@ support proposals: retain native arm64-only product support, do not modify the
 host Homebrew installation, and treat the x86_64 observations below as a
 read-only explanation of why that host installation is not supported. The
 verified-timestamp version analysis is in a separate archived review.
+The per-tuple full-VM requirement below is also superseded by
+`PLAN_20260924_arm_compatibility_ranges.md`: source deltas and adapter
+contracts cover version cohorts, with representative native cases for
+materially different execution behavior rather than one full VM per patch.
 
 ## Read-only integration probes
 
