@@ -24,8 +24,12 @@ evidence stops the command. Successful checks lead directly to ordinary public
 Extract a verified distribution archive into a user-owned directory and add that
 directory to `PATH`. Keep `bwd` and its `brewwarden` alias together.
 Users need an existing supported Homebrew installation and an installed supported
-`gh` (reviewed cohort 2.66.0–2.101.0), but not Go. BrewWarden does not install or update `gh`.
-Homebrew, Ruby and the attestation verifier are not bundled. BrewWarden
+`gh` (reviewed cohort 2.66.0–2.101.0), but not Go. The installed `gh`
+must be authenticated to github.com for online attestation lookup (`gh auth
+status` checks this); missing authentication holds before mutation. Both the
+oldest admitted gh 2.66.0 and gh 2.101.0 passed authenticated native
+acceptance. BrewWarden does not install or update `gh`. Homebrew, Ruby and
+the attestation verifier are not bundled. BrewWarden
 checks the installed Homebrew tree before copying it to an isolated inspection
 prefix; an unsupported or changed implementation holds execution.
 

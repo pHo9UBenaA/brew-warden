@@ -95,8 +95,11 @@ reviewed adapter-level cohort probes do not replace the committed-revision gate.
 The authenticated 17-case gate on Homebrew 7.0.6 passed with gh 2.101.0
 for `cf86592` and, independently, with gh 2.66.0 for `df5eb49`. The latter
 also verified an exact bottle using the normal authenticated `--repo` API
-path; the earlier unauthenticated 2.66.0 attempt predictably held before
-verification. Neither result is transferred to a later commit. Public release
+path. Its verified JSON matched the earlier offline capture byte-for-byte;
+ordinary unit tests now guard both that response and the recorded no-login
+failure. An unauthenticated 2.66.0 invocation holds before verification;
+installed gh requires a valid github.com login for online checks. Neither
+revision-bound native result is transferred to a later commit. Public release
 signing and notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
 notarize, or establish provenance of the compiler.

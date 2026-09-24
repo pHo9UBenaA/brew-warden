@@ -35,6 +35,12 @@ func TestCapturedGHVerifiedResultCohorts(t *testing.T) {
 			if got, err := oldestVerifiedTimestamp(result, artifact, now); err != nil || got != oldest {
 				t.Fatalf("verified signer/subject/earliest time not parsed: %d %v", got, err)
 			}
+			// The authenticated gh 2.66.0 --repo result matched the earlier
+			// offline-bundle capture byte-for-byte in the native guest. Keep the
+			// online response bound to the same parser regression fixture.
+			if version == "2.66.0" && EvidenceDigest(result) != domain.Digest("0faed6961f931e3c6f5fca8daedf42c3589a613fee54156ce04a593b51dabf69") {
+				t.Fatal("gh 2.66.0 fixture differs from authenticated online result")
+			}
 			other := artifact
 			other.SHA256 = domain.Digest("da67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036")
 			if _, err := oldestVerifiedTimestamp(result, other, now); err == nil {

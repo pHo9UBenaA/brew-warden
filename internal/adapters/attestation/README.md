@@ -13,8 +13,11 @@ and after verification, and the observed version is attributed in both evidence
 claims. Real native arm64 gh 2.66.0, 2.70.0, 2.74.0, 2.80.0, 2.97.0 and 2.101.0
 binaries verified signed public bundles for the same exact jq bottle. Their
 complete captured output is parsed by ordinary Go contract tests, including
-negative changed-subject, future-time and unknown-log-URI cases. Offline-bundle
-verification alone does not establish authenticated GitHub API acquisition.
+negative changed-subject, future-time and unknown-log-URI cases. The captured
+gh 2.66.0 result is byte-identical to its later authenticated online `--repo`
+response; an additional subprocess test uses 2.66.0's real no-login diagnostic
+to ensure it holds without issuing evidence. Offline-bundle verification alone
+does not establish authenticated GitHub API acquisition.
 The normal `--repo` API path and authenticated 17-case distribution gate passed
 with gh 2.101.0 on commit `cf86592` and independently with gh **2.66.0** on
 commit `df5eb49`, each using Homebrew 7.0.6 in a disposable native Tahoe guest.

@@ -20,8 +20,13 @@ acquired and verified the *exact* jq 1.8.2 arm64 Tahoe bottle (SHA-256
 `ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036`)
 via the normal GitHub API. It exited 0 with two verified Homebrew-signer
 results, both including a trusted Tlog URI `https://rekor.sigstore.dev` and a
-matching exact subject. The CLI output was checked for these fields without
-copying authentication diagnostics into public test fixtures.
+matching exact subject. The authenticated JSON SHA-256 was
+`0faed6961f931e3c6f5fca8daedf42c3589a613fee54156ce04a593b51dabf69`,
+byte-for-byte identical to the earlier signed-bundle response now retained as
+`internal/adapters/attestation/testdata/gh-2.66.0-jq-verified.json`. Ordinary
+adapter tests guard that contract and verify that the real 2.66.0 no-login
+stderr (which contains no credentials) produces no evidence. Cryptographic
+verification still belongs to installed gh at each product invocation.
 
 The packaged distribution at the unchanged `df5eb49` revision then passed
 `product-ready.sh complete` using reviewed Homebrew 7.0.6, the real installed
