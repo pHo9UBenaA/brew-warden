@@ -24,16 +24,16 @@ evidence stops the command. Successful checks lead directly to ordinary public
 Extract a verified distribution archive into a user-owned directory and add that
 directory to `PATH`. Keep `bwd` and its `brewwarden` alias together.
 Users need an existing supported Homebrew installation and an installed supported
-`gh` (currently 2.101.0), but not Go. BrewWarden does not install or update `gh`.
+`gh` (reviewed cohort 2.66.0–2.101.0), but not Go. BrewWarden does not install or update `gh`.
 Homebrew, Ruby and the attestation verifier are not bundled. BrewWarden
 checks the installed Homebrew tree before copying it to an isolated inspection
 prefix; an unsupported or changed implementation holds execution.
 
 Product install/upgrade support is **Apple Silicon arm64 on macOS Tahoe
-(26.x) only**, with the reviewed Homebrew 7.0.4 implementation at
-`/opt/homebrew` and installed gh 2.101.0. Intel Macs, x86_64/Rosetta Homebrew
-on Apple Silicon (including `/usr/local`), Linux, other Homebrew runtime bytes
-and other gh versions are not supported for mutation. A different shell such as
+(26.x) only**, with a reviewed Homebrew 6.0.19–7.0.6 release source at
+`/opt/homebrew` and installed gh 2.66.0–2.101.0. Intel Macs, x86_64/Rosetta
+Homebrew on Apple Silicon (including `/usr/local`), Linux, other Homebrew
+release sources and other gh versions are not supported for mutation. A different shell such as
 zsh does not change these requirements. See the
 [Homebrew contract](internal/adapters/homebrew/README.md) for the tested
 runtime and boundaries, and [distribution](docs/distribution.md)

@@ -26,12 +26,13 @@ type Collector struct {
 	client         *http.Client
 }
 type Collection struct {
-	root          string
-	inputs        collectionInputs
-	nodes         []domain.Node
-	observedAt    int64
-	runtimeDigest domain.Digest
-	frozen        []frozenInput
+	root            string
+	inputs          collectionInputs
+	nodes           []domain.Node
+	observedAt      int64
+	runtimeDigest   domain.Digest
+	runtimeRevision string
+	frozen          []frozenInput
 }
 type downloadEntry struct {
 	Name string `json:"name" required:"true"`
@@ -85,6 +86,10 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
+	result.runtimeRevision, err = c.Runtime.installedRevision(result.runtimeDigest)
+	if err != nil {
+		return err
+	}
 	client := c.client
 	if client == nil {
 		client = publicClient()
@@ -135,7 +140,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 			if claim == domain.Checksum {
 				raw, _ = json.Marshal(struct{ Bottle domain.Digest }{f.BottleSHA256})
 			}
-			evidence, err := domain.NewEvidence(domain.Evidence{Claim: claim, Subject: f.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "Homebrew signed formula API", ProviderVersion: brewRevision, RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600})
+			evidence, err := domain.NewEvidence(domain.Evidence{Claim: claim, Subject: f.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "Homebrew signed formula API", ProviderVersion: "brew/" + reviewedBrewRevisions[result.runtimeRevision], RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600})
 			if err != nil {
 				return err
 			}
@@ -163,7 +168,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := w.checkBottleMetadata(candidates); err != nil {
 		return err
 	}
-	advisoryEvidence, err := w.collectPublicAdvisories(ctx, client, candidates, result.observedAt)
+	advisoryEvidence, err := w.collectPublicAdvisories(ctx, client, candidates, result.observedAt, result.runtimeRevision)
 	if err != nil {
 		return err
 	}

@@ -1,14 +1,15 @@
 # Plan: bounded version ranges for native arm64 Homebrew bottles
 
-Date: 2026-09-24. Status: researched candidate ranges; product changes are NOT
-implemented by this plan. It supersedes the per-version/full-VM and x86_64
+Date: 2026-09-24. Status: cohort implementation and native probes in progress;
+final authenticated revision-bound acceptance remains separate. This plan
+alone is not evidence of product readiness. It supersedes the per-version/full-VM and x86_64
 proposals in `PLAN_20260924_installed_brew_compatibility.md`. The current
 execution contract remains `docs/design.md`. Never modify the host Homebrew;
 all integration writes stay in disposable guests or private workspaces.
 
 ## Answers and evidence as of 2026-09-24
 
-| Dependency | Actually admitted today | Candidate range to establish | Why these boundaries? |
+| Dependency | Admitted at plan creation | Target range | Why these boundaries? |
 | --- | --- | --- | --- |
 | Homebrew, native arm64 macOS Tahoe at `/opt/homebrew` | Exact reviewed 7.0.4 runtime at `edb70f031e4170c780799633a1226ff73e1077f4` (including its portable Ruby and implementation fingerprint) | **6.0.19 through 7.0.6**, inclusive, CONDITIONAL on contract checks below | 6.0.19 is the first inspected release whose `brew vulns --json` reports `skipped_formulae`, required to avoid declaring an unscanned dependency clean. Signed internal packages JWS/index and `brew fetch --bottle-tag` exist by then. 6.0.18's vulnerability JSON is only an array of findings, with no skipped-subject inventory; it does not meet the present coverage contract. 7.0.6 was the latest released tag checked. |
 | Installed gh attestation verifier | Exactly 2.101.0, tested with authenticated bottles | **2.66.0 through 2.101.0**, inclusive, CONDITIONAL on signed-result and trust-root checks below | gh 2.65.0 and earlier in the inspected sequence use `sigstore-go v0.6.2`, which emits `uri: "TODO"` for a verified Tlog timestamp. gh 2.66.0 first uses v0.7.0 and emits its verified URI; gh 2.70.0 first documents the JSON `verifiedTimestamps` trust contract. 2.101.0 was the latest released tag checked. |
@@ -116,7 +117,8 @@ installer's side effects. Neither test type is an arbitrary approval quota.
    new native cases when behavior, trust, binding or platform changes, not for
    every unrelated patch. Keep unknown versions held with actionable reasons.
 
-**Completion** means a documented *implemented* version interval that actually
-passes all required contracts and representative bound-execution acceptance.
-Until then, 6.0.19–7.0.6 and 2.66.0–2.101.0 are conditional targets only.
-Do not publish or claim new compatibility on the strength of this plan alone.
+**Completion** means a documented implemented interval with upstream contracts,
+representative bound-execution evidence and the final revision's authenticated
+product gate. The bounds were implemented and adapter probes exercised release
+cohorts; the final gate result must still be recorded separately. Do not publish
+or claim final product readiness on the strength of this plan alone.

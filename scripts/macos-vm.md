@@ -64,8 +64,11 @@ focused investigation, select `run public TARGETS [FAULT]`, `run native [FAULT]`
 and `fixture absent-jq|absent-xz|older-xz|repair-jq` separately. Fixtures modify
 **only that disposable guest**; `absent-*` deliberately uninstalls all versions
 of the named fixture formulae. Do not run unrelated guest mutations concurrently.
-`prepare` verifies VirtualMac arm64 before replacing the guest prefix, then runs
-the packaged `doctor` against the supported installed-runtime fingerprint. If
+`prepare` verifies VirtualMac arm64 before replacing the guest prefix. It
+transfers an explicitly supplied reviewed Homebrew release checkout (including
+its Git metadata, if present) only into the disposable guest, then runs the
+packaged `doctor` against that supported release source. A tar-only 7.0.4
+fixture remains bound to the legacy complete-runtime fingerprint. If
 preparation fails after a successful clone, the runner attempts guest credential
 removal and stops only that newly created clone; it retains private diagnostics
 and reports any cleanup it cannot confirm. A failed `doctor` never counts as
@@ -122,8 +125,9 @@ Inside the disposable guest only, preserve its original Homebrew prefix as
 `/opt/brewwarden-original-homebrew`. Populate `/opt/homebrew` from `git archive`
 of the reviewed Homebrew revision and extract its pinned portable Ruby archive
 under `Library/Homebrew/vendor`, with the matching `portable-ruby/current` link.
-The Homebrew adapter owns the installed-runtime fingerprint and supported
-revision; VM provisioning must use the same reviewed source and Ruby bytes.
+The Homebrew adapter owns the reviewed release commits, copied-runtime
+identity and the legacy 7.0.4 full fingerprint; VM provisioning must use the
+same reviewed source and the required installed arm64 portable Ruby bytes.
 Do not run this provisioning against a host prefix. The running guest agent
 survives the move, but its launch configuration still refers to the old path;
 recreate a clone for independent experiments instead of rebooting this modified

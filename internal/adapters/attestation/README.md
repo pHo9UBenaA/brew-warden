@@ -2,14 +2,18 @@
 
 Capability: `homebrew.core.provenance.v2` and `homebrew.core.age.v2`.
 
-The collector uses an already-installed, absolute GitHub CLI 2.101.0 path;
-other versions hold until their output contracts have been reviewed and tested.
-The installed gh 2.62.0 uses sigstore-go 0.6.2, which serializes a verified
-Tlog time with `uri: "TODO"`, not the verified Rekor URI required by our age
-contract. gh 2.66.0 first uses sigstore-go 0.7.0 with the verified Tlog URI;
-2.70.0 first documents the verified-timestamp JSON contract in the inspected
-releases. These are upstream source milestones, **not** an accepted gh version
-range: only 2.101.0 has passed this product's full native acceptance.
+The collector uses an already-installed, absolute GitHub CLI path. The reviewed
+version cohort is **2.66.0 through 2.101.0**, inclusive; versions outside the
+bounds or with missing required verified output hold. gh 2.62.0 through 2.65.0
+use sigstore-go 0.6.2, which serializes a verified Tlog time with
+`uri: "TODO"`, not the verified Rekor URI required by our age contract. gh
+2.66.0 first uses sigstore-go 0.7.0 with the verified Tlog URI; 2.70.0 first
+documents the verified-timestamp JSON contract. The executable is hashed before
+and after verification, and the observed version is attributed in both evidence
+claims. A real gh 2.66.0 binary verified an exact jq bottle and public signed
+bundles in a disposable arm64 guest, producing the expected signer, subject and
+Rekor URI. That offline-bundle probe does not itself establish authenticated
+GitHub API acquisition or a completed final-path product gate on this revision.
 It invokes `gh attestation verify BOTTLE --repo Homebrew/homebrew-core
 --predicate-type https://slsa.dev/provenance/v1 --format json --limit 100`.
 GitHub CLI owns Sigstore verification, public trust roots and the user's normal

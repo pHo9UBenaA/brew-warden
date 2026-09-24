@@ -3,8 +3,8 @@
 The archive contains `bwd`, its `brewwarden` alias, checksums, documentation
 and licenses. No Homebrew source, portable Ruby, runtime inventory or attestation
 verifier executable is bundled. Users need the reviewed native arm64
-Homebrew 7.0.4 installation at `/opt/homebrew` on macOS Tahoe and GitHub CLI
-(`gh` 2.101.0). The product
+Homebrew 6.0.19–7.0.6 release source at `/opt/homebrew` on macOS Tahoe and
+GitHub CLI (`gh` 2.66.0–2.101.0). The product
 archive targets **darwin/arm64 only**; Intel macOS, Rosetta/x86_64 Homebrew
 on Apple Silicon, Linux, and unreviewed runtime builds cannot execute a
 protected mutation. BrewWarden does not install or upgrade either command.

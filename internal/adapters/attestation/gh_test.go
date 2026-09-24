@@ -53,6 +53,7 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 		"[" + ghResult(a, "invalid") + "]",
 		"[" + ghResult(a, "2026-09-24T00:00:00Z") + "]",
 		"[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`, 1) + "]",
+		"[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`, 1) + "]",
 		"[" + strings.Replace(one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`, 1) + "]",
 	} {
 		if _, err := oldestVerifiedTimestamp([]byte(bad), a, now); err == nil {
@@ -153,6 +154,39 @@ func TestInstalledGHInputAndOutputBounds(t *testing.T) {
 	out := &boundedOutput{}
 	if _, err := out.Write(make([]byte, maxResponse+1)); err == nil || !out.overflow {
 		t.Fatal("unbounded verifier output accepted")
+	}
+}
+
+func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
+	root := t.TempDir()
+	artifact := artifactFixture()
+	bottle := filepath.Join(root, bottleName(artifact))
+	if err := os.WriteFile(bottle, []byte("cohort-bottle"), 0600); err != nil {
+		t.Fatal(err)
+	}
+	artifact.SHA256, _ = hashFile(bottle, 1000)
+	verified := "[" + ghResult(artifact, "2026-09-10T00:00:00Z") + "]"
+	for _, tc := range []struct {
+		version string
+		allowed bool
+	}{
+		{"2.65.0", false}, {"2.66.0", true}, {"2.70.0", true}, {"2.101.0", true},
+		{"2.102.0", false}, {"3.0.0", false}, {"2.66.0-rc1", false},
+	} {
+		t.Run(tc.version, func(t *testing.T) {
+			tool := filepath.Join(t.TempDir(), "gh")
+			script := "#!/bin/sh\nif [ \"$1\" = version ]; then printf '%s\\n' 'gh version " + tc.version + " (fixture)'; exit 0; fi\nprintf '%s' '" + verified + "'\n"
+			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
+				t.Fatal(err)
+			}
+			provenance, age, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix())
+			if (err == nil) != tc.allowed {
+				t.Fatalf("gh %s eligibility mismatch: %v", tc.version, err)
+			}
+			if tc.allowed && (age.ProviderVersion != "gh/"+tc.version || provenance.ProviderVersion != age.ProviderVersion || age.Publication != domain.VerifiedAttestation) {
+				t.Fatalf("verified claims lost verifier identity: %#v %#v", provenance, age)
+			}
+		})
 	}
 }
 

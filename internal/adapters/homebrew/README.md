@@ -5,22 +5,24 @@ private installer APIs or reconstruct installed payloads with Homebrew internals
 
 ## Supported runtime
 
-The supported installed implementation is Homebrew 7.0.4 at
-`edb70f031e4170c780799633a1226ff73e1077f4`, using its portable Ruby 4.0.7 on Apple
-Silicon arm64 macOS Tahoe at `/opt/homebrew`. Intel macOS, x86_64/Rosetta
-Homebrew on Apple Silicon, and Linux are not supported execution targets. The
-adapter fingerprints its installed
-`bin/brew` and `Library/Homebrew` tree (SHA-256
-`e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c`)
-while copying it into an empty private inspection prefix. Missing, changed,
-extra, unsafe or unsupported files hold. This compatibility fingerprint is
-in source, not a distributed runtime or file inventory. Homebrew and Ruby are
-reused from the existing prefix; no bootstrap or update occurs.
-The empty prefix prevents an installed old SBOM from selecting the wrong version
-for candidate vulnerability scanning. Execution uses `/opt/homebrew/bin/brew`.
-The exact reviewed runtime is currently the only accepted Homebrew build, even
-if another arm64 installation prints a nearby `brew --version` such as 7.0.6;
-version strings alone do not establish signed-input or execution binding.
+The supported source cohort comprises the inspected official Homebrew release
+commits **6.0.19 through 7.0.6** listed in `runtime.go`, with an installed
+native Apple Silicon arm64 Tahoe prefix at `/opt/homebrew`. Git HEAD must be a
+reviewed release; installed executable/Library source must be clean at that
+revision. A printable version or a forged local tag does not select a cohort.
+The existing tar-only 7.0.4 native fixture remains accepted only with its exact
+installed `bin/brew` and `Library/Homebrew` fingerprint (SHA-256
+`e4422c589c12df8ac55953c8ddf25cdcfcabf05e6e27e141f9143e671dcd614c`).
+Intel macOS, x86_64/Rosetta Homebrew on Apple Silicon, Linux, and unreviewed
+Git commits are not supported execution targets. The full installed
+executable/Library tree is still copied into a private inspection prefix and
+bound to the one-use plan by a digest. Changed, extra executable source or
+unsafe files hold. Its Git release identity and file bytes are checked again
+before Homebrew is allowed to mutate the prefix. No runtime inventory or
+Homebrew binaries are distributed. The installed portable Ruby is reused;
+missing required Ruby cannot be installed implicitly under the immutable
+inspection sandbox. The empty prefix prevents an installed old SBOM from
+selecting the wrong version for candidate scanning.
 
 The private HOME, cache, config, logs and temporary directory do not inherit user
 credentials or Homebrew settings. Collection cannot write to the installed prefix.
@@ -50,7 +52,7 @@ that older signed packages cannot contain malicious code.
 - `brew vulns --json` scans explicit candidates in the empty prefix. Missing,
   skipped, untrusted or unsupported subjects hold. A clean supported scan means
   no known applicable findings. No historical advisory witness is required.
-- Homebrew 7.0.4's scanner does not incorporate the Homebrew Advisory Database.
+- The reviewed Homebrew scanner does not incorporate the Homebrew Advisory Database.
   The official advisory feed and per-formula API therefore supply that component.
   Candidate identity must match; Homebrew's API owns applicability comparisons.
   Responses are attributed HTTPS observations, not signed metadata. The compressed
@@ -78,7 +80,7 @@ fetch or source download during installation.
 Existing selected kegs must have supported public installed metadata, an active
 opt link, no custom options and recorded bottle installation. Non-keg-only
 formulae must also have Homebrew's matching `var/homebrew/linked` record:
-Homebrew 7.0.4's public `brew link --dry-run` distinguishes this from a partial
+Homebrew's public `brew link --dry-run` distinguishes this from a partial
 pour that created an opt link but failed to link files into the prefix. This
 version-specific record is read as a symlink, not through a private Ruby API.
 Receipts and versions are observed; neither link proves existing payload hashes. The
@@ -105,10 +107,16 @@ attempt journals require the matching older build for recovery before mutation.
 
 Unit tests cover strict metadata, OCI digest/closure mismatch, archive extraction,
 input substitution, private operation locks, process-session liveness and partial
-execution outcomes. Explicit VM tests exercise public collection, actual install and
-upgrade, multiple targets, unchanged reruns, unrelated-package preservation,
-age exceptions, tampering, cancellation, partial failure and fresh retry. See
-[verification](../../../docs/verification.md) for repeatable entrypoints.
+execution outcomes. Isolated arm64 guest probes exercised signed metadata, exact
+bottles and complete scanner subjects on 6.0.19, 6.0.22 and 7.0.6; actual bound
+jq/dependency installation and unchanged rerun on 6.0.19, and jq installation
+and xz upgrade on 7.0.6, used a guest-only verifier wrapper delegating to real
+gh cryptographic verification of public bundles. They do not establish a
+completed authenticated final-path product gate on the changed source revision.
+The earlier 7.0.4 packaged VM suite covered age holds, tampering, cancellation,
+partial failure and fresh retry; do not transfer its revision-bound readiness
+result to this compatibility change. See [verification](../../../docs/verification.md)
+for repeatable entrypoints.
 
 The collector retains the verified gh response only within the pending workspace
 and does not use attestation or registration caches. Advisory status is

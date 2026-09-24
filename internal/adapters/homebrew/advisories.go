@@ -198,7 +198,10 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 	return domain.NoKnownApplicableFindings, nil
 }
 
-func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Client, candidates []formulaMetadata, now int64) ([]domain.Evidence, error) {
+func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Client, candidates []formulaMetadata, now int64, revision string) ([]domain.Evidence, error) {
+	if reviewedBrewRevisions[revision] == "" {
+		return nil, errors.New("unsupported Homebrew advisory source revision")
+	}
 	report, rawScan, err := w.scanCandidateVulnerabilities(ctx, candidates)
 	if err != nil {
 		return nil, err
@@ -258,7 +261,7 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		if err != nil {
 			return nil, err
 		}
-		e, err := domain.NewEvidence(domain.Evidence{Claim: domain.Vulnerabilities, Subject: candidate.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database", ProviderVersion: brewRevision, RawSHA256: digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600, Applicability: applies})
+		e, err := domain.NewEvidence(domain.Evidence{Claim: domain.Vulnerabilities, Subject: candidate.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database", ProviderVersion: "brew/" + reviewedBrewRevisions[revision], RawSHA256: digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600, Applicability: applies})
 		if err != nil {
 			return nil, err
 		}

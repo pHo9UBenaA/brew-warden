@@ -12,6 +12,7 @@ import (
 	"os"
 	"os/exec"
 	"path/filepath"
+	"strconv"
 	"strings"
 	"time"
 	"unicode/utf8"
@@ -19,14 +20,14 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-// PublicGH verifies the exact bottle bytes with the installed public gh CLI.
-// Only the inspected CLI version is accepted.
+// PublicGH verifies the exact bottle bytes with an installed, reviewed gh CLI.
+// Unknown or incompatible versions hold before collecting execution evidence.
 type PublicGH struct {
 	Path string
 }
 
 // InstalledGH resolves the user's installed command without installing or
-// upgrading it. VerifyBottle subsequently checks its exact supported version.
+// upgrading it. VerifyBottle subsequently checks the supported version cohort.
 func InstalledGH() (PublicGH, error) {
 	path, err := exec.LookPath("gh")
 	if err != nil {
@@ -40,22 +41,58 @@ func InstalledGH() (PublicGH, error) {
 }
 
 const ghLimit = 100
-const ghVersion = "gh version 2.101.0 "
 
-func (v PublicGH) Check(ctx context.Context) error {
+// The lower bound is the first inspected gh using sigstore-go 0.7.0, which
+// exposes the verified transparency-log URI instead of the literal "TODO".
+// The upper bound is the last upstream release reviewed for this contract.
+func supportedGHVersion(raw []byte) (string, error) {
+	line := strings.SplitN(string(raw), "\n", 2)[0]
+	fields := strings.Fields(line)
+	if len(fields) < 3 || fields[0] != "gh" || fields[1] != "version" {
+		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+	}
+	parts := strings.Split(fields[2], ".")
+	if len(parts) != 3 {
+		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+	}
+	values := [3]int{}
+	for i, part := range parts {
+		if len(part) == 0 || len(part) > 3 || len(part) > 1 && part[0] == '0' {
+			return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+		}
+		for _, digit := range part {
+			if digit < '0' || digit > '9' {
+				return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+			}
+		}
+		var err error
+		values[i], err = strconv.Atoi(part)
+		if err != nil {
+			return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+		}
+	}
+	if values[0] != 2 || values[1] < 66 || values[1] > 101 || values[1] == 101 && values[2] != 0 {
+		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+	}
+	return fields[2], nil
+}
+
+func (v PublicGH) checkedVersion(ctx context.Context) (string, error) {
 	if ctx == nil || !filepath.IsAbs(v.Path) {
-		return errors.New("installed gh unavailable")
+		return "", errors.New("installed gh unavailable")
 	}
 	bounded, cancel := context.WithTimeout(ctx, 10*time.Second)
 	defer cancel()
-	version, err := runGH(bounded, v.Path, []string{"version"})
+	raw, err := runGH(bounded, v.Path, []string{"version"})
 	if err != nil {
-		return errors.New("installed gh version check unavailable or timed out")
+		return "", errors.New("installed gh version check unavailable or timed out")
 	}
-	if !strings.HasPrefix(string(version), ghVersion) {
-		return errors.New("unsupported installed gh version (requires 2.101.0)")
-	}
-	return nil
+	return supportedGHVersion(raw)
+}
+
+func (v PublicGH) Check(ctx context.Context) error {
+	_, err := v.checkedVersion(ctx)
+	return err
 }
 
 // VerifyBottle returns the oldest verified timestamp for the exact bytes, as
@@ -213,8 +250,12 @@ func (v PublicGH) VerifyEvidence(ctx context.Context, a domain.Artifact, bottle 
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}
+	version, err := v.checkedVersion(ctx)
+	if err != nil {
+		return domain.Evidence{}, domain.Evidence{}, nil, err
+	}
 	base := domain.Evidence{Subject: a, Status: domain.Verified, Provider: domain.Supplement,
-		Source: repository, ProviderVersion: "gh/2.101.0", RawSHA256: EvidenceDigest(raw),
+		Source: repository, ProviderVersion: "gh/" + version, RawSHA256: EvidenceDigest(raw),
 		ObservedAt: now, ExpiresAt: now + 3600}
 	provenance := base
 	provenance.Claim = domain.Provenance

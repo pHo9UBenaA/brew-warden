@@ -13,7 +13,7 @@ import (
 func planFixture() executionPlan {
 	a := metadataFixture().Formulae[0].artifact()
 	digest := domain.Digest(strings.Repeat("a", 64))
-	return executionPlan{Schema: 1, MinimumAge: 0, Targets: []domain.Artifact{a}, Nodes: []domain.Node{{Artifact: a, Dependencies: []domain.Artifact{}, Evidence: []domain.Evidence{}}}, Actions: []plannedAction{{"jq", "install"}}, BeforeState: digest, Environment: executionEnvironment{digest, "26.6.2", "/opt/homebrew"}, Inputs: []frozenInput{{"fixture", digest}}, Attempt: digest, IssuedAt: 100, ExpiresAt: 200, Waivers: []domain.AgeWaiver{}}
+	return executionPlan{Schema: 1, MinimumAge: 0, Targets: []domain.Artifact{a}, Nodes: []domain.Node{{Artifact: a, Dependencies: []domain.Artifact{}, Evidence: []domain.Evidence{}}}, Actions: []plannedAction{{"jq", "install"}}, BeforeState: digest, Environment: executionEnvironment{Runtime: digest, OSVersion: "26.6.2", Prefix: "/opt/homebrew"}, Inputs: []frozenInput{{"fixture", digest}}, Attempt: digest, IssuedAt: 100, ExpiresAt: 200, Waivers: []domain.AgeWaiver{}}
 }
 func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 	p := planFixture()
@@ -56,6 +56,21 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 		}
 	}
 }
+func TestExecutionPlanBindsReviewedHomebrewRevision(t *testing.T) {
+	plan := planFixture()
+	plan.Schema = 3
+	for _, revision := range []string{"", strings.Repeat("0", 40)} {
+		plan.Environment.BrewRevision = revision
+		if _, err := plan.prepared(plan.BeforeState); err == nil {
+			t.Fatal("unreviewed Homebrew revision authorized an execution plan")
+		}
+	}
+	plan.Environment.BrewRevision = brewRevision
+	if _, err := plan.prepared(plan.BeforeState); err != nil {
+		t.Fatal("reviewed Homebrew revision could not bind a plan", err)
+	}
+}
+
 func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	root := t.TempDir()
 	p := planFixture()

@@ -25,9 +25,10 @@ type frozenInput struct {
 	SHA256 domain.Digest `json:"sha256" required:"true"`
 }
 type executionEnvironment struct {
-	Runtime   domain.Digest `json:"runtime" required:"true"`
-	OSVersion string        `json:"osVersion" required:"true"`
-	Prefix    string        `json:"prefix" required:"true"`
+	Runtime      domain.Digest `json:"runtime" required:"true"`
+	BrewRevision string        `json:"brewRevision,omitempty"`
+	OSVersion    string        `json:"osVersion" required:"true"`
+	Prefix       string        `json:"prefix" required:"true"`
 }
 type executionPlan struct {
 	Schema      int                  `json:"schema" required:"true"`
@@ -49,7 +50,7 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	if err != nil || (p.Schema != 1 && p.Schema != 2 && p.Schema != 3) || !p.Attempt.Valid() || !p.BeforeState.Valid() || p.IssuedAt <= 0 || p.ExpiresAt <= p.IssuedAt || p.ExpiresAt > p.IssuedAt+600 {
 		return ports.Prepared{}, errors.New("invalid persisted execution plan")
 	}
-	if !p.Environment.Runtime.Valid() || p.Environment.Prefix != "/opt/homebrew" || !strings.HasPrefix(p.Environment.OSVersion, "26.") || len(p.Environment.OSVersion) > 16 || strings.Trim(p.Environment.OSVersion, "0123456789.") != "" || len(p.Nodes) == 0 || len(p.Nodes) > 128 || len(p.Actions) != len(p.Nodes) || len(p.Inputs) == 0 || len(p.Inputs) > 10000 {
+	if !p.Environment.Runtime.Valid() || p.Schema >= 3 && reviewedBrewRevisions[p.Environment.BrewRevision] == "" || p.Environment.Prefix != "/opt/homebrew" || !strings.HasPrefix(p.Environment.OSVersion, "26.") || len(p.Environment.OSVersion) > 16 || strings.Trim(p.Environment.OSVersion, "0123456789.") != "" || len(p.Nodes) == 0 || len(p.Nodes) > 128 || len(p.Actions) != len(p.Nodes) || len(p.Inputs) == 0 || len(p.Inputs) > 10000 {
 		return ports.Prepared{}, errors.New("unsupported persisted execution environment or inventory")
 	}
 	inventory := map[string]domain.Digest{}

@@ -184,7 +184,7 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	evidence, err := w.collectPublicAdvisories(context.Background(), publicClient(), candidates, time.Now().Unix())
+	evidence, err := w.collectPublicAdvisories(context.Background(), publicClient(), candidates, time.Now().Unix(), brewRevision)
 	if err != nil {
 		t.Fatal(err)
 	}

@@ -3,6 +3,7 @@ package homebrew
 import (
 	"encoding/json"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -64,8 +65,32 @@ func TestLiveInstalledRuntimeFingerprint(t *testing.T) {
 		t.Skip("requires a disposable reviewed Homebrew tree")
 	}
 	got, err := (Runtime{}).materializeFrom(filepath.Join(t.TempDir(), "inspection"), prefix)
-	if err != nil || got != supportedRuntimeDigest {
-		t.Fatal("installed runtime fingerprint differs from reviewed version", got, err)
+	if err != nil {
+		t.Fatal("installed runtime source differs from reviewed versions", got, err)
+	}
+	if got != supportedRuntimeDigest {
+		if _, err := reviewedBrewSource(prefix); err != nil {
+			t.Fatal("installed runtime has no reviewed release identity", got, err)
+		}
+	}
+}
+
+func TestInstalledRuntimeDoesNotTrustAVersionBannerOrUnreviewedGitCommit(t *testing.T) {
+	_, prefix, destination := runtimeFixture(t)
+	brew := filepath.Join(prefix, "bin/brew")
+	if err := os.WriteFile(brew, []byte("#!/bin/sh\necho 'Homebrew 7.0.6'\n"), 0755); err != nil {
+		t.Fatal(err)
+	}
+	commands := [][]string{{"init", "-q"}, {"add", "bin/brew", "Library/Homebrew/fixture.rb"}, {"-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit", "-q", "-m", "unreviewed"}, {"tag", "7.0.6"}}
+	for _, args := range commands {
+		command := exec.Command("git", args...)
+		command.Dir = prefix
+		if out, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("isolated Git fixture %v: %v: %s", args, err, out)
+		}
+	}
+	if _, err := (Runtime{}).materializeFrom(destination, prefix); err == nil {
+		t.Fatal("unreviewed implementation authorized by version banner or Git tag")
 	}
 }
 

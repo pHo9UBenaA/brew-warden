@@ -82,7 +82,13 @@ prepare() {
   printf 'Acceptance workspace: %s\n' "$evidence"
   git rev-parse HEAD > "$evidence/source-revision"
   shasum -a 256 "$gh" "$archive" > "$evidence/inputs.sha256"
-  tar -cf "$evidence/reviewed-brew.tar" -C "$source" bin/brew Library/Homebrew
+  if [ -d "$source/.git" ] && [ ! -L "$source/.git" ]; then
+    # Reviewed release identity travels only into the disposable guest. A
+    # tar-only 7.0.4 native fixture still uses the legacy exact fingerprint.
+    tar -cf "$evidence/reviewed-brew.tar" -C "$source" bin/brew Library/Homebrew .git
+  else
+    tar -cf "$evidence/reviewed-brew.tar" -C "$source" bin/brew Library/Homebrew
+  fi
   shasum -a 256 "$evidence/reviewed-brew.tar" >> "$evidence/inputs.sha256"
   clone_owned=0
   trap 'cleanup_prepare_on_exit $?' 0
@@ -128,7 +134,7 @@ auth() {
   guest "$vm" /bin/sh -c 'umask 077; if test -f /private/tmp/bw-acceptance/home/device.pid && /bin/kill -0 "$(/bin/cat /private/tmp/bw-acceptance/home/device.pid)" 2>/dev/null; then exit 0; fi; : > /private/tmp/bw-acceptance/home/device.log; HOME=/private/tmp/bw-acceptance/home PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login --hostname github.com --git-protocol https --web > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null & echo $! > /private/tmp/bw-acceptance/home/device.pid'
   count=0
   while [ "$count" -lt 20 ]; do
-    lines=$(guest "$vm" /bin/sh -c '/usr/bin/grep -E "One-time code|Open this URL" /private/tmp/bw-acceptance/home/device.log 2>/dev/null' || true)
+    lines=$(guest "$vm" /bin/sh -c '/usr/bin/grep -Ei "one-time code|Open this URL" /private/tmp/bw-acceptance/home/device.log 2>/dev/null' || true)
     if [ -n "$lines" ]; then
       printf '%s\n' "$lines"
       printf 'Approve in your browser; do not paste a token here. Standard gh device login requests repo, read:org and gist scopes.\n'

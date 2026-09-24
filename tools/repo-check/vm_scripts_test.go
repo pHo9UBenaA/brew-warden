@@ -44,7 +44,11 @@ case "$1" in
         /usr/bin/id) exit 0 ;;
         /usr/sbin/sysctl) printf 'VirtualMac2,1\n'; exit 0 ;;
         /usr/bin/arch) printf 'arm64\n'; exit 0 ;;
-        /bin/sh) test ! -e "$TART_HOME/deny-rm"; exit $? ;;
+        /bin/sh)
+          case "${5:-}" in
+            *'grep -Ei'*) printf '%s\n' '! First copy your one-time code: ABCD-1234' 'Open this URL to continue in your web browser: https://github.com/login/device'; exit 0 ;;
+          esac
+          test ! -e "$TART_HOME/deny-rm"; exit $? ;;
       esac
     fi
     exit 29 ;;
@@ -233,6 +237,17 @@ func TestVMFinishStopsWhenGuestCredentialsCannotBeRemoved(t *testing.T) {
 	}
 	if actions := vmActions(t, root); !strings.Contains(actions, "stop:new-vm\n") {
 		t.Fatalf("unreachable guest was left running: %s", actions)
+	}
+}
+
+func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
+	root, tart := vmScriptFixture(t)
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runVMScriptFixture(t, root, tart, "auth", "new-vm")
+	if err != nil || !strings.Contains(out, "ABCD-1234") || !strings.Contains(out, "https://github.com/login/device") {
+		t.Fatalf("older gh device login code was hidden: %v: %s", err, out)
 	}
 }
 

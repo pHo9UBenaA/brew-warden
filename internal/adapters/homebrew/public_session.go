@@ -276,7 +276,15 @@ func acquireOperationLock(directory string) (*os.File, error) {
 
 // Compare the actual prefix's executable source with the reviewed inspection
 // runtime. Extra installed formulae/taps are not an executable source inventory.
-func (w workspace) checkPublicRuntime() error {
+func (w workspace) checkPublicRuntime(revision string) error {
+	if reviewedBrewRevisions[revision] == "" {
+		return errors.New("unrecognized Homebrew execution source")
+	}
+	if actual, err := reviewedBrewSource("/opt/homebrew"); err == nil && actual != revision {
+		return errors.New("installed Homebrew release changed before execution")
+	} else if err != nil && revision != brewRevision {
+		return errors.New("installed Homebrew release is no longer reviewed")
+	}
 	source := filepath.Join(w.root, "runtime/brew")
 	for _, directory := range []string{"bin", "Library"} {
 		err := filepath.WalkDir(filepath.Join(source, directory), func(path string, entry os.DirEntry, walkErr error) error {
@@ -338,7 +346,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if err != nil || !slices.Equal(files, c.frozen) {
 		return fail(errors.New("collected inputs changed before planning"))
 	}
-	if err := s.w.checkPublicRuntime(); err != nil {
+	if err := s.w.checkPublicRuntime(c.runtimeRevision); err != nil {
 		return fail(err)
 	}
 	s.lock, err = acquireOperationLock(filepath.Dir(c.root))
@@ -374,7 +382,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if _, err := rand.Read(nonce); err != nil {
 		return fail(err)
 	}
-	s.plan = executionPlan{Schema: 3, MinimumAge: policy.MinimumAgeSeconds(), Nodes: c.Evidence(), Actions: actions, BeforeState: before, Environment: executionEnvironment{c.runtimeDigest, strings.TrimSpace(string(osVersion)), "/opt/homebrew"}, Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)), IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600), Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{}}
+	s.plan = executionPlan{Schema: 3, MinimumAge: policy.MinimumAgeSeconds(), Nodes: c.Evidence(), Actions: actions, BeforeState: before, Environment: executionEnvironment{Runtime: c.runtimeDigest, BrewRevision: c.runtimeRevision, OSVersion: strings.TrimSpace(string(osVersion)), Prefix: "/opt/homebrew"}, Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)), IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600), Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{}}
 	for _, name := range c.inputs.Targets {
 		for _, node := range c.nodes {
 			if name == node.Artifact.Name {
@@ -454,6 +462,9 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		fresh.Assessment.Now = time.Now().Unix()
 		if fresh.Assessment.Now < s.plan.IssuedAt || fresh.Assessment.Now >= s.plan.ExpiresAt || domain.Evaluate(fresh.Assessment).Outcome != domain.Allow {
 			return ports.ExecutionResult{}, errors.New("execution plan expired")
+		}
+		if err := s.w.checkPublicRuntime(s.plan.Environment.BrewRevision); err != nil {
+			return ports.ExecutionResult{}, err
 		}
 		args := []string{selected.Operation, "--formula", "--force-bottle"}
 		if selected.Operation == "install" && !slices.ContainsFunc(s.plan.Targets, func(a domain.Artifact) bool { return a.Name == selected.Name }) {

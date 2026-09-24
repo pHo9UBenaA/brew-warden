@@ -42,11 +42,12 @@ Constrain executable paths, options, environment, resource limits, and output.
 ## Installed attestation command
 
 The [provenance adapter](../internal/adapters/attestation/README.md) delegates
-cryptography to installed GitHub CLI 2.101.0. It is not bundled, installed,
-downloaded or updated by BrewWarden. A missing or incompatible command holds
-operations requiring its evidence; its version and trust roots remain explicit
-product dependencies even though the application module uses only the standard
-library.
+cryptography to installed GitHub CLI 2.66.0 through 2.101.0, with mandatory
+exact-digest signer and verified-Rekor-time output checks. It is not bundled,
+installed, downloaded or updated by BrewWarden. A missing or incompatible
+command holds operations requiring its evidence; its version and trust roots
+remain explicit product dependencies even though the application module uses
+only the standard library.
 
 ## Release requirements
 

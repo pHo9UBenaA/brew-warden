@@ -74,9 +74,10 @@ effects in separate adapters and compose them outside; keep additional pure rule
 in the core. Follow [Homebrew integration](homebrew-integration.md) for the required
 capability records and contract tests. Do not create placeholder abstractions.
 
-The `homebrew` adapter owns the reviewed installed-runtime fingerprint, public
-signed-metadata commands, private process environment, candidate evidence,
-public execution session and minimal in-flight process record. Advisory and attestation-age observations use the same authenticated candidate identity;
+The `homebrew` adapter owns reviewed installed release identity, copied-runtime
+binding, public signed-metadata commands, private process environment,
+candidate evidence, public execution session and minimal in-flight process
+record. Advisory and attestation-age observations use the same authenticated candidate identity;
 all transport and command details remain outside core policy.
 
 ## Enforcement

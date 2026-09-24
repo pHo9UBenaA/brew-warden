@@ -4,8 +4,8 @@ Scripts are the source of truth; optional Task v3 aliases call the same scripts.
 Use the Go version pinned in `.go-version`, Git, and a POSIX shell. Race detection
 also requires a C compiler; it does not enable cgo in product code. The product
 mutation path is supported only on native Apple Silicon arm64 macOS Tahoe with
-its reviewed `/opt/homebrew` runtime; Linux and x86_64 test runs are development
-checks, not product acceptance.
+a reviewed `/opt/homebrew` release source; Linux and x86_64 test runs are
+development checks, not product acceptance.
 
 | Command | Checks or output | Network |
 | --- | --- | --- |
@@ -77,7 +77,8 @@ separate from the baseline; see Native product acceptance below.
 The distribution build checks repeatability of both binaries and complete license/documentation archives. Product installation enforcement and distribution
 packaging are implemented for the supported scope. The local product-ready gate
 requires an unchanged committed revision through its two human-mediated VM phases;
-passing ordinary CI alone never claims native product readiness. Public release
+passing ordinary CI alone never claims native product readiness. Reviewed
+adapter-level cohort probes do not replace that committed-revision gate. Public release
 signing and notarization have not been performed. Go may add a linker ad-hoc signature on
 macOS; this is not publisher authentication. Building does not publish, tag,
 notarize, or establish provenance of the compiler.
