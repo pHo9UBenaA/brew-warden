@@ -1,8 +1,9 @@
 # Follow-up: bounded security review and exact-revision local readiness
 
-Date: 2026-09-24. Status: planned; this document does not itself establish
-product readiness. Current product rules remain in `docs/design.md`; operational
-checks and their limits remain in `docs/verification.md`.
+Date: 2026-09-24. Status: follow-up worklist; the exact-revision gate result
+must be recorded separately. This document does not itself establish product
+readiness. Current product rules remain in `docs/design.md`; operational checks
+and their limits remain in `docs/verification.md`.
 
 ## Starting point and scope
 

@@ -11,6 +11,7 @@ unset BREWWARDEN_VM_TART
 usage() {
   printf 'Usage: %s start BASE NEW_VM REVIEWED_BREW_TREE GH_ARM64\n' "$0" >&2
   printf '       %s complete VM\n' "$0" >&2
+  printf '       %s cancel VM\n' "$0" >&2
   exit 2
 }
 fail() { printf '%s\n' "$*" >&2; exit 1; }
@@ -69,11 +70,29 @@ start() {
   printf '%s\n' "$archive" > "$root/archive"
   /usr/bin/shasum -a 256 "$archive" | /usr/bin/awk '{print $1}' > "$root/archive-sha256"
   clean_source
+  trap 'mark_prepare_failure $?' 0
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   run_logged vm-prepare ./scripts/macos-vm-acceptance.sh prepare "$base" "$vm" "$source" "$gh" "$archive"
+  trap - 0 INT TERM
   printf '%s\n' awaiting-device-approval > "$root/state"
   printf 'Offline checks and repeat build passed; private Apple Silicon VM prepared.\n'
+  trap 'finish_on_exit $?' 0
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   ./scripts/macos-vm-acceptance.sh auth "$vm"
+  trap - 0 INT TERM
   printf 'Approve the device code in your browser, then run: %s complete %s\n' "$0" "$vm"
+  printf 'If approval expires, request a fresh code with the guest runner or run: %s cancel %s\n' "$0" "$vm"
+}
+mark_prepare_failure() {
+  result=$1
+  trap - 0
+  if [ "$result" -ne 0 ]; then
+    printf '%s\n' failed > "$root/state"
+    printf 'VM preparation failed; NOT product-ready. Review %s and confirm clone cleanup.\n' "$root" >&2
+  fi
+  exit "$result"
 }
 finish_on_exit() {
   result=$1
@@ -82,7 +101,7 @@ finish_on_exit() {
     printf 'Guest credentials removed and VM stopped.\n'
   else
     /usr/bin/tail -n 20 "$root/vm-finish.log" >&2
-    printf 'Guest cleanup failed: manually remove guest credentials and stop %s; NOT product-ready.\n' "$vm" >&2
+    printf 'Guest cleanup unconfirmed: verify credentials were removed and %s is stopped; NOT product-ready.\n' "$vm" >&2
     result=1
   fi
   if [ "$result" -eq 0 ]; then
@@ -101,6 +120,17 @@ finish_on_exit() {
     printf 'Local acceptance failed; NOT product-ready. Review %s\n' "$root" >&2
   fi
   exit "$result"
+}
+cancel() {
+  [ "$#" -eq 1 ] || usage
+  vm=$1; valid_name "$vm"
+  root="$PWD/.cache/product-ready.$vm"
+  [ -d "$root" ] && [ ! -L "$root" ] && [ "$(read_line "$root/state")" = awaiting-device-approval ] || fail 'No pending readiness run for this VM; cannot cancel an unrelated clone'
+  printf 'Cancelling pending VM readiness; NOT product-ready.\n'
+  trap 'finish_on_exit 1' 0
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
+  exit 1
 }
 complete() {
   [ "$#" -eq 1 ] || usage
@@ -127,5 +157,6 @@ operation=$1; shift
 case "$operation" in
   start) start "$@" ;;
   complete) complete "$@" ;;
+  cancel) cancel "$@" ;;
   *) usage ;;
 esac

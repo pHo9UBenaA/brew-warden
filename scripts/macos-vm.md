@@ -65,8 +65,11 @@ and `fixture absent-jq|absent-xz|older-xz|repair-jq` separately. Fixtures modify
 **only that disposable guest**; `absent-*` deliberately uninstalls all versions
 of the named fixture formulae. Do not run unrelated guest mutations concurrently.
 `prepare` verifies VirtualMac arm64 before replacing the guest prefix, then runs
-the packaged `doctor` against the supported installed-runtime fingerprint.
-`auth` starts the standard gh device flow inside a private guest HOME; approval
+the packaged `doctor` against the supported installed-runtime fingerprint. If
+preparation fails after a successful clone, the runner attempts guest credential
+removal and stops only that newly created clone; it retains private diagnostics
+and reports any cleanup it cannot confirm. A failed `doctor` never counts as
+success. `auth` starts the standard gh device flow inside a private guest HOME; approval
 is human-mediated. Standard gh device login asks for `repo`, `read:org`, and
 `gist` scopes. `finish` removes guest credentials and stops the VM; also revoke
 the temporary GitHub CLI OAuth authorization from the account afterward.
@@ -85,6 +88,10 @@ export PATH="$PWD/.cache/sdk/go/bin:$PATH"
   "$REVIEWED_HOMEBREW_TREE" "$GH_ARM64"
 # Human: approve the guest-only short-lived GitHub device code.
 ./scripts/product-ready.sh complete brewwarden-ready-01
+# If approval expires, request a fresh code inside this guest:
+# ./scripts/macos-vm-acceptance.sh auth brewwarden-ready-01
+# Or fail this gate and stop its pending guest:
+# ./scripts/product-ready.sh cancel brewwarden-ready-01
 ```
 
 `start` runs `check.sh all` (baseline unit/integration tests, race, coverage,
@@ -93,7 +100,10 @@ the opt-in native tests. It repeats the committed `darwin/arm64` distribution
 build, fingerprints its archive, provisions a fresh guest and requests human
 device approval. `complete` refuses a changed source or archive, requires guest
 authentication and runs the **entire** VM suite. It removes guest credentials and
-stops the VM on success or failed execution. Only after all checks, VM cases and
+stops the VM on success or failed execution. If approval is still pending,
+`complete` refuses to run and keeps the gate pending; `cancel` records failure
+and stops only that gate's VM. If `start` fails while requesting a device code,
+it cleans up the newly prepared guest rather than leaving it running. Only after all checks, VM cases and
 cleanup pass does it write `product-ready.txt` under a private, ignored
 `.cache/product-ready.VM/` evidence directory and report **local product-ready
 for the tested initial scope**. A failed run is not resumable as proof of

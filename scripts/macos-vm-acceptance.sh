@@ -50,6 +50,21 @@ require_guest() {
   arch=$(guest "$1" /usr/bin/arch) || fail 'Guest architecture unavailable'
   case "$model:$arch" in VirtualMac*:arm64) ;; *) fail 'Only a disposable Apple Silicon VirtualMac is supported' ;; esac
 }
+cleanup_prepare_on_exit() {
+  result=$1
+  trap - 0
+  if [ "$result" -ne 0 ] && [ "${clone_owned:-0}" -eq 1 ]; then
+    printf 'VM setup failed; cleaning up the newly created clone %s.\n' "$vm" >&2
+    if guest "$vm" /usr/bin/id > /dev/null 2>&1 && ./scripts/macos-vm-acceptance.sh finish "$vm" > "$evidence/failed-prepare-cleanup.log" 2>&1; then
+      printf 'Guest credentials removed and new clone stopped.\n' >&2
+    elif tart_run stop "$vm" >> "$evidence/failed-prepare-cleanup.log" 2>&1; then
+      printf 'VM stopped; guest credential cleanup unconfirmed. Review %s\n' "$evidence/failed-prepare-cleanup.log" >&2
+    else
+      printf 'VM cleanup unconfirmed; inspect and stop only %s. Review %s\n' "$vm" "$evidence/failed-prepare-cleanup.log" >&2
+    fi
+  fi
+  exit "$result"
+}
 prepare() {
   [ "$#" -eq 5 ] || usage
   base=$1; vm=$2; source=$3; gh=$4; archive=$5
@@ -69,7 +84,12 @@ prepare() {
   shasum -a 256 "$gh" "$archive" > "$evidence/inputs.sha256"
   tar -cf "$evidence/reviewed-brew.tar" -C "$source" bin/brew Library/Homebrew
   shasum -a 256 "$evidence/reviewed-brew.tar" >> "$evidence/inputs.sha256"
+  clone_owned=0
+  trap 'cleanup_prepare_on_exit $?' 0
+  trap 'exit 130' INT
+  trap 'exit 143' TERM
   tart_run clone "$base" "$vm"
+  clone_owned=1
   tart_run set "$vm" --cpu 4 --memory 4096
   nohup env -i HOME="$tart_user_home" TART_HOME="$tart_home" TART_NO_AUTO_PRUNE=1 \
     PATH=/usr/bin:/bin "$tart" run --no-graphics --no-audio --no-clipboard "$vm" \
@@ -99,12 +119,13 @@ prepare() {
   /bin/cat "$evidence/doctor.log"
   printf 'Prepare complete. Run: %s auth %s\n' "$0" "$vm"
   printf 'Do not reboot this modified clone: its guest agent still refers to the original prefix.\n'
+  trap - 0 INT TERM
 }
 auth() {
   [ "$#" -eq 1 ] || usage
   vm=$1; valid_name "$vm"; require_guest "$vm"
   if guest_auth "$vm"; then printf 'Guest gh is already authenticated.\n'; return; fi
-  guest "$vm" /bin/sh -c 'umask 077; if test -f /private/tmp/bw-acceptance/home/device.pid && /bin/kill -0 "$(/bin/cat /private/tmp/bw-acceptance/home/device.pid)" 2>/dev/null; then exit 0; fi; HOME=/private/tmp/bw-acceptance/home PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login --hostname github.com --git-protocol https --web > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null & echo $! > /private/tmp/bw-acceptance/home/device.pid'
+  guest "$vm" /bin/sh -c 'umask 077; if test -f /private/tmp/bw-acceptance/home/device.pid && /bin/kill -0 "$(/bin/cat /private/tmp/bw-acceptance/home/device.pid)" 2>/dev/null; then exit 0; fi; : > /private/tmp/bw-acceptance/home/device.log; HOME=/private/tmp/bw-acceptance/home PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login --hostname github.com --git-protocol https --web > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null & echo $! > /private/tmp/bw-acceptance/home/device.pid'
   count=0
   while [ "$count" -lt 20 ]; do
     lines=$(guest "$vm" /bin/sh -c '/usr/bin/grep -E "One-time code|Open this URL" /private/tmp/bw-acceptance/home/device.log 2>/dev/null' || true)
@@ -249,13 +270,22 @@ suite() {
 }
 finish() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"; require_guest "$vm"
+  vm=$1; valid_name "$vm"
+  if ! guest "$vm" /usr/bin/id > /dev/null 2>&1; then
+    if tart_run stop "$vm"; then
+      fail 'Guest agent unavailable; VM stopped but guest credential cleanup unconfirmed'
+    fi
+    fail 'Guest agent unavailable; VM stop and credential cleanup unconfirmed'
+  fi
+  require_guest "$vm"
   # GH CLI may fall back to a plaintext guest config. Logout first, then
   # discard only this VM's private credentials; never touch host auth state.
   guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" \
     "$guest_gh" auth logout --hostname github.com >/dev/null 2>&1 || true
-  guest "$vm" /bin/sh -c 'rm -rf /private/tmp/bw-acceptance/home/.config/gh /private/tmp/bw-acceptance/home/.local/state/gh /private/tmp/bw-acceptance/home/device.log /private/tmp/bw-acceptance/home/device.pid'
-  tart_run stop "$vm"
+  cleaned=1
+  guest "$vm" /bin/sh -c 'rm -rf /private/tmp/bw-acceptance/home/.config/gh /private/tmp/bw-acceptance/home/.local/state/gh /private/tmp/bw-acceptance/home/device.log /private/tmp/bw-acceptance/home/device.pid' || cleaned=0
+  tart_run stop "$vm" || fail 'Guest stop failed; credential cleanup and VM state unconfirmed'
+  [ "$cleaned" -eq 1 ] || fail 'Guest credential removal failed; VM stopped but cleanup unconfirmed'
   printf 'Guest credentials removed and VM stopped. If device login was approved, also revoke its GitHub CLI OAuth grant in your account settings.\n'
 }
 [ "$#" -ge 1 ] || usage
