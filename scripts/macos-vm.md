@@ -34,7 +34,7 @@ own sandbox separately denies network access during native installation.
 
 ## Local-only acceptance runner
 
-The optional VM cases in `tests/` have the `vmacceptance` build tag and are **not**
+The optional VM cases in `tests/vm/` have the `vmacceptance` build tag and are **not**
 part of `go test ./...` or GitHub Actions. `scripts/macos-vm-acceptance.sh` drives
 Tart and compiles those tests only when invoked locally. It does not use
 Playwright or a browser automation dependency: native subprocesses, installed
@@ -121,7 +121,7 @@ clone and assuming the agent will restart.
 
 Transfer explicit archives with `tart exec -i ... tar -xf -`. Do not mount host
 folders. Product test inputs are a private workspace, installed supported gh
-and an arm64 test binary built from `./tests`. The distribution contains no
+and an arm64 test binary built from `./tests/vm`. The distribution contains no
 Homebrew or Ruby bytes; the guest installation must match the reviewed runtime
 fingerprint.
 For final acceptance, transfer the complete reproducible distribution archive.

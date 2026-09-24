@@ -1,6 +1,6 @@
 //go:build vmacceptance
 
-package tests
+package vm
 
 import (
 	"testing"

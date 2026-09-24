@@ -30,7 +30,7 @@ operations and failures, never gh flags or HTTP client objects.
 | `internal/composition` | Construct and connect implementations | every internal layer |
 | `cmd/<name>` | Process entry point | composition |
 | `tools` | Development harness, not product code | tools |
-| `tests` | Cross-boundary integration tests, test files only | all internal product layers |
+| `tests` | External policy/application/CLI contract tests and shared fixtures; `tests/vm` is tagged native product acceptance, test files only | all internal product layers |
 
 Domain standard-library imports are a small allowlist of computation packages.
 Ports additionally permit `context` and `io`; application may use those packages

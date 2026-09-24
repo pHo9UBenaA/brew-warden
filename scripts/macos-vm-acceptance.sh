@@ -156,7 +156,7 @@ run_case() {
   [ "$(go env GOVERSION)" = "go$(cat .go-version)" ] || fail 'Pinned Go toolchain required for local VM tests'
   mkdir -p .cache
   output=$(mktemp "$PWD/.cache/vm-acceptance-test.XXXXXXXX")
-  GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c -tags=vmacceptance -o "$output" ./tests
+  GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c -tags=vmacceptance -o "$output" ./tests/vm
   tart_run exec -i "$vm" /bin/sh -c 'umask 077; cat > /private/tmp/bw-acceptance/acceptance.test && chmod 0700 /private/tmp/bw-acceptance/acceptance.test' < "$output"
   rm -f "$output"
   case "$mode" in

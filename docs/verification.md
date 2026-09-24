@@ -112,15 +112,34 @@ while its child remains, and require fresh checks once it stops. Application
 tests verify session binding, stale evidence, cancellation and partial/unknown
 outcomes. They do not substitute for native Homebrew execution.
 
+## Test ownership
+
+Tests are grouped by the boundary they exercise, not by a claim that every
+function is exclusively a unit or integration test:
+
+- `internal/<layer>/*_test.go` and `tools/<tool>/*_test.go` exercise their owning
+  package. Explicitly gated live Homebrew adapter probes remain next to the
+  unexported adapter implementation they test; they never mutate the host.
+- `tests/*_test.go` exercises public domain policy contracts, application and
+  CLI behavior across layers. Policy fixtures are shared with bound-execution
+  tests, so moving them into a second copied fixture would make both diverge.
+- `tests/vm/*_test.go` exercises the real packaged product and Homebrew only in
+  a disposable VM, with an explicit `vmacceptance` tag and separate local runner.
+  It is absent from normal test and CI package discovery.
+
+This is a responsibility/execution boundary, not a proof of exhaustive test
+coverage. Cross-layer integration and native acceptance complement package-local
+unit tests rather than counting the same mock as independent evidence.
+
 ## Native product acceptance
 
-All optional `tests/*` native acceptance files use the `vmacceptance` build tag;
-normal `go test ./...`, baseline CI and GitHub Actions do not compile or run
+All optional `tests/vm/*` native acceptance files use the `vmacceptance` build
+tag; normal `go test ./...`, baseline CI and GitHub Actions do not compile or run
 them. Run them only through the local [Tart VM runner](../scripts/macos-vm.md)
-(or explicitly compile `go test -tags=vmacceptance -c ./tests` for the guest).
+(or explicitly compile `go test -tags=vmacceptance -c ./tests/vm` for the guest).
 Human-approved GitHub device authentication stays inside the guest, never CI.
 
-Use `tests/native_execution_test.go` only inside a disposable VirtualMac with
+Use `tests/vm/native_execution_test.go` only inside a disposable VirtualMac with
 `BREWWARDEN_VM_RUNTIME` set to a private test workspace in the disposable
 VM, with supported Homebrew and installed `gh` in the guest. The test checks the hardware
 model before any prefix mutation. `BREWWARDEN_VM_OPERATION=upgrade` selects upgrade;
@@ -163,7 +182,7 @@ by local test success.
 standard-prefix formula selected by `BREWWARDEN_VM_UPGRADE_TARGET`. It requires
 the public bound upgrade to activate the exact verified newer keg while all
 unrelated installed racks remain unchanged; fixture provisioning is explicit in
-the guest. `TestLiveGeneralBottleExecution` in `tests/general_execution_test.go` accepts
+the guest. `TestLiveGeneralBottleExecution` in `tests/vm/general_execution_test.go` accepts
 space-separated `BREWWARDEN_VM_GENERAL_TARGETS` in the same disposable VM.
 Provision absent targets to test fresh installation. It uses live authenticated
 metadata, release and advisory providers, provenance verification, the real public-command

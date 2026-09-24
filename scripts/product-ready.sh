@@ -57,10 +57,10 @@ start() {
   # check.sh all includes verify, normal tests, race, coverage, fuzz, lint and
   # source/binary vulnerability scans. Never let caller-selected FUZZTIME skip fuzzing.
   run_logged check-all /usr/bin/env FUZZTIME=10s ./scripts/check.sh all
-  run_logged vm-vet /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go vet -tags=vmacceptance ./tests
-  run_logged vm-lint "$PWD/.cache/tools/staticcheck" -tags=vmacceptance ./tests
-  run_logged vm-vuln "$PWD/.cache/tools/govulncheck" -tags=vmacceptance -test ./tests
-  run_logged vm-compile /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c -tags=vmacceptance -o "$root/acceptance.test" ./tests
+  run_logged vm-vet /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go vet -tags=vmacceptance ./tests/vm
+  run_logged vm-lint "$PWD/.cache/tools/staticcheck" -tags=vmacceptance ./tests/vm
+  run_logged vm-vuln "$PWD/.cache/tools/govulncheck" -tags=vmacceptance -test ./tests/vm
+  run_logged vm-compile /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c -tags=vmacceptance -o "$root/acceptance.test" ./tests/vm
   run_logged distribution ./scripts/build-product.sh darwin/arm64
   build_dir=$(awk -F ': ' '/^Distribution build evidence: / {print $2}' "$root/distribution.log")
   case "$build_dir" in "$PWD"/.cache/product-build.*) ;; *) fail 'Distribution build evidence path unavailable' ;; esac
