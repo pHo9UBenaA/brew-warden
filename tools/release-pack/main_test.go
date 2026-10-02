@@ -21,8 +21,14 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 	if err := archive(second, []item{files[2], files[0], files[1]}); err != nil {
 		t.Fatal(err)
 	}
-	a, _ := os.ReadFile(first)
-	b, _ := os.ReadFile(second)
+	a, err := os.ReadFile(first)
+	if err != nil {
+		t.Fatal(err)
+	}
+	b, err := os.ReadFile(second)
+	if err != nil {
+		t.Fatal(err)
+	}
 	if !bytes.Equal(a, b) {
 		t.Fatal("archive depends on enumeration or time")
 	}

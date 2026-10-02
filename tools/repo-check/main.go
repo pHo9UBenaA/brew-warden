@@ -35,4 +35,7 @@ func main() {
 		fatal(err)
 	}
 }
-func fatal(err error) { fmt.Fprintln(os.Stderr, err); os.Exit(1) }
+func fatal(err error) {
+	fmt.Fprintln(os.Stderr, err)
+	os.Exit(1)
+}

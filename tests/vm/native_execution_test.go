@@ -105,7 +105,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	policy := domain.DefaultPolicy()
 	waivers := []domain.AgeWaiver{}
 	if fault == "age" || fault == "age-exception" || fault == "exception-changed-input" {
-		policy, err = domain.NewPolicy(9223372036)
+		policy, err = domain.NewPolicy(domain.MaximumMinimumAgeSeconds)
 		if err != nil {
 			t.Fatal(err)
 		}

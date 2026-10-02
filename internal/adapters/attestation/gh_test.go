@@ -23,9 +23,13 @@ func resultFixture(a domain.Artifact) string {
 
 func ghResult(a domain.Artifact, timestamps ...string) string {
 	var entries []map[string]json.RawMessage
-	_ = json.Unmarshal([]byte(resultFixture(a)), &entries)
+	if err := json.Unmarshal([]byte(resultFixture(a)), &entries); err != nil {
+		panic(err)
+	}
 	var verification map[string]json.RawMessage
-	_ = json.Unmarshal(entries[0]["verificationResult"], &verification)
+	if err := json.Unmarshal(entries[0]["verificationResult"], &verification); err != nil {
+		panic(err)
+	}
 	var values []map[string]string
 	for _, ts := range timestamps {
 		values = append(values, map[string]string{"type": "Tlog", "uri": "https://rekor.sigstore.dev", "timestamp": ts})
@@ -45,23 +49,27 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 	if err != nil || got != time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC).Unix() {
 		t.Fatal(got, err)
 	}
-	for _, bad := range []string{
-		"[]", "null", "[" + one + "]{}",
-		"[" + strings.TrimSuffix(strings.Repeat(one+",", ghLimit), ",") + "]",
-		"[" + one + "," + ghResult(func() domain.Artifact { b := a; b.SHA256 = domain.Digest(strings.Repeat("b", 64)); return b }(), "2026-01-01T00:00:00Z") + "]",
-		"[" + ghResult(a) + "]",
-		"[" + ghResult(a, "invalid") + "]",
-		"[" + ghResult(a, "2026-09-24T00:00:00Z") + "]",
-		"[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`, 1) + "]",
-		"[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`, 1) + "]",
-		"[" + strings.Replace(one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`, 1) + "]",
-	} {
-		if _, err := oldestVerifiedTimestamp([]byte(bad), a, now); err == nil {
-			t.Fatal("accepted incomplete or unrelated attestation", bad[:min(len(bad), 100)])
-		}
-	}
 	b := a
 	b.SHA256 = domain.Digest(strings.Repeat("b", 64))
+	for name, bad := range map[string]string{
+		"empty results":          "[]",
+		"null results":           "null",
+		"trailing JSON":          "[" + one + "]{}",
+		"saturated results":      "[" + strings.TrimSuffix(strings.Repeat(one+",", ghLimit), ",") + "]",
+		"unrelated older result": "[" + one + "," + ghResult(b, "2026-01-01T00:00:00Z") + "]",
+		"missing timestamps":     "[" + ghResult(a) + "]",
+		"malformed timestamp":    "[" + ghResult(a, "invalid") + "]",
+		"future timestamp":       "[" + ghResult(a, "2026-09-24T00:00:00Z") + "]",
+		"untrusted log":          "[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`, 1) + "]",
+		"unknown log":            "[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`, 1) + "]",
+		"untrusted repository":   "[" + strings.Replace(one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`, 1) + "]",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := oldestVerifiedTimestamp([]byte(bad), a, now); err == nil {
+				t.Fatal("accepted incomplete or unrelated attestation", bad[:min(len(bad), 100)])
+			}
+		})
+	}
 	if _, err := oldestVerifiedTimestamp([]byte("["+one+"]"), b, now); err == nil {
 		t.Fatal("rebottled bytes inherited old age")
 	}
@@ -164,7 +172,11 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 	if err := os.WriteFile(bottle, []byte("cohort-bottle"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	artifact.SHA256, _ = hashFile(bottle, 1000)
+	var err error
+	artifact.SHA256, err = hashFile(bottle, 1000)
+	if err != nil {
+		t.Fatal("cannot hash cohort bottle fixture", err)
+	}
 	verified := "[" + ghResult(artifact, "2026-09-10T00:00:00Z") + "]"
 	for _, tc := range []struct {
 		version string
@@ -197,7 +209,11 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 	if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	a.SHA256, _ = hashFile(bottle, 1000)
+	var err error
+	a.SHA256, err = hashFile(bottle, 1000)
+	if err != nil {
+		t.Fatal("cannot hash command-boundary bottle fixture", err)
+	}
 	tool := filepath.Join(root, "gh")
 	verified := "[" + ghResult(a, "2026-09-10T00:00:00Z") + "]"
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
@@ -213,7 +229,9 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 		{"bottle changed", "printf changed > \"$3\"; printf '%s' '" + verified + "'", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			_ = os.WriteFile(bottle, []byte("bottle"), 0600)
+			if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
+				t.Fatal("cannot restore bottle fixture", err)
+			}
 			script := "#!/bin/sh\nif [ \"$1\" = version ]; then printf 'gh version 2.101.0 (fixture)\\n'; exit 0; fi\n" +
 				"test \"$1\" = attestation && test \"$2\" = verify && test \"$3\" = '" + bottle + "' && test \"$4\" = --repo && test \"$5\" = Homebrew/homebrew-core && test \"$6\" = --predicate-type && test \"$8\" = --format && test \"${10}\" = --limit && test \"${11}\" = 100 || exit 5\n" + tc.script + "\n"
 			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {

@@ -7,7 +7,7 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-func TestConfig(t *testing.T) {
+func TestParseConfigDefaultsAndExplicitZeroAge(t *testing.T) {
 	for _, data := range []string{
 		`{"schemaVersion":1}`,
 		`{"schemaVersion":1,"age":{"minimumHours":168},"trust":{"allowedTaps":["homebrew/core"]},"verification":{"requireChecksum":true,"requireBottleAttestation":true},"emergency":{"mode":"suggest","waivableRules":["age"]}}`,

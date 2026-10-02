@@ -41,11 +41,15 @@ func Execute(ctx context.Context, original ports.Prepared, session ports.Executi
 		return result, errors.New("execution revalidation failed")
 	}
 	now := clock.Now()
-	if fresh.Assessment.Policy != original.Assessment.Policy || fresh.Assessment.Binding != original.Assessment.Binding || fresh.BeforeState != original.BeforeState || fresh.ExceptionID != original.ExceptionID ||
-		!fresh.BeforeState.Valid() || fresh.ExpiresAt <= now || original.ExpiresAt <= now || fresh.ExpiresAt > original.ExpiresAt {
+	samePlan := fresh.Assessment.Policy == original.Assessment.Policy &&
+		fresh.Assessment.Binding == original.Assessment.Binding &&
+		fresh.BeforeState == original.BeforeState && fresh.ExceptionID == original.ExceptionID
+	if !samePlan || !fresh.BeforeState.Valid() || fresh.ExpiresAt <= now || original.ExpiresAt <= now || fresh.ExpiresAt > original.ExpiresAt {
 		return result, errors.New("execution plan changed or expired")
 	}
-	if (fresh.Assessment.Exception == nil) != (fresh.ExceptionID == "") || (fresh.ExceptionID != "" && !fresh.ExceptionID.Valid()) {
+	hasException := fresh.Assessment.Exception != nil
+	hasExceptionID := fresh.ExceptionID != ""
+	if hasException != hasExceptionID || (hasExceptionID && !fresh.ExceptionID.Valid()) {
 		return result, errors.New("execution exception identity invalid")
 	}
 	fresh.Assessment.Now = now

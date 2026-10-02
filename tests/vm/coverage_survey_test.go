@@ -52,7 +52,9 @@ func TestLivePublicCoverageSurvey(t *testing.T) {
 			record.Result = "evidence collected"
 			for _, node := range record.Candidates {
 				for _, evidence := range node.Evidence {
-					if evidence.Status != domain.Verified || evidence.Claim == domain.Vulnerabilities && evidence.Applicability != domain.NoKnownApplicableFindings || evidence.Claim == domain.Publication && time.Now().Unix()-evidence.PublishedAt < domain.DefaultPolicy().MinimumAgeSeconds() {
+					if evidence.Status != domain.Verified ||
+						(evidence.Claim == domain.Vulnerabilities && evidence.Applicability != domain.NoKnownApplicableFindings) ||
+						(evidence.Claim == domain.Publication && time.Now().Unix()-evidence.PublishedAt < domain.DefaultPolicy().MinimumAgeSeconds()) {
 						record.Result = "held by evidence or age policy"
 					}
 				}

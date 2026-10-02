@@ -109,7 +109,11 @@ func TestInFlightParentExitHelper(t *testing.T) {
 
 func TestInFlightParentDeathAndFreshRetry(t *testing.T) {
 	for _, pending := range []bool{false, true} {
-		t.Run(map[bool]string{false: "committed", true: "pending"}[pending], func(t *testing.T) {
+		name := "committed"
+		if pending {
+			name = "pending"
+		}
+		t.Run(name, func(t *testing.T) {
 			directory := t.TempDir()
 			writer := exec.Command(os.Args[0], "-test.run=^TestInFlightParentExitHelper$")
 			writer.Env = append(os.Environ(), "BREWWARDEN_INFLIGHT_HELPER=1", "BREWWARDEN_INFLIGHT_DIR="+directory)

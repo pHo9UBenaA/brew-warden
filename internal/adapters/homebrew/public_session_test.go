@@ -14,7 +14,8 @@ func TestPublicOperationLockExcludesConcurrentMutation(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if _, err := acquireOperationLock(directory); err == nil {
+	if second, err := acquireOperationLock(directory); err == nil {
+		second.Close()
 		t.Fatal("second mutation acquired the active operation lock")
 	}
 	if err := lock.Close(); err != nil {
@@ -103,14 +104,30 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		want   string
 	}{
 		{"current", func(*installedFormula) {}, "keep"},
-		{"absent", func(s *installedFormula) { s.Installed = nil; s.LinkedKeg = nil }, "install"},
+		{"absent", func(s *installedFormula) {
+			s.Installed = nil
+			s.LinkedKeg = nil
+		}, "install"},
 		{"outdated", func(s *installedFormula) {
 			old := "1.0"
 			s.LinkedKeg = &old
 			s.Installed[0].Version = old
 			s.Outdated = true
 		}, "upgrade"},
-		{"newer installed", func(s *installedFormula) { old := "999.0"; s.LinkedKeg = &old; s.Installed[0].Version = old }, ""},
+		{"newer installed", func(s *installedFormula) {
+			newer := "999.0"
+			s.LinkedKeg = &newer
+			s.Installed[0].Version = newer
+		}, ""},
+		{"active version missing", func(s *installedFormula) {
+			missing := "missing"
+			s.LinkedKeg = &missing
+		}, ""},
+		{"duplicate active version with unsupported flags", func(s *installedFormula) {
+			unsupported := s.Installed[0]
+			unsupported.Poured = false
+			s.Installed = append(s.Installed, unsupported)
+		}, ""},
 		{"pinned", func(s *installedFormula) { s.Pinned = true }, ""},
 		{"unlinked", func(s *installedFormula) { s.LinkedKeg = nil }, ""},
 		{"partial pour", func(s *installedFormula) { s.LinkIncomplete = true }, ""},
@@ -135,24 +152,6 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		t.Fatal("upgrade of absent root accepted")
 	}
 }
-func TestPublicOperationLock(t *testing.T) {
-	directory := t.TempDir()
-	first, err := acquireOperationLock(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	if second, err := acquireOperationLock(directory); err == nil {
-		second.Close()
-		t.Fatal("concurrent operation accepted")
-	}
-	first.Close()
-	second, err := acquireOperationLock(directory)
-	if err != nil {
-		t.Fatal(err)
-	}
-	second.Close()
-}
-
 func TestPublicOperationLockRejectsUnsafeFiles(t *testing.T) {
 	for _, kind := range []string{"symlink", "shared file"} {
 		t.Run(kind, func(t *testing.T) {

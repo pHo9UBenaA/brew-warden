@@ -11,6 +11,19 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
+const diagnosticHelp = `BrewWarden (bwd / brewwarden)
+Usage: bwd [--config PATH] [--minimum-release-age DURATION] doctor
+       bwd brew install|upgrade ... (disabled)
+This build cannot enable execution.`
+
+const executionHelp = `BrewWarden (bwd / brewwarden)
+Usage: bwd [--config PATH] [--minimum-release-age DURATION]
+           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]
+       bwd doctor
+Supported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/homebrew.
+Age exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.
+No casks, third-party taps, source builds or arbitrary Homebrew options.`
+
 // Unsupported commands never fall through to an unchecked brew process.
 func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, service *application.Service) int {
 	if len(args) == 1 && args[0] == "--version" {
@@ -20,16 +33,12 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		return 0
 	}
 	if len(args) == 1 && (args[0] == "--help" || args[0] == "-h") {
-		if service == nil {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION] doctor\n       bwd brew install|upgrade ... (disabled)\nThis build cannot enable execution.")
-			if err != nil {
-				return 1
-			}
-		} else {
-			_, err := fmt.Fprintln(out, "BrewWarden (bwd / brewwarden)\nUsage: bwd [--config PATH] [--minimum-release-age DURATION]\n           [--age-exception NAME=REASON] brew install|upgrade [FORMULA ...]\n       bwd doctor\nSupported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/homebrew.\nAge exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.\nNo casks, third-party taps, source builds or arbitrary Homebrew options.")
-			if err != nil {
-				return 1
-			}
+		help := diagnosticHelp
+		if service != nil {
+			help = executionHelp
+		}
+		if _, err := fmt.Fprintln(out, help); err != nil {
+			return 1
 		}
 		return 0
 	}
@@ -90,23 +99,7 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	run := *service
 	run.Present = func(p ports.Prepared) error {
-		if _, err := fmt.Fprintln(errOut, "Checking requested formulae and dependencies:"); err != nil {
-			return err
-		}
-		for _, node := range p.Assessment.Nodes {
-			a := node.Artifact
-			if _, err := fmt.Fprintf(errOut, "  %s %s\n", a.Name, a.Version); err != nil {
-				return err
-			}
-		}
-		if p.Assessment.Exception != nil {
-			for _, w := range p.Assessment.Exception.Waivers {
-				if _, err := fmt.Fprintf(errOut, "  Age exception: %s sha256:%s reason=%q\n", w.Artifact.Name, w.Artifact.SHA256, w.Reason); err != nil {
-					return err
-				}
-			}
-		}
-		return nil
+		return presentPlan(errOut, p)
 	}
 	result, err := run.Run(ctx, ports.Request{Operation: rest[1], Targets: rest[2:]}, policy, overrides)
 	if err != nil {
@@ -132,6 +125,26 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		return 1
 	}
 	return 0
+}
+
+func presentPlan(out io.Writer, prepared ports.Prepared) error {
+	if _, err := fmt.Fprintln(out, "Checking requested formulae and dependencies:"); err != nil {
+		return err
+	}
+	for _, node := range prepared.Assessment.Nodes {
+		artifact := node.Artifact
+		if _, err := fmt.Fprintf(out, "  %s %s\n", artifact.Name, artifact.Version); err != nil {
+			return err
+		}
+	}
+	if prepared.Assessment.Exception != nil {
+		for _, waiver := range prepared.Assessment.Exception.Waivers {
+			if _, err := fmt.Fprintf(out, "  Age exception: %s sha256:%s reason=%q\n", waiver.Artifact.Name, waiver.Artifact.SHA256, waiver.Reason); err != nil {
+				return err
+			}
+		}
+	}
+	return nil
 }
 
 func ageOptions(args []string) ([]string, []ports.AgeOverride, error) {

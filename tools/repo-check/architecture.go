@@ -199,22 +199,26 @@ func architecture(root string) error {
 			}
 		}
 	}
+	const (
+		visiting = iota + 1
+		visited
+	)
 	state := map[string]int{}
 	var visit func(string) error
 	visit = func(n string) error {
-		if state[n] == 1 {
+		if state[n] == visiting {
 			return fmt.Errorf("package import cycle at %s", n)
 		}
-		if state[n] == 2 {
+		if state[n] == visited {
 			return nil
 		}
-		state[n] = 1
+		state[n] = visiting
 		for _, next := range graph[n] {
 			if err := visit(next); err != nil {
 				return err
 			}
 		}
-		state[n] = 2
+		state[n] = visited
 		return nil
 	}
 	keys := make([]string, 0, len(graph))

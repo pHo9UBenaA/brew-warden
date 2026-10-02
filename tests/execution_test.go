@@ -38,7 +38,10 @@ func (s *executionSession) Run(_ context.Context, _ domain.Binding) (ports.Execu
 	s.ran = true
 	return s.result, s.runErr
 }
-func (s *executionSession) Close() error { s.closed = true; return s.closeErr }
+func (s *executionSession) Close() error {
+	s.closed = true
+	return s.closeErr
+}
 
 func preparedExecution() ports.Prepared {
 	a := eligibleAssessment()
@@ -99,11 +102,11 @@ func TestFreshExecutionFailureGatesNeverLaunch(t *testing.T) {
 				clock.now += 121
 			case "emergency signature":
 				waiveYoung(&s.prepared.Assessment)
-				s.prepared.Assessment.Nodes[0].Evidence[2].Status = domain.Failed
+				evidenceFor(&s.prepared.Assessment.Nodes[0], domain.Provenance).Status = domain.Failed
 				s.prepared.ExceptionID = domain.Digest(strings.Repeat("e", 64))
 				p.ExceptionID = s.prepared.ExceptionID
 			case "stale vulnerability":
-				s.prepared.Assessment.Nodes[1].Evidence[4].ExpiresAt = clock.now
+				evidenceFor(&s.prepared.Assessment.Nodes[1], domain.Vulnerabilities).ExpiresAt = clock.now
 			case "cancel during revalidation":
 				s.afterValidate = cancel
 			case "clock advances":

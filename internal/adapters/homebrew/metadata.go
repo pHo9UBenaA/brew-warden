@@ -3,9 +3,10 @@ package homebrew
 import (
 	"errors"
 	"fmt"
-	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"slices"
 	"strings"
+
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 type formulaMetadata struct {
@@ -50,23 +51,27 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 		}
 		index[f.Name] = f
 	}
+	const (
+		visiting = iota + 1
+		visited
+	)
 	state := map[string]int{}
 	var visit func(string) error
 	visit = func(name string) error {
 		f, ok := index[name]
-		if !ok || state[name] == 1 {
+		if !ok || state[name] == visiting {
 			return errors.New("incomplete or cyclic metadata closure")
 		}
-		if state[name] == 2 {
+		if state[name] == visited {
 			return nil
 		}
-		state[name] = 1
+		state[name] = visiting
 		for _, dep := range f.Dependencies {
 			if err := visit(dep); err != nil {
 				return err
 			}
 		}
-		state[name] = 2
+		state[name] = visited
 		return nil
 	}
 	seenTargets := map[string]bool{}
@@ -88,7 +93,10 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 	candidates := []formulaMetadata{}
 	for name := range state {
 		f := index[name]
-		if !f.artifact().Valid() || !slices.Contains([]string{"arm64_tahoe", "all"}, f.BottleTag) || !slices.Contains([]string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar"}, f.Cellar) || f.BottleURL != "https://ghcr.io/v2/homebrew/core/"+strings.ReplaceAll(f.Name, "@", "/")+"/blobs/sha256:"+string(f.BottleSHA256) {
+		expectedURL := "https://ghcr.io/v2/homebrew/core/" + strings.ReplaceAll(f.Name, "@", "/") + "/blobs/sha256:" + string(f.BottleSHA256)
+		supportedTag := slices.Contains([]string{"arm64_tahoe", "all"}, f.BottleTag)
+		supportedCellar := slices.Contains([]string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar"}, f.Cellar)
+		if !f.artifact().Valid() || !supportedTag || !supportedCellar || f.BottleURL != expectedURL {
 			return nil, nil, fmt.Errorf("unsupported bottle for %s: tag %q, cellar %q", f.Name, f.BottleTag, f.Cellar)
 		}
 		candidates = append(candidates, f)

@@ -20,7 +20,8 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/ports"
 )
 
-// It coordinates only BrewWarden operations, not independent Homebrew clients.
+// publicSession owns one bound execution and its operation lock. The lock
+// coordinates only BrewWarden operations, not independent Homebrew clients.
 type publicSession struct {
 	w        workspace
 	prepared ports.Prepared
@@ -113,33 +114,13 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		if err != nil {
 			return nil, "", err
 		}
+		candidate := nodes[slices.Index(names, formula.Name)].Artifact
 		for j := range formula.Installed {
 			version := &formula.Installed[j]
-			identity := nodes[slices.Index(names, formula.Name)].Artifact
-			identity.Version = version.Version
-			if !identity.Valid() {
-				return nil, "", errors.New("invalid installed version path")
-			}
-			keg := filepath.Join("/opt/homebrew/Cellar", formula.Name, version.Version)
-			resolved, err := filepath.EvalSymlinks(keg)
-			if err != nil || resolved != keg {
-				return nil, "", errors.New("installed keg escapes expected prefix")
-			}
-			raw, err := readRegular(filepath.Join(keg, "INSTALL_RECEIPT.json"), 1024*1024)
+			version.ReceiptSHA256, err = installedReceiptDigest(candidate, version.Version)
 			if err != nil {
 				return nil, "", err
 			}
-			var receipt struct {
-				Arch   string `json:"arch" required:"true"`
-				Source struct {
-					Tap  string `json:"tap" required:"true"`
-					Spec string `json:"spec" required:"true"`
-				} `json:"source" required:"true"`
-			}
-			if err := decodeSchema(raw, &receipt, true); err != nil || receipt.Arch != "arm64" || receipt.Source.Tap != "homebrew/core" || receipt.Source.Spec != "stable" {
-				return nil, "", errors.New("installed receipt is not official core stable")
-			}
-			version.ReceiptSHA256 = digestBytes(raw)
 		}
 	}
 	raw, err := json.Marshal(document.Formulae)
@@ -156,6 +137,35 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		return nil, "", err
 	}
 	return document.Formulae, digest, nil
+}
+
+// installedReceiptDigest binds a recorded official-core installation to its
+// receipt bytes. It does not authenticate the installed payload itself.
+func installedReceiptDigest(candidate domain.Artifact, version string) (domain.Digest, error) {
+	candidate.Version = version
+	if !candidate.Valid() {
+		return "", errors.New("invalid installed version path")
+	}
+	keg := filepath.Join("/opt/homebrew/Cellar", candidate.Name, version)
+	resolved, err := filepath.EvalSymlinks(keg)
+	if err != nil || resolved != keg {
+		return "", errors.New("installed keg escapes expected prefix")
+	}
+	raw, err := readRegular(filepath.Join(keg, "INSTALL_RECEIPT.json"), 1024*1024)
+	if err != nil {
+		return "", err
+	}
+	var receipt struct {
+		Arch   string `json:"arch" required:"true"`
+		Source struct {
+			Tap  string `json:"tap" required:"true"`
+			Spec string `json:"spec" required:"true"`
+		} `json:"source" required:"true"`
+	}
+	if err := decodeSchema(raw, &receipt, true); err != nil || receipt.Arch != "arm64" || receipt.Source.Tap != "homebrew/core" || receipt.Source.Spec != "stable" {
+		return "", errors.New("installed receipt is not official core stable")
+	}
+	return digestBytes(raw), nil
 }
 
 // Homebrew 7.0.4's Keg#linked? uses var/homebrew/linked, while Keg#optlinked?
@@ -214,50 +224,51 @@ func publicActions(states []installedFormula, nodes []domain.Node, request colle
 		if state.LinkIncomplete {
 			return nil, errors.New("installed Homebrew link step is incomplete; repair with brew link before retrying")
 		}
-		action := "install"
-		if len(state.Installed) == 0 {
-			if request.Operation == "upgrade" && slices.Contains(request.Targets, state.Name) {
-				return nil, errors.New("upgrade target is not installed")
-			}
-		} else {
-			wanted := node.Artifact.Version
-			if node.Artifact.Revision > 0 {
-				wanted += "_" + strconv.Itoa(node.Artifact.Revision)
-			}
-			selected := ""
-			if state.LinkedKeg != nil {
-				selected = *state.LinkedKeg
-			}
-			if selected == "" {
-				return nil, errors.New("unlinked installed candidate requires manual Homebrew repair")
-			}
-			found := false
-			for _, version := range state.Installed {
-				if version.Version != selected {
-					continue
-				}
-				found = true
-				if len(version.Options) != 0 || !version.Poured || !version.Built {
-					return nil, errors.New("installed candidate is not a supported bottle")
-				}
-				// These public receipt flags describe recorded installation state.
-				// They do not establish the digest of an already installed payload.
-				if version.Version == wanted {
-					action = "keep"
-				} else if state.Outdated {
-					action = "upgrade"
-				} else {
-					return nil, errors.New("candidate downgrade or unmatched installed version")
-				}
-			}
-			if !found {
-				return nil, errors.New("active installed version is absent from public info")
-			}
+		operation, err := installedAction(state, node.Artifact, request)
+		if err != nil {
+			return nil, err
 		}
-		result = append(result, plannedAction{Name: state.Name, Operation: action})
+		result = append(result, plannedAction{Name: state.Name, Operation: operation})
 	}
 	return result, nil
 }
+func installedAction(state installedFormula, candidate domain.Artifact, request collectionInputs) (string, error) {
+	if len(state.Installed) == 0 {
+		if request.Operation == "upgrade" && slices.Contains(request.Targets, state.Name) {
+			return "", errors.New("upgrade target is not installed")
+		}
+		return "install", nil
+	}
+	wanted := candidate.Version
+	if candidate.Revision > 0 {
+		wanted += "_" + strconv.Itoa(candidate.Revision)
+	}
+	if state.LinkedKeg == nil || *state.LinkedKeg == "" {
+		return "", errors.New("unlinked installed candidate requires manual Homebrew repair")
+	}
+	operation := ""
+	for _, version := range state.Installed {
+		if version.Version != *state.LinkedKeg {
+			continue
+		}
+		if len(version.Options) != 0 || !version.Poured || !version.Built {
+			return "", errors.New("installed candidate is not a supported bottle")
+		}
+		// Public receipt flags describe installation state, not payload integrity.
+		if version.Version == wanted {
+			operation = "keep"
+		} else if state.Outdated {
+			operation = "upgrade"
+		} else {
+			return "", errors.New("candidate downgrade or unmatched installed version")
+		}
+	}
+	if operation == "" {
+		return "", errors.New("active installed version is absent from public info")
+	}
+	return operation, nil
+}
+
 func acquireOperationLock(directory string) (*os.File, error) {
 	file, err := os.OpenFile(filepath.Join(directory, "execution.lock"), os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0600)
 	if err != nil {
@@ -303,22 +314,22 @@ func (w workspace) checkPublicRuntime(revision string) error {
 			}
 			destination := filepath.Join("/opt/homebrew", relative)
 			if entry.Type()&os.ModeSymlink != 0 {
-				a, err := os.Readlink(path)
+				copiedLink, err := os.Readlink(path)
 				if err != nil {
 					return err
 				}
-				b, err := os.Readlink(destination)
-				if err != nil || a != b {
+				installedLink, err := os.Readlink(destination)
+				if err != nil || copiedLink != installedLink {
 					return errors.New("installed Homebrew runtime link differs from supported build")
 				}
 				return nil
 			}
-			a, err := readRegular(path, 128*1024*1024)
+			copiedBytes, err := readRegular(path, 128*1024*1024)
 			if err != nil {
 				return err
 			}
-			b, err := readRegular(destination, 128*1024*1024)
-			if err != nil || digestBytes(a) != digestBytes(b) {
+			installedBytes, err := readRegular(destination, 128*1024*1024)
+			if err != nil || digestBytes(copiedBytes) != digestBytes(installedBytes) {
 				return errors.New("installed Homebrew differs from supported build")
 			}
 			return nil
@@ -356,7 +367,13 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if err := clearStoppedInFlight(filepath.Dir(c.root)); err != nil {
 		return fail(err)
 	}
-	immutable := []string{filepath.Join(s.w.root, "public-execution.sb"), filepath.Join(s.w.root, "runtime"), filepath.Join(s.w.root, "cache/api"), filepath.Join(s.w.root, "cache/downloads"), filepath.Join(s.w.root, "plan.json")}
+	immutable := []string{
+		filepath.Join(s.w.root, "public-execution.sb"),
+		filepath.Join(s.w.root, "runtime"),
+		filepath.Join(s.w.root, "cache/api"),
+		filepath.Join(s.w.root, "cache/downloads"),
+		filepath.Join(s.w.root, "plan.json"),
+	}
 	// Installer descendants must not rewrite confinement or frozen inputs.
 	for _, file := range files {
 		immutable = append(immutable, filepath.Join(s.w.root, file.Path))
@@ -382,7 +399,17 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if _, err := rand.Read(nonce); err != nil {
 		return fail(err)
 	}
-	s.plan = executionPlan{Schema: 3, MinimumAge: policy.MinimumAgeSeconds(), Nodes: c.Evidence(), Actions: actions, BeforeState: before, Environment: executionEnvironment{Runtime: c.runtimeDigest, BrewRevision: c.runtimeRevision, OSVersion: strings.TrimSpace(string(osVersion)), Prefix: "/opt/homebrew"}, Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)), IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600), Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{}}
+	s.plan = executionPlan{
+		Schema: 3, MinimumAge: policy.MinimumAgeSeconds(),
+		Nodes: c.Evidence(), Actions: actions, BeforeState: before,
+		Environment: executionEnvironment{
+			Runtime: c.runtimeDigest, BrewRevision: c.runtimeRevision,
+			OSVersion: strings.TrimSpace(string(osVersion)), Prefix: "/opt/homebrew",
+		},
+		Inputs: files, Attempt: domain.Digest(hex.EncodeToString(nonce)),
+		IssuedAt: now, ExpiresAt: min(now+600, c.observedAt+3600),
+		Waivers: append([]domain.AgeWaiver{}, waivers...), Targets: []domain.Artifact{},
+	}
 	for _, name := range c.inputs.Targets {
 		for _, node := range c.nodes {
 			if name == node.Artifact.Name {
@@ -439,23 +466,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		}
 	}
 	for len(remaining) != 0 {
-		var selected plannedAction
-		for _, node := range s.plan.Nodes {
-			action, ok := remaining[node.Artifact.Name]
-			if !ok {
-				continue
-			}
-			ready := true
-			for _, dependency := range node.Dependencies {
-				if _, pending := remaining[dependency.Name]; pending {
-					ready = false
-				}
-			}
-			if ready {
-				selected = action
-				break
-			}
-		}
+		selected := nextReadyAction(s.plan.Nodes, remaining)
 		if selected.Name == "" {
 			return ports.ExecutionResult{}, errors.New("cyclic execution plan")
 		}
@@ -485,6 +496,26 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	matches := err == nil && slices.IndexFunc(actions, func(a plannedAction) bool { return a.Operation != "keep" }) < 0
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }
+
+// Select the first pending action whose dependencies have already completed.
+// Node order remains deterministic; an empty result means no progress is possible.
+func nextReadyAction(nodes []domain.Node, remaining map[string]plannedAction) plannedAction {
+	for _, node := range nodes {
+		action, pending := remaining[node.Artifact.Name]
+		if !pending {
+			continue
+		}
+		blocked := slices.ContainsFunc(node.Dependencies, func(dependency domain.Artifact) bool {
+			_, pending := remaining[dependency.Name]
+			return pending
+		})
+		if !blocked {
+			return action
+		}
+	}
+	return plannedAction{}
+}
+
 func (s *publicSession) runCommand(ctx context.Context, args []string) (ports.ExecutionResult, error) {
 	ctx, cancel := context.WithTimeout(ctx, 15*time.Minute)
 	defer cancel()
@@ -507,7 +538,12 @@ func (s *publicSession) runCommand(ctx context.Context, args []string) (ports.Ex
 	if err := command.Start(); err != nil {
 		return ports.ExecutionResult{}, err
 	}
-	owned := inFlight{Schema: 1, Plan: s.prepared.Assessment.Binding.Plan, Attempt: s.prepared.Assessment.Binding.Attempt, PID: command.Process.Pid, Session: command.Process.Pid, Collection: filepath.Base(s.w.root)}
+	owned := inFlight{
+		Schema: 1, Plan: s.prepared.Assessment.Binding.Plan,
+		Attempt: s.prepared.Assessment.Binding.Attempt,
+		PID:     command.Process.Pid, Session: command.Process.Pid,
+		Collection: filepath.Base(s.w.root),
+	}
 	if err := saveInFlight(filepath.Dir(s.w.root), owned); err != nil {
 		_ = syscall.Kill(-command.Process.Pid, syscall.SIGKILL)
 		_ = command.Wait()

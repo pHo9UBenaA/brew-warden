@@ -4,8 +4,9 @@ import (
 	"bytes"
 	"encoding/json"
 	"errors"
-	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 	"io"
+
+	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
 func verifiedSubject(data []byte, a domain.Artifact) error {
@@ -62,7 +63,9 @@ func verifiedSubject(data []byte, a domain.Artifact) error {
 		if err := decodeObject(signature.Certificate, &cert, "subjectAlternativeName", "issuer", "sourceRepositoryURI", "runnerEnvironment"); err != nil {
 			return err
 		}
-		if (cert.Identity != identityPrefix+"publish-commit-bottles.yml@refs/heads/main" && cert.Identity != identityPrefix+"dispatch-build-bottle.yml@refs/heads/main") || cert.Issuer != issuer || cert.Repository != repository || cert.Runner != "github-hosted" {
+		trustedWorkflow := cert.Identity == identityPrefix+"publish-commit-bottles.yml@refs/heads/main" ||
+			cert.Identity == identityPrefix+"dispatch-build-bottle.yml@refs/heads/main"
+		if !trustedWorkflow || cert.Issuer != issuer || cert.Repository != repository || cert.Runner != "github-hosted" {
 			return errors.New("provenance signer identity mismatch")
 		}
 		var statement struct {

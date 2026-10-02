@@ -1,8 +1,6 @@
 package homebrew
 
-import (
-	"strconv"
-)
+import "strconv"
 
 type collectionInputs struct {
 	Schema     int               `json:"schema" required:"true"`

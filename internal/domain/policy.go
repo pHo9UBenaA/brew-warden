@@ -5,6 +5,10 @@ import "errors"
 
 const DefaultMinimumAgeSeconds int64 = 168 * 60 * 60
 
+// MaximumMinimumAgeSeconds is the whole-second limit of Go's signed 64-bit
+// nanosecond duration. Keep CLI durations and persisted hours in the same range.
+const MaximumMinimumAgeSeconds int64 = 9223372036
+
 // Policy cannot disable integrity, provenance, trust or vulnerability checks.
 // Its zero value is invalid; use NewPolicy or DefaultPolicy.
 type Policy struct {
@@ -13,7 +17,7 @@ type Policy struct {
 }
 
 func NewPolicy(minimumAgeSeconds int64) (Policy, error) {
-	if minimumAgeSeconds < 0 || minimumAgeSeconds > 9223372036 {
+	if minimumAgeSeconds < 0 || minimumAgeSeconds > MaximumMinimumAgeSeconds {
 		return Policy{}, errors.New("minimum age must fit a nonnegative duration in whole seconds")
 	}
 	return Policy{minimumAgeSeconds: minimumAgeSeconds, valid: true}, nil

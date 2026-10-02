@@ -56,7 +56,7 @@ func ParseConfig(r io.Reader) (domain.Policy, error) {
 	seconds := domain.DefaultMinimumAgeSeconds
 	if doc.Age != nil && doc.Age.MinimumHours != nil {
 		hours := *doc.Age.MinimumHours
-		if hours < 0 || hours > 9223372036/3600 {
+		if hours < 0 || hours > domain.MaximumMinimumAgeSeconds/3600 {
 			return domain.Policy{}, errors.New("minimumHours is outside the supported duration range")
 		}
 		seconds = hours * 3600

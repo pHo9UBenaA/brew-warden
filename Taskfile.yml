@@ -17,7 +17,7 @@ tasks:
     desc: Run baseline offline checks
     cmds: ['./scripts/verify.sh']
   build:
-    desc: Build the repository checker (product CLI is not implemented)
+    desc: Build the repository checker and diagnostic-only CLIs
     cmds: ['./scripts/check.sh build']
   test-race:
     desc: Run race detection and shuffled tests (requires a C compiler)
@@ -26,11 +26,11 @@ tasks:
     desc: Report test coverage without an arbitrary percentage gate
     cmds: ['./scripts/check.sh cover']
   fuzz:
-    desc: Fuzz commit message handling (FUZZTIME defaults to 10s)
+    desc: Fuzz commit messages, configuration, evidence and policy (FUZZTIME defaults to 10s)
     cmds: ['./scripts/check.sh fuzz']
   lint:
     desc: Run pinned Staticcheck
     cmds: ['./scripts/check.sh lint']
   vuln:
-    desc: Scan source, tests, and checker binary (network)
+    desc: Scan source, tests, checker and CLI binaries (network)
     cmds: ['./scripts/check.sh vuln']

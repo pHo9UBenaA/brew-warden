@@ -47,9 +47,12 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 			return errors.New("unsupported bottle installation side effects")
 		}
 		if relative == ".bottle" || strings.HasPrefix(relative, ".bottle/") {
-			root := relative == ".bottle" || relative == ".bottle/etc" || relative == ".bottle/var"
-			content := strings.HasPrefix(relative, ".bottle/etc/") || strings.HasPrefix(relative, ".bottle/var/")
-			if root && header.Typeflag != tar.TypeDir || !root && !content || header.Typeflag != tar.TypeDir && header.Typeflag != tar.TypeReg {
+			isSharedRoot := relative == ".bottle" || relative == ".bottle/etc" || relative == ".bottle/var"
+			isSharedContent := strings.HasPrefix(relative, ".bottle/etc/") || strings.HasPrefix(relative, ".bottle/var/")
+			if isSharedRoot && header.Typeflag != tar.TypeDir || !isSharedRoot && !isSharedContent {
+				return errors.New("unsupported bottle shared-prefix entry")
+			}
+			if header.Typeflag != tar.TypeDir && header.Typeflag != tar.TypeReg {
 				return errors.New("unsupported bottle shared-prefix entry")
 			}
 		}

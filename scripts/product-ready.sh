@@ -14,7 +14,10 @@ usage() {
   printf '       %s cancel VM\n' "$0" >&2
   exit 2
 }
-fail() { printf '%s\n' "$*" >&2; exit 1; }
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
 valid_name() {
   case "$1" in
     ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;

@@ -15,7 +15,23 @@ import (
 type workspace struct{ root string }
 
 func (w workspace) environment() []string {
-	return []string{"HOME=" + filepath.Join(w.root, "home"), "PATH=/usr/bin:/bin:/usr/sbin:/sbin", "TMPDIR=" + filepath.Join(w.root, "tmp"), "XDG_CONFIG_HOME=" + filepath.Join(w.root, "home/config"), "HOMEBREW_CACHE=" + filepath.Join(w.root, "cache"), "HOMEBREW_LOGS=" + filepath.Join(w.root, "logs"), "HOMEBREW_TEMP=" + filepath.Join(w.root, "tmp"), "HOMEBREW_NO_AUTO_UPDATE=1", "HOMEBREW_NO_ANALYTICS=1", "HOMEBREW_NO_ENV_HINTS=1", "HOMEBREW_NO_COLOR=1", "HOMEBREW_NO_INSTALL_CLEANUP=1", "HOMEBREW_NO_AUTOREMOVE=1", "HOMEBREW_NO_BOOTSNAP=1", "TZ=UTC"}
+	return []string{
+		"HOME=" + filepath.Join(w.root, "home"),
+		"PATH=/usr/bin:/bin:/usr/sbin:/sbin",
+		"TMPDIR=" + filepath.Join(w.root, "tmp"),
+		"XDG_CONFIG_HOME=" + filepath.Join(w.root, "home/config"),
+		"HOMEBREW_CACHE=" + filepath.Join(w.root, "cache"),
+		"HOMEBREW_LOGS=" + filepath.Join(w.root, "logs"),
+		"HOMEBREW_TEMP=" + filepath.Join(w.root, "tmp"),
+		"HOMEBREW_NO_AUTO_UPDATE=1",
+		"HOMEBREW_NO_ANALYTICS=1",
+		"HOMEBREW_NO_ENV_HINTS=1",
+		"HOMEBREW_NO_COLOR=1",
+		"HOMEBREW_NO_INSTALL_CLEANUP=1",
+		"HOMEBREW_NO_AUTOREMOVE=1",
+		"HOMEBREW_NO_BOOTSNAP=1",
+		"TZ=UTC",
+	}
 }
 func (w workspace) initialize() error {
 	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations", "states"} {
@@ -26,7 +42,10 @@ func (w workspace) initialize() error {
 	return nil
 }
 func (w workspace) sandbox(name string, network bool, mutablePrefix bool, immutable []string) (string, error) {
-	quote := func(value string) string { raw, _ := json.Marshal(value); return string(raw) }
+	quote := func(value string) string {
+		raw, _ := json.Marshal(value)
+		return string(raw)
+	}
 	profile := "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write* (subpath " + quote(w.root) + ") (literal \"/dev/null\"))\n"
 	if !network {
 		profile += "(deny network*)\n"

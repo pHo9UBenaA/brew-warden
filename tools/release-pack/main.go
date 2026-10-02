@@ -27,7 +27,10 @@ func main() {
 		os.Exit(1)
 	}
 }
-func hash(b []byte) string { s := sha256.Sum256(b); return hex.EncodeToString(s[:]) }
+func hash(data []byte) string {
+	sum := sha256.Sum256(data)
+	return hex.EncodeToString(sum[:])
+}
 func run(args []string) error {
 	if len(args) != 4 {
 		return fmt.Errorf("usage: release-pack BINARY GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")

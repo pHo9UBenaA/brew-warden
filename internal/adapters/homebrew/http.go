@@ -11,7 +11,13 @@ import (
 func publicClient() *http.Client {
 	transport := http.DefaultTransport.(*http.Transport).Clone()
 	transport.Proxy = nil
-	return &http.Client{Transport: transport, Timeout: 60 * time.Second, CheckRedirect: func(*http.Request, []*http.Request) error { return errors.New("metadata redirects are unsupported") }}
+	return &http.Client{
+		Transport: transport,
+		Timeout:   60 * time.Second,
+		CheckRedirect: func(*http.Request, []*http.Request) error {
+			return errors.New("metadata redirects are unsupported")
+		},
+	}
 }
 
 // Reject ambiguous keys and excessive depth in official advisory responses.

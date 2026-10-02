@@ -21,7 +21,10 @@ usage() {
   printf '       %s fixture VM absent-jq|absent-xz|older-xz|repair-jq\n' "$0" >&2
   exit 2
 }
-fail() { printf '%s\n' "$*" >&2; exit 1; }
+fail() {
+  printf '%s\n' "$*" >&2
+  exit 1
+}
 valid_name() {
   case "$1" in
     ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
@@ -32,8 +35,7 @@ tart_run() {
     PATH=/usr/bin:/bin "$tart" "$@"
 }
 guest() {
-  vm=$1; shift
-  tart_run exec "$vm" "$@"
+  tart_run exec "$@"
 }
 guest_auth() {
   guest "$1" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" \
@@ -131,7 +133,20 @@ auth() {
   [ "$#" -eq 1 ] || usage
   vm=$1; valid_name "$vm"; require_guest "$vm"
   if guest_auth "$vm"; then printf 'Guest gh is already authenticated.\n'; return; fi
-  guest "$vm" /bin/sh -c 'umask 077; if test -f /private/tmp/bw-acceptance/home/device.pid && /bin/kill -0 "$(/bin/cat /private/tmp/bw-acceptance/home/device.pid)" 2>/dev/null; then exit 0; fi; : > /private/tmp/bw-acceptance/home/device.log; HOME=/private/tmp/bw-acceptance/home PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login --hostname github.com --git-protocol https --web > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null & echo $! > /private/tmp/bw-acceptance/home/device.pid'
+  guest "$vm" /bin/sh -c '
+    umask 077
+    if test -f /private/tmp/bw-acceptance/home/device.pid &&
+      /bin/kill -0 "$(/bin/cat /private/tmp/bw-acceptance/home/device.pid)" 2>/dev/null; then
+      exit 0
+    fi
+    : > /private/tmp/bw-acceptance/home/device.log
+    HOME=/private/tmp/bw-acceptance/home \
+      PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true \
+      /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login \
+        --hostname github.com --git-protocol https --web \
+        > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null &
+    echo $! > /private/tmp/bw-acceptance/home/device.pid
+  '
   count=0
   while [ "$count" -lt 20 ]; do
     lines=$(guest "$vm" /bin/sh -c '/usr/bin/grep -Ei "one-time code|Open this URL" /private/tmp/bw-acceptance/home/device.log 2>/dev/null' || true)

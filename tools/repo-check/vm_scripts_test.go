@@ -212,7 +212,6 @@ func TestVMFinishRemovesGuestCredentialsAndStops(t *testing.T) {
 }
 
 func TestVMFinishStopsAfterGuestCredentialRemovalFails(t *testing.T) {
-
 	root, tart := vmScriptFixture(t)
 	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
 		t.Fatal(err)

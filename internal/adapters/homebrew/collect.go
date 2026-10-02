@@ -44,7 +44,11 @@ type downloadDocument struct {
 }
 
 func (c *Collector) Collect(ctx context.Context, request ports.Request, now int64) (*Collection, error) {
-	if c == nil || ctx == nil || c.BottleVerifier == nil || now <= 0 || now > 1<<62 || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" || !domain.ValidRequest(request.Operation, request.Targets) || len(request.Targets) == 0 {
+	if c == nil || ctx == nil || c.BottleVerifier == nil || now <= 0 || now > 1<<62 {
+		return nil, errors.New("unsupported native collection request")
+	}
+	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" ||
+		!domain.ValidRequest(request.Operation, request.Targets) || len(request.Targets) == 0 {
 		return nil, errors.New("unsupported native collection request")
 	}
 	if !filepath.IsAbs(c.Directory) {
@@ -140,7 +144,13 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 			if claim == domain.Checksum {
 				raw, _ = json.Marshal(struct{ Bottle domain.Digest }{f.BottleSHA256})
 			}
-			evidence, err := domain.NewEvidence(domain.Evidence{Claim: claim, Subject: f.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "Homebrew signed formula API", ProviderVersion: "brew/" + reviewedBrewRevisions[result.runtimeRevision], RawSHA256: digestBytes(raw), ObservedAt: result.observedAt, ExpiresAt: result.observedAt + 3600})
+			evidence, err := domain.NewEvidence(domain.Evidence{
+				Claim: claim, Subject: f.artifact(), Status: domain.Verified,
+				Provider: domain.Homebrew, Source: "Homebrew signed formula API",
+				ProviderVersion: "brew/" + reviewedBrewRevisions[result.runtimeRevision],
+				RawSHA256:       digestBytes(raw), ObservedAt: result.observedAt,
+				ExpiresAt: result.observedAt + 3600,
+			})
 			if err != nil {
 				return err
 			}

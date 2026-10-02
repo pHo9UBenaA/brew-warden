@@ -226,7 +226,9 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 	}
 	raw = append(raw, '\n')
 	digest := digestBytes(raw)
-	if pin != "" && digest != pin || pin == "" && !sourceReviewed && digest != supportedRuntimeDigest {
+	fixtureMismatch := pin != "" && digest != pin
+	unreviewedRuntime := pin == "" && !sourceReviewed && digest != supportedRuntimeDigest
+	if fixtureMismatch || unreviewedRuntime {
 		return digest, errors.New("installed Homebrew version or runtime differs from supported build")
 	}
 	if pin == "" && sourceReviewed {

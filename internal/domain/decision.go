@@ -65,7 +65,6 @@ type Assessment struct {
 	Nodes     []Node
 	Now       int64
 	Exception *AgeException
-	// Supplied from the trusted attempt journal, not serialized authorization.
 }
 
 // Evaluate requires the full reachable graph, exactly one current evidence item
@@ -119,37 +118,43 @@ func Evaluate(a Assessment) Decision {
 			}
 		}
 		for claim := Metadata; claim <= Vulnerabilities; claim++ {
-			items := byClaim[claim]
-			code := ""
-			if len(items) != 1 {
-				code = "evidence_missing_or_ambiguous"
-			} else {
-				e := items[0]
-				switch {
-				case !e.valid() || e.ObservedAt > a.Now || e.ExpiresAt <= a.Now:
-					code = "evidence_invalid_or_stale"
-				case e.Status != Verified:
-					code = "required_evidence_unverified"
-				case claim == Vulnerabilities && e.Applicability != NoKnownApplicableFindings:
-					code = "vulnerability_applicability_unresolved"
-				case claim == Publication:
-					if e.Publication != VerifiedAttestation || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
-						code = "publication_unknown_or_conflicting"
-					} else if a.Now-e.PublishedAt < a.Policy.MinimumAgeSeconds() {
-						code = "release_too_young"
-					}
-				}
+			code := requiredEvidenceReason(byClaim[claim], claim, a.Policy, a.Now)
+			if code == "" {
+				continue
 			}
-			if code != "" {
-				if claim == Publication && code == "release_too_young" && waivers[node.Artifact] {
-					d.Waived = append(d.Waived, node.Artifact)
-				} else {
-					add(Hold, code, node.Artifact, claim)
-				}
+			if claim == Publication && code == "release_too_young" && waivers[node.Artifact] {
+				d.Waived = append(d.Waived, node.Artifact)
+			} else {
+				add(Hold, code, node.Artifact, claim)
 			}
 		}
 	}
 	return d
+}
+
+// requiredEvidenceReason returns an empty code only for one current, verified
+// claim. Denials from any duplicate evidence are handled separately by Evaluate.
+func requiredEvidenceReason(items []Evidence, claim Claim, policy Policy, now int64) string {
+	if len(items) != 1 {
+		return "evidence_missing_or_ambiguous"
+	}
+	e := items[0]
+	switch {
+	case !e.valid() || e.ObservedAt > now || e.ExpiresAt <= now:
+		return "evidence_invalid_or_stale"
+	case e.Status != Verified:
+		return "required_evidence_unverified"
+	case claim == Vulnerabilities && e.Applicability != NoKnownApplicableFindings:
+		return "vulnerability_applicability_unresolved"
+	case claim == Publication:
+		if e.Publication != VerifiedAttestation || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
+			return "publication_unknown_or_conflicting"
+		}
+		if now-e.PublishedAt < policy.MinimumAgeSeconds() {
+			return "release_too_young"
+		}
+	}
+	return ""
 }
 
 func validGraph(targets []Artifact, nodes []Node) bool {
@@ -165,17 +170,21 @@ func validGraph(targets []Artifact, nodes []Node) bool {
 		names[n.Artifact.Name] = true
 		index[n.Artifact] = n
 	}
+	const (
+		visiting uint8 = iota + 1
+		visited
+	)
 	state := map[Artifact]uint8{}
 	var visit func(Artifact) bool
 	visit = func(id Artifact) bool {
 		n, exists := index[id]
-		if !exists || state[id] == 1 {
+		if !exists || state[id] == visiting {
 			return false
 		}
-		if state[id] == 2 {
+		if state[id] == visited {
 			return true
 		}
-		state[id] = 1
+		state[id] = visiting
 		seen := map[Artifact]bool{}
 		for _, dep := range n.Dependencies {
 			if seen[dep] || !visit(dep) {
@@ -183,7 +192,7 @@ func validGraph(targets []Artifact, nodes []Node) bool {
 			}
 			seen[dep] = true
 		}
-		state[id] = 2
+		state[id] = visited
 		return true
 	}
 	seen := map[Artifact]bool{}

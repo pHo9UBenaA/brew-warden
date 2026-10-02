@@ -261,7 +261,13 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		if err != nil {
 			return nil, err
 		}
-		e, err := domain.NewEvidence(domain.Evidence{Claim: domain.Vulnerabilities, Subject: candidate.artifact(), Status: domain.Verified, Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database", ProviderVersion: "brew/" + reviewedBrewRevisions[revision], RawSHA256: digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600, Applicability: applies})
+		e, err := domain.NewEvidence(domain.Evidence{
+			Claim: domain.Vulnerabilities, Subject: candidate.artifact(), Status: domain.Verified,
+			Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database",
+			ProviderVersion: "brew/" + reviewedBrewRevisions[revision],
+			RawSHA256:       digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600,
+			Applicability: applies,
+		})
 		if err != nil {
 			return nil, err
 		}
