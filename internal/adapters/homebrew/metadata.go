@@ -27,7 +27,11 @@ type metadataDocument struct {
 }
 
 func (f formulaMetadata) artifact() domain.Artifact {
-	return domain.Artifact{Tap: "homebrew/core", Name: f.Name, Version: f.Version, Revision: f.Revision, Rebuild: f.Rebuild, OS: "macos", Arch: "arm64", BottleTag: f.BottleTag, SHA256: f.BottleSHA256}
+	return domain.Artifact{
+		Tap: "homebrew/core", Name: f.Name, Version: f.Version,
+		Revision: f.Revision, Rebuild: f.Rebuild,
+		OS: "macos", Arch: "arm64", BottleTag: f.BottleTag, SHA256: f.BottleSHA256,
+	}
 }
 func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaMetadata, error) {
 	var doc metadataDocument

@@ -30,7 +30,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	if err != nil || !digest.Valid() {
 		t.Fatalf("reviewed Homebrew runtime unavailable: %v", err)
 	}
-	profile, err := w.sandbox("cohort-collect", true, false, []string{filepath.Join(root, "runtime/brew/Library")})
+	profile, err := w.sandbox("cohort-collect", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library")})
 	if err != nil {
 		t.Fatal(err)
 	}

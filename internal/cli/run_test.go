@@ -71,10 +71,15 @@ func TestWrapperOptions(t *testing.T) {
 			t.Fatalf("unexpected diagnostic: %s", &diagnostics)
 		}
 	}
-	for _, args := range [][]string{{"--minimum-release-age", "-1h", "doctor"}, {"--minimum-release-age", "0.5s", "doctor"}, {"--minimum-release-age", "1h", "--minimum-release-age", "2h", "doctor"}, {"--config", "", "doctor"}} {
+	for _, args := range [][]string{
+		{"--minimum-release-age", "-1h", "doctor"},
+		{"--minimum-release-age", "0.5s", "doctor"},
+		{"--minimum-release-age", "1h", "--minimum-release-age", "2h", "doctor"},
+		{"--config", "", "doctor"},
+	} {
 		var out, diagnostics bytes.Buffer
 		if RunWithConfig(args, &out, &diagnostics, configSource{}) == 0 || !strings.HasPrefix(diagnostics.String(), "invocation_invalid:") {
-			t.Fatal("invalid wrapper options accepted")
+			t.Fatalf("invalid wrapper options %q accepted: %s", args, &diagnostics)
 		}
 	}
 	_, age, rest, err := options([]string{"brew", "install", "--minimum-release-age", "0h"})

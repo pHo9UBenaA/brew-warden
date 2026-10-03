@@ -94,7 +94,10 @@ func validAdvisoryID(id string) bool {
 		return false
 	}
 	for _, r := range id {
-		if !(r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z' || r >= '0' && r <= '9' || r == '-' || r == '_' || r == '.' || r == ':') {
+		isLetter := r >= 'a' && r <= 'z' || r >= 'A' && r <= 'Z'
+		isDigit := r >= '0' && r <= '9'
+		isSeparator := r == '-' || r == '_' || r == '.' || r == ':'
+		if !isLetter && !isDigit && !isSeparator {
 			return false
 		}
 	}
@@ -137,7 +140,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 			}
 		}
 	}
-	profile, err := w.sandbox("advisory", true, false, []string{
+	profile, err := w.sandbox("advisory", sandboxPermissions{AllowNetwork: true}, []string{
 		filepath.Join(w.root, "runtime/brew/Library"), filepath.Join(w.root, metadataCachePath),
 		filepath.Join(w.root, "runtime/brew/Cellar"), filepath.Join(w.root, "runtime/brew/opt"),
 	})

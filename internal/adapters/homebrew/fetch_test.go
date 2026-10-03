@@ -23,10 +23,19 @@ func TestCLICacheResultsRequireEverySelectedBottle(t *testing.T) {
 	if err := writeNew(file, original, 0600); err != nil {
 		t.Fatal(err)
 	}
-	for _, output := range []string{"", "Warning: bottle unavailable\n", file + "\n" + file + "\n", strings.Replace(file, "arm64_tahoe", "arm64_sonoma", 1) + "\n", strings.Replace(file, "jq--", "other--", 1) + "\n", file + "\r\n"} {
-		if _, err := w.bottleCachePaths([]byte(output), []formulaMetadata{candidate}); err == nil {
-			t.Fatalf("incomplete or wrong bottle result accepted: %q", output)
-		}
+	for name, output := range map[string]string{
+		"missing path":            "",
+		"warning instead of path": "Warning: bottle unavailable\n",
+		"duplicate path":          file + "\n" + file + "\n",
+		"wrong platform":          strings.Replace(file, "arm64_tahoe", "arm64_sonoma", 1) + "\n",
+		"wrong formula":           strings.Replace(file, "jq--", "other--", 1) + "\n",
+		"carriage return":         file + "\r\n",
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, err := w.bottleCachePaths([]byte(output), []formulaMetadata{candidate}); err == nil {
+				t.Fatalf("incomplete or wrong bottle result accepted: %q", output)
+			}
+		})
 	}
 	raw, err := w.bottleCachePaths([]byte(file+"\n"), []formulaMetadata{candidate})
 	if err != nil {

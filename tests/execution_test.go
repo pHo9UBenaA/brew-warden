@@ -67,18 +67,28 @@ func TestFreshExecutionReportsActualExitAndState(t *testing.T) {
 			if result.Outcome != tc.want || !s.ran || !s.closed || (err == nil) != (tc.want == domain.AttemptSucceeded) {
 				t.Fatal(result, err, s)
 			}
-			s.ran = false // A new test session cannot reuse a saved binding.
-			s.prepared.Assessment.Binding.Attempt = domain.Digest(strings.Repeat("d", 64))
-			if _, err := application.Execute(context.Background(), p, s, &executionClock{p.Assessment.Now}); err == nil || s.ran {
-				t.Fatal("changed attempt reused an old plan", err)
-			}
 		})
+	}
+}
+
+func TestExecutionRejectsChangedAttemptWithoutLaunch(t *testing.T) {
+	original := preparedExecution()
+	fresh := preparedExecution()
+	fresh.Assessment.Binding.Attempt = domain.Digest(strings.Repeat("d", 64))
+	session := &executionSession{prepared: fresh}
+	_, err := application.Execute(context.Background(), original, session, &executionClock{original.Assessment.Now})
+	if err == nil || session.ran || !session.closed {
+		t.Fatal("changed attempt reused an old plan or leaked its session", err, session)
 	}
 }
 
 func TestExecutionCannotReportSuccessWhenOwnedProcessStateIsUnresolved(t *testing.T) {
 	p := preparedExecution()
-	s := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, AfterState: domain.Digest(strings.Repeat("c", 64)), MatchesPlan: true}, closeErr: errors.New("owned process still active")}
+	s := &executionSession{
+		prepared: p,
+		result:   ports.ExecutionResult{ExitKnown: true, AfterState: domain.Digest(strings.Repeat("c", 64)), MatchesPlan: true},
+		closeErr: errors.New("owned process still active"),
+	}
 	result, err := application.Execute(context.Background(), p, s, &executionClock{p.Assessment.Now})
 	if err == nil || result.Outcome != domain.AttemptUnknown || !s.ran || !s.closed {
 		t.Fatal("success inferred despite unresolved process", result, err)

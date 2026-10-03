@@ -45,7 +45,9 @@ func TestGitHooks(t *testing.T) {
 	write("scripts/verify.sh", "#!/bin/sh\nset -eu\nprintf verified > hook-verified\n")
 	write("shim/go", "#!/bin/sh\nset -eu\n[ \"$1\" = run ]\n[ \"$2\" = ./tools/repo-check ]\nshift 2\nexec \"$CHECKER\" \"$@\"\n")
 	write(".gitignore", "checker\nshim/\nhook-verified\n.cache/\n")
-	env := append(os.Environ(), "GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "CHECKER="+checker, "PATH="+filepath.Join(root, "shim")+string(os.PathListSeparator)+os.Getenv("PATH"))
+	env := append(os.Environ(),
+		"GIT_CONFIG_GLOBAL=/dev/null", "GIT_CONFIG_NOSYSTEM=1", "CHECKER="+checker,
+		"PATH="+filepath.Join(root, "shim")+string(os.PathListSeparator)+os.Getenv("PATH"))
 	// Do not let Git's hook-local variables redirect this temporary repository.
 	clean := env[:0]
 	for _, v := range env {

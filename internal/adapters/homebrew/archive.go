@@ -39,7 +39,8 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 		}
 		name := strings.TrimSuffix(header.Name, "/")
 		_, duplicate := entries[name]
-		if !safeRelative(name) || duplicate || len(entries) >= 100000 || name != prefix && !strings.HasPrefix(name, prefix+"/") {
+		insideKeg := name == prefix || strings.HasPrefix(name, prefix+"/")
+		if !safeRelative(name) || duplicate || len(entries) >= 100000 || !insideKeg {
 			return errors.New("unsafe or ambiguous bottle path")
 		}
 		relative := strings.TrimPrefix(name, prefix+"/")
@@ -49,7 +50,9 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 		if relative == ".bottle" || strings.HasPrefix(relative, ".bottle/") {
 			isSharedRoot := relative == ".bottle" || relative == ".bottle/etc" || relative == ".bottle/var"
 			isSharedContent := strings.HasPrefix(relative, ".bottle/etc/") || strings.HasPrefix(relative, ".bottle/var/")
-			if isSharedRoot && header.Typeflag != tar.TypeDir || !isSharedRoot && !isSharedContent {
+			unsupportedLocation := !isSharedRoot && !isSharedContent
+			sharedRootIsFile := isSharedRoot && header.Typeflag != tar.TypeDir
+			if unsupportedLocation || sharedRootIsFile {
 				return errors.New("unsupported bottle shared-prefix entry")
 			}
 			if header.Typeflag != tar.TypeDir && header.Typeflag != tar.TypeReg {
@@ -72,7 +75,8 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 			}
 		case tar.TypeSymlink:
 			target := path.Clean(path.Join(path.Dir(name), header.Linkname))
-			if path.IsAbs(header.Linkname) || target != prefix && !strings.HasPrefix(target, prefix+"/") {
+			targetInsideKeg := target == prefix || strings.HasPrefix(target, prefix+"/")
+			if path.IsAbs(header.Linkname) || !targetInsideKeg {
 				return errors.New("bottle link escapes keg")
 			}
 		default:

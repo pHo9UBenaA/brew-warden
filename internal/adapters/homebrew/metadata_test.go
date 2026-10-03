@@ -1,7 +1,6 @@
 package homebrew
 
 import (
-	"encoding/json"
 	"strings"
 	"testing"
 
@@ -23,7 +22,7 @@ func metadataFixture() metadataDocument {
 }
 func TestMetadataClosureAndIdentity(t *testing.T) {
 	doc := metadataFixture()
-	raw, _ := json.Marshal(doc)
+	raw := marshalFixture(t, doc)
 	if recipes, candidates, err := parseMetadata(raw, []string{"jq"}); err != nil || len(recipes) != 2 || len(candidates) != 2 {
 		t.Fatal(recipes, candidates, err)
 	}
@@ -41,23 +40,26 @@ func TestMetadataClosureAndIdentity(t *testing.T) {
 		t.Run(name, func(t *testing.T) {
 			doc := metadataFixture()
 			mutate(&doc)
-			raw, err := json.Marshal(doc)
-			if err != nil {
-				t.Fatal(err)
-			}
+			raw := marshalFixture(t, doc)
 			if _, _, err := parseMetadata(raw, []string{"jq"}); err == nil {
 				t.Fatal("invalid candidate metadata accepted", string(raw))
 			}
 		})
 	}
-	for _, raw := range []string{strings.Replace(string(raw), `"revision":0,`, "", 1), strings.Replace(string(raw), `"schema":1`, `"Schema":1`, 1), strings.Replace(string(raw), `"schema":1`, `"schema":1,"schema":1`, 1)} {
-		if _, _, err := parseMetadata([]byte(raw), []string{"jq"}); err == nil {
-			t.Fatal("ambiguous or incomplete metadata accepted")
-		}
+	for name, invalid := range map[string]string{
+		"missing revision": strings.Replace(string(raw), `"revision":0,`, "", 1),
+		"mis-cased schema": strings.Replace(string(raw), `"schema":1`, `"Schema":1`, 1),
+		"duplicate schema": strings.Replace(string(raw), `"schema":1`, `"schema":1,"schema":1`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if _, _, err := parseMetadata([]byte(invalid), []string{"jq"}); err == nil {
+				t.Fatal("ambiguous or incomplete metadata accepted")
+			}
+		})
 	}
 }
 func FuzzNativeMetadata(f *testing.F) {
-	raw, _ := json.Marshal(metadataFixture())
+	raw := marshalFixture(f, metadataFixture())
 	f.Add(string(raw))
 	f.Add(`{}`)
 	f.Fuzz(func(t *testing.T, s string) {
@@ -72,7 +74,7 @@ func TestBottleCellarMustMatchExecutionPrefix(t *testing.T) {
 	for _, cellar := range []string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar", "/usr/local/Cellar", "/tmp/Cellar"} {
 		doc := metadataFixture()
 		doc.Formulae[0].Cellar = cellar
-		raw, _ := json.Marshal(doc)
+		raw := marshalFixture(t, doc)
 		_, _, err := parseMetadata(raw, []string{"jq"})
 		want := cellar == ":any" || cellar == ":any_skip_relocation" || cellar == "/opt/homebrew/Cellar"
 		if (err == nil) != want {

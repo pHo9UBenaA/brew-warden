@@ -34,7 +34,8 @@ read_line() {
   printf '%s' "$value"
 }
 run_logged() {
-  label=$1; shift
+  label=$1
+  shift
   printf 'Checking %s...\n' "$label"
   if "$@" > "$root/$label.log" 2>&1; then
     printf 'Passed %s.\n' "$label"
@@ -47,8 +48,12 @@ run_logged() {
 }
 start() {
   [ "$#" -eq 4 ] || usage
-  base=$1; vm=$2; source=$3; gh=$4
-  valid_name "$base"; valid_name "$vm"
+  base=$1
+  vm=$2
+  source=$3
+  gh=$4
+  valid_name "$base"
+  valid_name "$vm"
   [ "$base" != "$vm" ] || fail 'Refusing to replace the base VM'
   revision=$(git rev-parse HEAD)
   clean_source
@@ -126,7 +131,8 @@ finish_on_exit() {
 }
 cancel() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"
+  vm=$1
+  valid_name "$vm"
   root="$PWD/.cache/product-ready.$vm"
   [ -d "$root" ] && [ ! -L "$root" ] && [ "$(read_line "$root/state")" = awaiting-device-approval ] || fail 'No pending readiness run for this VM; cannot cancel an unrelated clone'
   printf 'Cancelling pending VM readiness; NOT product-ready.\n'
@@ -137,7 +143,8 @@ cancel() {
 }
 complete() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"
+  vm=$1
+  valid_name "$vm"
   root="$PWD/.cache/product-ready.$vm"
   [ -d "$root" ] && [ ! -L "$root" ] && [ "$(read_line "$root/state")" = awaiting-device-approval ] || fail 'No pending readiness run for this VM; start with a fresh clone'
   # Do not stop a still-pending device login: human approval is required.
@@ -156,7 +163,8 @@ complete() {
   clean_source
 }
 [ "$#" -ge 1 ] || usage
-operation=$1; shift
+operation=$1
+shift
 case "$operation" in
   start) start "$@" ;;
   complete) complete "$@" ;;

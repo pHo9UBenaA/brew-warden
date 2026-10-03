@@ -6,7 +6,6 @@ import (
 	"context"
 	"io"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -26,10 +25,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	if source == "" || len(targets) == 0 {
 		t.Skip("requires disposable VM and explicit targets")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("requires disposable macOS VM")
-	}
+	requireDisposableMac(t)
 	if !domain.ValidRequest("install", targets) {
 		t.Fatal("invalid acceptance targets")
 	}

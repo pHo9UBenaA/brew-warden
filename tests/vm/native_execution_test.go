@@ -70,10 +70,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	if source == "" {
 		t.Skip("requires explicitly provisioned disposable macOS VM")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("native execution tests require a disposable macOS VM")
-	}
+	requireDisposableMac(t)
 	operation := os.Getenv("BREWWARDEN_VM_OPERATION")
 	if operation == "" {
 		operation = "install"

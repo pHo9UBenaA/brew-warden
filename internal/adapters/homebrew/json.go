@@ -15,14 +15,14 @@ const maxDocumentBytes = maxManifest
 
 // Decode with the standard JSON implementation, supplementing its permissive
 // duplicate-key and case-insensitive field matching. This is schema validation,
-// not a separate JSON parser. All persisted schema fields have explicit tags.
+// not a separate JSON parser. Untagged exported fields use their exact Go names.
 func decodeStrict(data []byte, out any) error {
 	return decodeSchema(data, out, false)
 }
 
 // External command output may contain irrelevant fields, but all selected fields
 // retain exact spelling, uniqueness, required presence and non-null values.
-func decodeSchema(data []byte, out any, external bool) error {
+func decodeSchema(data []byte, out any, allowUnknownFields bool) error {
 	if len(data) > maxDocumentBytes || !utf8.Valid(data) {
 		return errors.New("JSON exceeds size limit or contains invalid UTF-8")
 	}
@@ -32,20 +32,20 @@ func decodeSchema(data []byte, out any, external bool) error {
 	}
 	d := json.NewDecoder(bytes.NewReader(data))
 	d.UseNumber()
-	if err := validateValue(d, t.Elem(), 0, external); err != nil {
+	if err := validateValue(d, t.Elem(), 0, allowUnknownFields); err != nil {
 		return err
 	}
 	if _, err := d.Token(); err != io.EOF {
 		return errors.New("JSON must contain exactly one value")
 	}
 	d = json.NewDecoder(bytes.NewReader(data))
-	if !external {
+	if !allowUnknownFields {
 		d.DisallowUnknownFields()
 	}
 	return d.Decode(out)
 }
 
-func validateValue(d *json.Decoder, t reflect.Type, depth int, external bool) error {
+func validateValue(d *json.Decoder, t reflect.Type, depth int, allowUnknownFields bool) error {
 	if depth > 16 {
 		return errors.New("JSON nesting exceeds limit")
 	}
@@ -83,7 +83,7 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int, external bool) er
 			}
 			name, ok := key.(string)
 			field, known := fields[name]
-			if !ok || (!known && !external) || seen[name] {
+			if !ok || (!known && !allowUnknownFields) || seen[name] {
 				return errors.New("unknown, mis-cased or duplicate JSON field")
 			}
 			seen[name] = true
@@ -99,7 +99,7 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int, external bool) er
 				}
 				continue
 			}
-			if err := validateValue(d, field, depth+1, external); err != nil {
+			if err := validateValue(d, field, depth+1, allowUnknownFields); err != nil {
 				return err
 			}
 		}
@@ -122,7 +122,7 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int, external bool) er
 			return errors.New("expected JSON array")
 		}
 		for d.More() {
-			if err := validateValue(d, t.Elem(), depth+1, external); err != nil {
+			if err := validateValue(d, t.Elem(), depth+1, allowUnknownFields); err != nil {
 				return err
 			}
 		}

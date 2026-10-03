@@ -32,7 +32,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	profile, err := w.sandbox("read", false, false, []string{filepath.Join(root, "runtime/brew/Library")})
+	profile, err := w.sandbox("read", sandboxPermissions{}, []string{filepath.Join(root, "runtime/brew/Library")})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -45,8 +45,8 @@ func TestLiveNativeMetadata(t *testing.T) {
 	}
 	result, err := w.metadata(context.Background(), profile, []string{"jq"})
 	if err != nil {
-		log, _ := os.ReadFile(filepath.Join(root, "metadata.stderr"))
-		t.Fatalf("%v: %s", err, log)
+		log, readErr := os.ReadFile(filepath.Join(root, "info-0.stderr"))
+		t.Fatalf("metadata: %v; diagnostic read: %v: %s", err, readErr, log)
 	}
 	recipes, candidates, err := parseMetadata(result, []string{"jq"})
 	if err != nil {
@@ -95,9 +95,9 @@ func TestLiveNativeMetadata(t *testing.T) {
 	// cache writes allowed (network and host writes still denied) to establish
 	// the precise rejection cause, rather than accept any process failure.
 	_, err = w.invoke(context.Background(), "signature-diagnostic", profile, "info", "--json=v2", "--formula", "homebrew/core/jq")
-	log, _ := os.ReadFile(filepath.Join(root, "signature-diagnostic.stderr"))
-	if err == nil || !strings.Contains(strings.ToLower(string(log)), "signature") {
-		t.Fatalf("tampered metadata was not rejected for its signature: %v: %s", err, log)
+	log, readErr := os.ReadFile(filepath.Join(root, "signature-diagnostic.stderr"))
+	if err == nil || readErr != nil || !strings.Contains(strings.ToLower(string(log)), "signature") {
+		t.Fatalf("tampered metadata was not rejected for its signature: %v; diagnostic read: %v: %s", err, readErr, log)
 	}
 	if err := os.WriteFile(cache, metadata, 0600); err != nil {
 		t.Fatal(err)
@@ -131,8 +131,8 @@ func TestLiveNativeMetadata(t *testing.T) {
 	}
 	downloaded, err := w.fetchBottles(context.Background(), profile, candidates)
 	if err != nil {
-		log, _ := os.ReadFile(filepath.Join(root, "fetch.stderr"))
-		t.Fatalf("public CLI fetch failed: %v: %s", err, log)
+		log, readErr := os.ReadFile(filepath.Join(root, "fetch.stderr"))
+		t.Fatalf("public CLI fetch failed: %v; diagnostic read: %v: %s", err, readErr, log)
 	}
 	if err := w.copyDownloads(downloaded, candidates); err != nil {
 		t.Fatal(err)

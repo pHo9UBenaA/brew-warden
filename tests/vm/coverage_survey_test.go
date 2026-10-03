@@ -6,7 +6,6 @@ import (
 	"context"
 	"encoding/json"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -25,10 +24,7 @@ func TestLivePublicCoverageSurvey(t *testing.T) {
 	if source == "" || len(names) == 0 {
 		t.Skip("requires explicit VM coverage survey")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("requires disposable VM")
-	}
+	requireDisposableMac(t)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "coverage-survey-")
 	if err != nil {
 		t.Fatal(err)

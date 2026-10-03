@@ -5,10 +5,8 @@ package vm
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strconv"
-	"strings"
 	"testing"
 	"time"
 
@@ -26,9 +24,9 @@ func TestLiveExplicitUpgradeChangesSelectedVersion(t *testing.T) {
 	if source == "" || target == "" {
 		t.Skip("requires a disposable VM, private workspace and older installed target")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") || !domain.ValidRequest("install", []string{target}) {
-		t.Fatal("upgrade requires a disposable VirtualMac and one valid formula name")
+	requireDisposableMac(t)
+	if !domain.ValidRequest("install", []string{target}) {
+		t.Fatal("upgrade requires one valid formula name")
 	}
 	prior, err := filepath.EvalSymlinks(filepath.Join("/opt/homebrew/opt", target))
 	if err != nil || filepath.Dir(prior) != filepath.Join("/opt/homebrew/Cellar", target) {

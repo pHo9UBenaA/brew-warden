@@ -15,10 +15,26 @@ import (
 )
 
 func artifactFixture() domain.Artifact {
-	return domain.Artifact{Tap: "homebrew/core", Name: "jq", Version: "1.8.2", Rebuild: 1, OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe", SHA256: domain.Digest(strings.Repeat("a", 64))}
+	return domain.Artifact{
+		Tap: "homebrew/core", Name: "jq", Version: "1.8.2", Rebuild: 1,
+		OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe",
+		SHA256: domain.Digest(strings.Repeat("a", 64)),
+	}
 }
 func resultFixture(a domain.Artifact) string {
-	return `[{"verificationResult":{"signature":{"certificate":{"subjectAlternativeName":"` + identityPrefix + `publish-commit-bottles.yml@refs/heads/main","issuer":"` + issuer + `","sourceRepositoryURI":"` + repository + `","runnerEnvironment":"github-hosted"}},"statement":{"_type":"https://in-toto.io/Statement/v1","predicateType":"https://slsa.dev/provenance/v1","subject":[{"name":"` + bottleName(a) + `","digest":{"sha256":"` + string(a.SHA256) + `"}}]}}}]`
+	return `[{"verificationResult":{
+		"signature":{"certificate":{
+			"subjectAlternativeName":"` + identityPrefix + `publish-commit-bottles.yml@refs/heads/main",
+			"issuer":"` + issuer + `",
+			"sourceRepositoryURI":"` + repository + `",
+			"runnerEnvironment":"github-hosted"
+		}},
+		"statement":{
+			"_type":"https://in-toto.io/Statement/v1",
+			"predicateType":"https://slsa.dev/provenance/v1",
+			"subject":[{"name":"` + bottleName(a) + `","digest":{"sha256":"` + string(a.SHA256) + `"}}]
+		}
+	}}]`
 }
 
 func ghResult(a domain.Artifact, timestamps ...string) string {
@@ -34,10 +50,17 @@ func ghResult(a domain.Artifact, timestamps ...string) string {
 	for _, ts := range timestamps {
 		values = append(values, map[string]string{"type": "Tlog", "uri": "https://rekor.sigstore.dev", "timestamp": ts})
 	}
-	verification["verifiedTimestamps"], _ = json.Marshal(values)
-	entries[0]["verificationResult"], _ = json.Marshal(verification)
-	out, _ := json.Marshal(entries[0])
-	return string(out)
+	verification["verifiedTimestamps"] = marshalResultFixture(values)
+	entries[0]["verificationResult"] = marshalResultFixture(verification)
+	return string(marshalResultFixture(entries[0]))
+}
+
+func marshalResultFixture(value any) []byte {
+	raw, err := json.Marshal(value)
+	if err != nil {
+		panic(err)
+	}
+	return raw
 }
 
 func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
@@ -55,7 +78,7 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 		"empty results":          "[]",
 		"null results":           "null",
 		"trailing JSON":          "[" + one + "]{}",
-		"saturated results":      "[" + strings.TrimSuffix(strings.Repeat(one+",", ghLimit), ",") + "]",
+		"saturated results":      "[" + strings.TrimSuffix(strings.Repeat(one+",", attestationResultLimit), ",") + "]",
 		"unrelated older result": "[" + one + "," + ghResult(b, "2026-01-01T00:00:00Z") + "]",
 		"missing timestamps":     "[" + ghResult(a) + "]",
 		"malformed timestamp":    "[" + ghResult(a, "invalid") + "]",
@@ -88,10 +111,11 @@ func FuzzVerifiedSubject(f *testing.F) {
 		a := artifactFixture()
 		sum := sha256.Sum256(data)
 		a.SHA256 = domain.Digest(hex.EncodeToString(sum[:]))
-		// Exercise the untrusted parser as well as constructed valid results.
-		_ = verifiedSubject(data, a)
-		valid := []byte(resultFixture(a))
-		if err := verifiedSubject(valid, a); err != nil {
+		const now = int64(1800000000)
+		// Exercise the public evidence parser, including arbitrary untrusted output.
+		_, _ = oldestVerifiedTimestamp(data, a, now)
+		valid := []byte("[" + ghResult(a, time.Unix(now-60, 0).UTC().Format(time.RFC3339)) + "]")
+		if _, err := oldestVerifiedTimestamp(valid, a, now); err != nil {
 			t.Fatal("matching verified subject was refused", err)
 		}
 		other := a
@@ -102,14 +126,13 @@ func FuzzVerifiedSubject(f *testing.F) {
 			digest[0] = 'a'
 		}
 		other.SHA256 = domain.Digest(digest)
-		if err := verifiedSubject(valid, other); err == nil {
+		if _, err := oldestVerifiedTimestamp(valid, other, now); err == nil {
 			t.Fatal("different bottle digest borrowed the attestation")
 		}
 		wrongSigner := strings.Replace(string(valid), `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`, 1)
-		if err := verifiedSubject([]byte(wrongSigner), a); err == nil {
+		if _, err := oldestVerifiedTimestamp([]byte(wrongSigner), a, now); err == nil {
 			t.Fatal("untrusted signer borrowed the attestation")
 		}
-		const now = int64(1800000000)
 		oneTime := now - int64(len(data)%4096+1)*60
 		twoTime := now - int64(sum[0]+1)*30
 		one := ghResult(a, time.Unix(oneTime, 0).UTC().Format(time.RFC3339))
@@ -232,8 +255,16 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 			if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
 				t.Fatal("cannot restore bottle fixture", err)
 			}
-			script := "#!/bin/sh\nif [ \"$1\" = version ]; then printf 'gh version 2.101.0 (fixture)\\n'; exit 0; fi\n" +
-				"test \"$1\" = attestation && test \"$2\" = verify && test \"$3\" = '" + bottle + "' && test \"$4\" = --repo && test \"$5\" = Homebrew/homebrew-core && test \"$6\" = --predicate-type && test \"$8\" = --format && test \"${10}\" = --limit && test \"${11}\" = 100 || exit 5\n" + tc.script + "\n"
+			script := `#!/bin/sh
+if [ "$1" = version ]; then
+  printf 'gh version 2.101.0 (fixture)\n'
+  exit 0
+fi
+test "$1" = attestation && test "$2" = verify &&
+test "$3" = '` + bottle + `' && test "$4" = --repo &&
+test "$5" = Homebrew/homebrew-core && test "$6" = --predicate-type &&
+test "$8" = --format && test "${10}" = --limit && test "${11}" = 100 || exit 5
+` + tc.script + "\n"
 			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}

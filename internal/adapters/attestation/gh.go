@@ -40,7 +40,10 @@ func InstalledGH() (PublicGH, error) {
 	return PublicGH{Path: path}, nil
 }
 
-const ghLimit = 100
+// Reaching the requested result limit cannot establish the earliest timestamp.
+const attestationResultLimit = 100
+
+var errUnsupportedGHVersion = errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
 
 // The lower bound is the first inspected gh using sigstore-go 0.7.0, which
 // exposes the verified transparency-log URI instead of the literal "TODO".
@@ -49,30 +52,30 @@ func supportedGHVersion(raw []byte) (string, error) {
 	line := strings.SplitN(string(raw), "\n", 2)[0]
 	fields := strings.Fields(line)
 	if len(fields) < 3 || fields[0] != "gh" || fields[1] != "version" {
-		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+		return "", errUnsupportedGHVersion
 	}
 	parts := strings.Split(fields[2], ".")
 	if len(parts) != 3 {
-		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+		return "", errUnsupportedGHVersion
 	}
 	values := [3]int{}
 	for i, part := range parts {
 		if len(part) == 0 || len(part) > 3 || len(part) > 1 && part[0] == '0' {
-			return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+			return "", errUnsupportedGHVersion
 		}
 		for _, digit := range part {
 			if digit < '0' || digit > '9' {
-				return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+				return "", errUnsupportedGHVersion
 			}
 		}
 		var err error
 		values[i], err = strconv.Atoi(part)
 		if err != nil {
-			return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+			return "", errUnsupportedGHVersion
 		}
 	}
 	if values[0] != 2 || values[1] < 66 || values[1] > 101 || values[1] == 101 && values[2] != 0 {
-		return "", errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
+		return "", errUnsupportedGHVersion
 	}
 	return fields[2], nil
 }
@@ -117,7 +120,7 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 	raw, err := runGH(ctx, v.Path, []string{"attestation", "verify", bottle,
 		"--repo", "Homebrew/homebrew-core",
 		"--predicate-type", "https://slsa.dev/provenance/v1",
-		"--format", "json", "--limit", "100"})
+		"--format", "json", "--limit", strconv.Itoa(attestationResultLimit)})
 	if err != nil {
 		return 0, nil, fmt.Errorf("public attestation verification unavailable: %w", err)
 	}
@@ -179,7 +182,7 @@ func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, 
 		return 0, errors.New("invalid public attestation output size")
 	}
 	var results []json.RawMessage
-	if err := decodeJSONArray(data, &results); err != nil || len(results) == 0 || len(results) >= ghLimit {
+	if err := decodeJSONArray(data, &results); err != nil || len(results) == 0 || len(results) >= attestationResultLimit {
 		return 0, errors.New("missing or saturated public attestations")
 	}
 	oldest := now
@@ -198,10 +201,8 @@ func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, 
 		if err := decodeObject(result.Verification, &verification, "signature", "statement", "verifiedTimestamps"); err != nil || len(verification.Timestamps) == 0 {
 			return 0, errors.New("missing verified attestation timestamps")
 		}
-		// Validate all signer and subject fields using the same contract as the
-		// existing verifier; do not borrow time from an unrelated result.
-		wrapped, err := json.Marshal([]json.RawMessage{raw})
-		if err != nil || verifiedSubject(wrapped, a) != nil {
+		matched, err := verifiedResultSubject(raw, a)
+		if err != nil || !matched {
 			return 0, errors.New("public attestation subject or signer mismatch")
 		}
 		for _, value := range verification.Timestamps {
@@ -254,9 +255,11 @@ func (v PublicGH) VerifyEvidence(ctx context.Context, a domain.Artifact, bottle 
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}
-	base := domain.Evidence{Subject: a, Status: domain.Verified, Provider: domain.Supplement,
-		Source: repository, ProviderVersion: "gh/" + version, RawSHA256: EvidenceDigest(raw),
-		ObservedAt: now, ExpiresAt: now + 3600}
+	base := domain.Evidence{
+		Subject: a, Status: domain.Verified, Provider: domain.Supplement,
+		Source: repository, ProviderVersion: "gh/" + version,
+		RawSHA256: EvidenceDigest(raw), ObservedAt: now, ExpiresAt: now + 3600,
+	}
 	provenance := base
 	provenance.Claim = domain.Provenance
 	age := base

@@ -47,7 +47,9 @@ type executionPlan struct {
 
 func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	policy, err := domain.NewPolicy(p.MinimumAge)
-	if err != nil || (p.Schema != 1 && p.Schema != 2 && p.Schema != 3) || !p.Attempt.Valid() || !p.BeforeState.Valid() || p.IssuedAt <= 0 || p.ExpiresAt <= p.IssuedAt || p.ExpiresAt > p.IssuedAt+600 {
+	supportedSchema := p.Schema == 1 || p.Schema == 2 || p.Schema == 3
+	validInterval := p.IssuedAt > 0 && p.ExpiresAt > p.IssuedAt && p.ExpiresAt <= p.IssuedAt+600
+	if err != nil || !supportedSchema || !p.Attempt.Valid() || !p.BeforeState.Valid() || !validInterval {
 		return ports.Prepared{}, errors.New("invalid persisted execution plan")
 	}
 	environment := p.Environment
@@ -68,7 +70,8 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	}
 	for i, node := range p.Nodes {
 		action := p.Actions[i]
-		if action.Name != node.Artifact.Name || action.Operation != "install" && action.Operation != "upgrade" && action.Operation != "keep" {
+		supportedOperation := action.Operation == "install" || action.Operation == "upgrade" || action.Operation == "keep"
+		if action.Name != node.Artifact.Name || !supportedOperation {
 			return ports.Prepared{}, errors.New("invalid persisted action graph")
 		}
 		for _, e := range node.Evidence {
@@ -81,20 +84,24 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 		}
 	}
 	policyBytes, _ := json.Marshal(struct{ MinimumAge int64 }{p.MinimumAge})
-	graph := []struct {
+	type graphNode struct {
 		Artifact     domain.Artifact
 		Dependencies []domain.Artifact
-	}{}
+	}
+	graph := []graphNode{}
 	for _, node := range p.Nodes {
-		graph = append(graph, struct {
-			Artifact     domain.Artifact
-			Dependencies []domain.Artifact
-		}{node.Artifact, node.Dependencies})
+		graph = append(graph, graphNode{Artifact: node.Artifact, Dependencies: node.Dependencies})
 	}
 	graphBytes, _ := json.Marshal(graph)
 	environmentBytes, _ := json.Marshal(p.Environment)
-	binding := domain.Binding{Plan: id, Policy: digestBytes(policyBytes), Graph: digestBytes(graphBytes), Environment: digestBytes(environmentBytes), Attempt: p.Attempt}
-	result := ports.Prepared{Assessment: domain.Assessment{Policy: policy, Binding: binding, Targets: p.Targets, Nodes: p.Nodes}, BeforeState: p.BeforeState, ExpiresAt: p.ExpiresAt}
+	binding := domain.Binding{
+		Plan: id, Policy: digestBytes(policyBytes), Graph: digestBytes(graphBytes),
+		Environment: digestBytes(environmentBytes), Attempt: p.Attempt,
+	}
+	result := ports.Prepared{
+		Assessment:  domain.Assessment{Policy: policy, Binding: binding, Targets: p.Targets, Nodes: p.Nodes},
+		BeforeState: p.BeforeState, ExpiresAt: p.ExpiresAt,
+	}
 	if len(p.Waivers) > 0 {
 		exception := domain.AgeException{Binding: binding, IssuedAt: p.IssuedAt, ExpiresAt: p.ExpiresAt, Waivers: p.Waivers}
 		raw, _ := json.Marshal(exception)

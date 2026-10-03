@@ -7,7 +7,7 @@ import (
 	"testing"
 )
 
-func fixture(t *testing.T, files map[string]string) string {
+func sourceTreeFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
 	files["go.mod"] = "module example.test/tool\n\ngo 1.24.0\n"
@@ -50,7 +50,7 @@ func TestArchitecture(t *testing.T) {
 	}
 	for _, tc := range cases {
 		t.Run(tc.name, func(t *testing.T) {
-			err := architecture(fixture(t, tc.files))
+			err := architecture(sourceTreeFixture(t, tc.files))
 			if tc.want == "" {
 				if err != nil {
 					t.Fatal(err)

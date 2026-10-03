@@ -42,7 +42,8 @@ guest_auth() {
     PATH="$guest_path" "$guest_gh" auth status >/dev/null 2>&1
 }
 guest_brew() {
-  vm=$1; shift
+  vm=$1
+  shift
   guest "$vm" /usr/bin/env -i HOME="$guest_home" PATH="$guest_path" \
     HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTOREMOVE=1 \
     HOMEBREW_NO_INSTALL_CLEANUP=1 /opt/homebrew/bin/brew "$@"
@@ -69,8 +70,13 @@ cleanup_prepare_on_exit() {
 }
 prepare() {
   [ "$#" -eq 5 ] || usage
-  base=$1; vm=$2; source=$3; gh=$4; archive=$5
-  valid_name "$base"; valid_name "$vm"
+  base=$1
+  vm=$2
+  source=$3
+  gh=$4
+  archive=$5
+  valid_name "$base"
+  valid_name "$vm"
   [ "$base" != "$vm" ] || fail 'A clone cannot replace its base VM'
   [ -x "$tart" ] || fail 'Reviewed Tart executable unavailable'
   [ -d "$source/Library/Homebrew" ] && [ -f "$source/bin/brew" ] || fail 'Explicit reviewed Homebrew tree unavailable'
@@ -105,13 +111,21 @@ prepare() {
   ready=0
   count=0
   while [ "$count" -lt 60 ]; do
-    if guest "$vm" /usr/bin/id > /dev/null 2>&1; then ready=1; break; fi
+    if guest "$vm" /usr/bin/id > /dev/null 2>&1; then
+      ready=1
+      break
+    fi
     sleep 3
     count=$((count + 1))
   done
   [ "$ready" -eq 1 ] || fail 'Guest agent did not start; clone retained for diagnosis'
   require_guest "$vm"
-  guest "$vm" /bin/sh -c 'umask 077; test ! -e /opt/brewwarden-original-homebrew && test -f /opt/homebrew/bin/brew && mkdir -p /private/tmp/bw-acceptance/gh /private/tmp/bw-acceptance/home /private/tmp/bw-acceptance/product' || fail 'Guest prefix or private workspace is not fresh'
+  guest "$vm" /bin/sh -c '
+    umask 077
+    test ! -e /opt/brewwarden-original-homebrew &&
+      test -f /opt/homebrew/bin/brew &&
+      mkdir -p /private/tmp/bw-acceptance/gh /private/tmp/bw-acceptance/home /private/tmp/bw-acceptance/product
+  ' || fail 'Guest prefix or private workspace is not fresh'
   tart_run exec -i "$vm" /bin/sh -c 'umask 077; cat > /private/tmp/bw-acceptance/gh/gh && chmod 0700 /private/tmp/bw-acceptance/gh/gh' < "$gh"
   tart_run exec -i "$vm" /usr/bin/tar -xzf - -C "$guest_root/product" < "$archive"
   revision=$(git rev-parse HEAD)
@@ -123,7 +137,10 @@ prepare() {
   guest "$vm" /bin/mkdir -p /opt/homebrew/Cellar /opt/homebrew/var/homebrew /opt/homebrew/etc /opt/homebrew/share /opt/homebrew/Library
   tart_run exec -i "$vm" /usr/bin/tar -xf - -C /opt/homebrew < "$evidence/reviewed-brew.tar"
   guest "$vm" /usr/bin/env -i HOME="$guest_home" PATH="$guest_path" "$guest_bwd" doctor \
-    > "$evidence/doctor.log" 2>&1 || { /bin/cat "$evidence/doctor.log"; fail 'Installed Homebrew tree did not match reviewed runtime'; }
+    > "$evidence/doctor.log" 2>&1 || {
+      /bin/cat "$evidence/doctor.log"
+      fail 'Installed Homebrew tree did not match reviewed runtime'
+    }
   /bin/cat "$evidence/doctor.log"
   printf 'Prepare complete. Run: %s auth %s\n' "$0" "$vm"
   printf 'Do not reboot this modified clone: its guest agent still refers to the original prefix.\n'
@@ -131,8 +148,13 @@ prepare() {
 }
 auth() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"; require_guest "$vm"
-  if guest_auth "$vm"; then printf 'Guest gh is already authenticated.\n'; return; fi
+  vm=$1
+  valid_name "$vm"
+  require_guest "$vm"
+  if guest_auth "$vm"; then
+    printf 'Guest gh is already authenticated.\n'
+    return
+  fi
   guest "$vm" /bin/sh -c '
     umask 077
     if test -f /private/tmp/bw-acceptance/home/device.pid &&
@@ -181,8 +203,11 @@ run_test() {
 }
 run_case() {
   [ "$#" -ge 2 ] || usage
-  vm=$1; mode=$2; shift 2
-  valid_name "$vm"; require_guest "$vm"
+  vm=$1
+  mode=$2
+  shift 2
+  valid_name "$vm"
+  require_guest "$vm"
   if [ "$mode" = doctor ]; then
     [ "$#" -eq 0 ] || usage
     guest "$vm" /usr/bin/env -i HOME="$guest_home" PATH="$guest_path" "$guest_bwd" doctor
@@ -232,19 +257,29 @@ run_case() {
   esac
 }
 remove_if_installed() {
-  vm=$1; name=$2
-  if guest "$vm" /bin/test ! -e "/opt/homebrew/Cellar/$name"; then return; fi
+  vm=$1
+  name=$2
+  if guest "$vm" /bin/test ! -e "/opt/homebrew/Cellar/$name"; then
+    return
+  fi
   installed=$(guest_brew "$vm" list --formula --versions "$name") || fail "Cannot inspect guest installation of $name"
   [ -n "$installed" ] || fail "Cannot confirm installed guest formula $name"
   guest_brew "$vm" uninstall --formula --force "$name"
 }
 fixture() {
   [ "$#" -eq 2 ] || usage
-  vm=$1; kind=$2; valid_name "$vm"; require_guest "$vm"
+  vm=$1
+  kind=$2
+  valid_name "$vm"
+  require_guest "$vm"
   printf 'Modifying only the disposable guest Homebrew prefix for fixture: %s\n' "$kind"
   case "$kind" in
-    absent-jq) remove_if_installed "$vm" jq; remove_if_installed "$vm" oniguruma ;;
-    absent-xz) remove_if_installed "$vm" zstd; remove_if_installed "$vm" xz ;;
+    absent-jq)
+      remove_if_installed "$vm" jq
+      remove_if_installed "$vm" oniguruma ;;
+    absent-xz)
+      remove_if_installed "$vm" zstd
+      remove_if_installed "$vm" xz ;;
     repair-jq) guest_brew "$vm" link --formula jq ;;
     older-xz)
       guest "$vm" /bin/sh -c 'test ! -e /opt/homebrew/Cellar/xz && test -f /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3/INSTALL_RECEIPT.json' || fail 'Older xz fixture unavailable; first make xz absent'
@@ -255,7 +290,9 @@ fixture() {
 }
 suite() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"; require_guest "$vm"
+  vm=$1
+  valid_name "$vm"
+  require_guest "$vm"
   guest_auth "$vm" || fail 'Authorize guest gh before starting the local-only suite'
   run_case "$vm" doctor
   run_case "$vm" command brew install jq
@@ -291,7 +328,8 @@ suite() {
 }
 finish() {
   [ "$#" -eq 1 ] || usage
-  vm=$1; valid_name "$vm"
+  vm=$1
+  valid_name "$vm"
   if ! guest "$vm" /usr/bin/id > /dev/null 2>&1; then
     if tart_run stop "$vm"; then
       fail 'Guest agent unavailable; VM stopped but guest credential cleanup unconfirmed'
@@ -304,13 +342,19 @@ finish() {
   guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" \
     "$guest_gh" auth logout --hostname github.com >/dev/null 2>&1 || true
   cleaned=1
-  guest "$vm" /bin/sh -c 'rm -rf /private/tmp/bw-acceptance/home/.config/gh /private/tmp/bw-acceptance/home/.local/state/gh /private/tmp/bw-acceptance/home/device.log /private/tmp/bw-acceptance/home/device.pid' || cleaned=0
+  guest "$vm" /bin/sh -c '
+    rm -rf /private/tmp/bw-acceptance/home/.config/gh \
+      /private/tmp/bw-acceptance/home/.local/state/gh \
+      /private/tmp/bw-acceptance/home/device.log \
+      /private/tmp/bw-acceptance/home/device.pid
+  ' || cleaned=0
   tart_run stop "$vm" || fail 'Guest stop failed; credential cleanup and VM state unconfirmed'
   [ "$cleaned" -eq 1 ] || fail 'Guest credential removal failed; VM stopped but cleanup unconfirmed'
   printf 'Guest credentials removed and VM stopped. If device login was approved, also revoke its GitHub CLI OAuth grant in your account settings.\n'
 }
 [ "$#" -ge 1 ] || usage
-command=$1; shift
+command=$1
+shift
 case "$command" in
   prepare) prepare "$@" ;;
   auth) auth "$@" ;;

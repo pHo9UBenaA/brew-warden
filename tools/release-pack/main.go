@@ -86,12 +86,12 @@ func run(args []string) error {
 func archive(output string, items []item) error {
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	sums := ""
-	for i, x := range items {
-		if i > 0 && x.Name == items[i-1].Name {
+	for i, entry := range items {
+		if i > 0 && entry.Name == items[i-1].Name {
 			return fmt.Errorf("duplicate package path")
 		}
-		if x.Link == "" {
-			sums += hash(x.Data) + "  " + x.Name + "\n"
+		if entry.Link == "" {
+			sums += hash(entry.Data) + "  " + entry.Name + "\n"
 		}
 	}
 	items = append(items, item{Name: "SHA256SUMS", Data: []byte(sums), Mode: 0644})
@@ -103,18 +103,21 @@ func archive(output string, items []item) error {
 	defer file.Close()
 	compressed := gzip.NewWriter(file)
 	writer := tar.NewWriter(compressed)
-	for _, x := range items {
-		h := &tar.Header{Name: "brewwarden/" + x.Name, Mode: x.Mode, Size: int64(len(x.Data)), ModTime: time.Unix(0, 0), Format: tar.FormatPAX, Typeflag: tar.TypeReg}
-		if x.Link != "" {
-			h.Typeflag = tar.TypeSymlink
-			h.Linkname = x.Link
-			h.Size = 0
+	for _, entry := range items {
+		header := &tar.Header{
+			Name: "brewwarden/" + entry.Name, Mode: entry.Mode, Size: int64(len(entry.Data)),
+			ModTime: time.Unix(0, 0), Format: tar.FormatPAX, Typeflag: tar.TypeReg,
 		}
-		if err := writer.WriteHeader(h); err != nil {
+		if entry.Link != "" {
+			header.Typeflag = tar.TypeSymlink
+			header.Linkname = entry.Link
+			header.Size = 0
+		}
+		if err := writer.WriteHeader(header); err != nil {
 			return err
 		}
-		if x.Link == "" {
-			if _, err := writer.Write(x.Data); err != nil {
+		if entry.Link == "" {
+			if _, err := writer.Write(entry.Data); err != nil {
 				return err
 			}
 		}

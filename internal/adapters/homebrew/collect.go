@@ -98,7 +98,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if client == nil {
 		client = publicClient()
 	}
-	profile, err := w.sandbox("collect", true, false, []string{filepath.Join(w.root, "runtime/brew/Library")})
+	profile, err := w.sandbox("collect", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(w.root, "runtime/brew/Library")})
 	if err != nil {
 		return err
 	}
@@ -129,7 +129,14 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err := w.copyDownloads(downloaded, candidates); err != nil {
 		return err
 	}
-	metadataClaim, _ := json.Marshal(struct{ SignedMetadata, PublicResult, Runtime domain.Digest }{digestBytes(metadata), digestBytes(parsed), result.runtimeDigest})
+	metadataClaim, _ := json.Marshal(struct {
+		SignedMetadata domain.Digest
+		PublicResult   domain.Digest
+		Runtime        domain.Digest
+	}{
+		SignedMetadata: digestBytes(metadata),
+		PublicResult:   digestBytes(parsed), Runtime: result.runtimeDigest,
+	})
 	for _, f := range candidates {
 		node := domain.Node{Artifact: f.artifact(), Dependencies: []domain.Artifact{}}
 		for _, name := range f.Dependencies {

@@ -81,7 +81,12 @@ func TestInstalledRuntimeDoesNotTrustAVersionBannerOrUnreviewedGitCommit(t *test
 	if err := os.WriteFile(brew, []byte("#!/bin/sh\necho 'Homebrew 7.0.6'\n"), 0755); err != nil {
 		t.Fatal(err)
 	}
-	commands := [][]string{{"init", "-q"}, {"add", "bin/brew", "Library/Homebrew/fixture.rb"}, {"-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit", "-q", "-m", "unreviewed"}, {"tag", "7.0.6"}}
+	commands := [][]string{
+		{"init", "-q"},
+		{"add", "bin/brew", "Library/Homebrew/fixture.rb"},
+		{"-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit", "-q", "-m", "unreviewed"},
+		{"tag", "7.0.6"},
+	}
 	for _, args := range commands {
 		command := exec.Command("git", args...)
 		command.Dir = prefix

@@ -45,7 +45,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if err := writeNew(cache, signed, 0600); err != nil {
 		t.Fatal(err)
 	}
-	profile, err := w.sandbox("advisory-probe", true, false, []string{filepath.Join(root, "runtime/brew/Library"), cache})
+	profile, err := w.sandbox("advisory-probe", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library"), cache})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -139,7 +139,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if status != 0 || len(restored.Findings) != 0 || len(restored.Skipped) != 0 {
 		t.Fatal("candidate result did not recover")
 	}
-	profile, err = w.sandbox("advisory-network-denied", false, false, []string{filepath.Join(root, "runtime/brew/Library"), cache})
+	profile, err = w.sandbox("advisory-network-denied", sandboxPermissions{}, []string{filepath.Join(root, "runtime/brew/Library"), cache})
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -171,7 +171,7 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
-	profile, err := w.sandbox("acquire", true, false, []string{filepath.Join(root, "runtime/brew/Library")})
+	profile, err := w.sandbox("acquire", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library")})
 	if err != nil {
 		t.Fatal(err)
 	}

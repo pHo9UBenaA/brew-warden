@@ -26,10 +26,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 	if source == "" || len(names) == 0 {
 		t.Skip("requires disposable VM, built runtime and explicit targets")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("requires disposable VM")
-	}
+	requireDisposableMac(t)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "public-execution-")
 	if err != nil {
 		t.Fatal(err)
@@ -47,7 +44,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		runContext, stopRun := context.WithCancel(ctx)
 		defer stopRun()
 		streams := homebrew.Streams{Out: os.Stdout, Err: os.Stderr}
-		interrupt := &interruptOnPour{destination: os.Stdout, cancel: stopRun}
+		interrupt := &interruptOnFetch{destination: os.Stdout, cancel: stopRun}
 		if fault == "interrupt" {
 			streams.Out, streams.Err = interrupt, interrupt
 		}
@@ -216,7 +213,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 	}
 }
 
-type interruptOnPour struct {
+type interruptOnFetch struct {
 	mu          sync.Mutex
 	destination io.Writer
 	cancel      context.CancelFunc
@@ -224,13 +221,13 @@ type interruptOnPour struct {
 	triggered   bool
 }
 
-func (w *interruptOnPour) Triggered() bool {
+func (w *interruptOnFetch) Triggered() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.triggered
 }
 
-func (w *interruptOnPour) Write(data []byte) (int, error) {
+func (w *interruptOnFetch) Write(data []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	w.tail += string(data)

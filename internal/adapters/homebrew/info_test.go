@@ -6,7 +6,32 @@ import (
 )
 
 // Captured public info output, trimmed to selected fields and an irrelevant null.
-const infoFixture = `{"formulae":[{"name":"jq","full_name":"jq","tap":"homebrew/core","versions":{"stable":"1.8.2","head":"HEAD","bottle":true},"urls":{"stable":{"url":"https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz","tag":null,"revision":null,"using":null,"checksum":"71b8d6e8f5fe81f6c6d0d110e3892251f6ce76ed095abd315e26e6e1193af3af"},"head":{"url":"https://github.com/jqlang/jq.git","branch":"master","using":null}},"revision":0,"bottle":{"stable":{"rebuild":1,"root_url":"https://ghcr.io/v2/homebrew/core","files":{"arm64_tahoe":{"cellar":":any","url":"https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036","sha256":"ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036"}}}},"dependencies":["oniguruma"],"build_dependencies":[],"tap_git_head":"65464f0db62b68517e0b6509173d405b7398b095","ruby_source_path":"Formula/j/jq.rb","ruby_source_checksum":{"sha256":"0081a3a8d8afaa165b4bfa9b222723916b56f4d04b975d7aad35e8cdad0b0296"},"desc":null}],"casks":[]}`
+const infoFixture = `{"formulae":[{
+	"name":"jq","full_name":"jq","tap":"homebrew/core",
+	"versions":{"stable":"1.8.2","head":"HEAD","bottle":true},
+	"urls":{
+		"stable":{
+			"url":"https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz",
+			"tag":null,"revision":null,"using":null,
+			"checksum":"71b8d6e8f5fe81f6c6d0d110e3892251f6ce76ed095abd315e26e6e1193af3af"
+		},
+		"head":{"url":"https://github.com/jqlang/jq.git","branch":"master","using":null}
+	},
+	"revision":0,
+	"bottle":{"stable":{
+		"rebuild":1,"root_url":"https://ghcr.io/v2/homebrew/core",
+		"files":{"arm64_tahoe":{
+			"cellar":":any",
+			"url":"https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036",
+			"sha256":"ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036"
+		}}
+	}},
+	"dependencies":["oniguruma"],"build_dependencies":[],
+	"tap_git_head":"65464f0db62b68517e0b6509173d405b7398b095",
+	"ruby_source_path":"Formula/j/jq.rb",
+	"ruby_source_checksum":{"sha256":"0081a3a8d8afaa165b4bfa9b222723916b56f4d04b975d7aad35e8cdad0b0296"},
+	"desc":null
+}],"casks":[]}`
 
 func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	f, err := parseInfo([]byte(infoFixture), []string{"jq"})

@@ -41,17 +41,25 @@ func (w workspace) initialize() error {
 	}
 	return nil
 }
-func (w workspace) sandbox(name string, network bool, mutablePrefix bool, immutable []string) (string, error) {
+
+type sandboxPermissions struct {
+	AllowNetwork      bool
+	AllowPrefixWrites bool
+}
+
+func (w workspace) sandbox(name string, permissions sandboxPermissions, immutable []string) (string, error) {
 	quote := func(value string) string {
 		raw, _ := json.Marshal(value)
 		return string(raw)
 	}
 	profile := "(version 1)\n(allow default)\n(deny file-write*)\n(allow file-write* (subpath " + quote(w.root) + ") (literal \"/dev/null\"))\n"
-	if !network {
+	if !permissions.AllowNetwork {
 		profile += "(deny network*)\n"
 	}
-	if mutablePrefix {
-		profile += "(allow file-write* (subpath \"/opt/homebrew\"))\n(deny file-write* (subpath \"/opt/homebrew/Library\") (subpath \"/opt/homebrew/.git\") (literal \"/opt/homebrew/bin/brew\"))\n"
+	if permissions.AllowPrefixWrites {
+		profile += "(allow file-write* (subpath \"/opt/homebrew\"))\n" +
+			"(deny file-write* (subpath \"/opt/homebrew/Library\") " +
+			"(subpath \"/opt/homebrew/.git\") (literal \"/opt/homebrew/bin/brew\"))\n"
 	}
 	for _, file := range immutable {
 		profile += "(deny file-write* (subpath " + quote(file) + "))\n"

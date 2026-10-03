@@ -57,7 +57,14 @@ func TestFreshRetryRequiresNewBoundPlan(t *testing.T) {
 }
 
 func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
-	for _, args := range [][]string{{"brew", "install", "jq", "--age-exception", "jq=urgent"}, {"brew", "--help"}, {"brew", "install", "--cask", "jq"}, {"--age-exception", "jq=\x1b[31m", "brew", "install", "jq"}, {"--age-exception", "jq=urgent", "--age-exception", "jq=again", "brew", "install", "jq"}, {"history"}, {"status"}, {"reconcile"}} {
+	for _, args := range [][]string{
+		{"brew", "install", "jq", "--age-exception", "jq=urgent"},
+		{"brew", "--help"},
+		{"brew", "install", "--cask", "jq"},
+		{"--age-exception", "jq=\x1b[31m", "brew", "install", "jq"},
+		{"--age-exception", "jq=urgent", "--age-exception", "jq=again", "brew", "install", "jq"},
+		{"history"}, {"status"}, {"reconcile"},
+	} {
 		planner := &servicePlanner{}
 		s := application.Service{Planner: planner}
 		var out bytes.Buffer
@@ -65,6 +72,9 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 			t.Fatal("unsupported invocation reached planner", args, out.String())
 		}
 	}
+}
+
+func TestRuntimeCLIPreservesExitCodeAndPrintableAgeReason(t *testing.T) {
 	p := preparedExecution()
 	session := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 7, AfterState: p.BeforeState}}
 	planner := &servicePlanner{p: p, s: session}

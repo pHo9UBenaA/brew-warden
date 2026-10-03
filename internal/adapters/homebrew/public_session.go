@@ -36,7 +36,7 @@ type installedFormula struct {
 	Pinned         bool               `json:"pinned" required:"true"`
 	Outdated       bool               `json:"outdated" required:"true"`
 	KegOnly        bool               `json:"keg_only" required:"true"`
-	LinkedKeg      *string            `json:"active_version,omitempty"`
+	ActiveVersion  *string            `json:"active_version,omitempty"`
 	LinkIncomplete bool               `json:"link_incomplete,omitempty"`
 	Installed      []installedVersion `json:"installed" required:"true"`
 }
@@ -110,7 +110,7 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		// Observe the opt link, and for normal formulae also require Homebrew's
 		// linked-keg record. A partially poured but unlinked keg is not a
 		// successfully installed formula, even if its opt link exists.
-		formula.LinkedKeg, formula.LinkIncomplete, err = installedLink("/opt/homebrew", formula.Name, formula.KegOnly)
+		formula.ActiveVersion, formula.LinkIncomplete, err = installedLink("/opt/homebrew", formula.Name, formula.KegOnly)
 		if err != nil {
 			return nil, "", err
 		}
@@ -243,12 +243,12 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 	if candidate.Revision > 0 {
 		wanted += "_" + strconv.Itoa(candidate.Revision)
 	}
-	if state.LinkedKeg == nil || *state.LinkedKeg == "" {
+	if state.ActiveVersion == nil || *state.ActiveVersion == "" {
 		return "", errors.New("unlinked installed candidate requires manual Homebrew repair")
 	}
 	operation := ""
 	for _, version := range state.Installed {
-		if version.Version != *state.LinkedKeg {
+		if version.Version != *state.ActiveVersion {
 			continue
 		}
 		if len(version.Options) != 0 || !version.Poured || !version.Built {
@@ -378,7 +378,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	for _, file := range files {
 		immutable = append(immutable, filepath.Join(s.w.root, file.Path))
 	}
-	s.profile, err = s.w.sandbox("public-execution", false, true, immutable)
+	s.profile, err = s.w.sandbox("public-execution", sandboxPermissions{AllowPrefixWrites: true}, immutable)
 	if err != nil {
 		return fail(err)
 	}
@@ -528,7 +528,10 @@ func (s *publicSession) runCommand(ctx context.Context, args []string) (ports.Ex
 	base := publicBrewCommand(ctx, s.w, s.profile, args...)
 	// Hold the child before exec until its process session is durably recorded.
 	// All command arguments remain separate; the shell program is a fixed literal.
-	command := exec.CommandContext(ctx, "/bin/sh", append([]string{"-c", `read -r ready <&3 || exit 125; exec 3<&-; exec "$@"`, "brewwarden-exec"}, base.Args...)...)
+	startupGate := `read -r ready <&3 || exit 125
+exec 3<&-
+exec "$@"`
+	command := exec.CommandContext(ctx, "/bin/sh", append([]string{"-c", startupGate, "brewwarden-exec"}, base.Args...)...)
 	command.Env, command.Dir = base.Env, base.Dir
 	command.ExtraFiles = []*os.File{gate, s.lock}
 	command.SysProcAttr = &syscall.SysProcAttr{Setsid: true}

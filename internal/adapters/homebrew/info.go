@@ -57,7 +57,10 @@ func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
 			return nil, errors.New("homebrew info identity mismatch")
 		}
 		selected[f.Name] = true
-		m := formulaMetadata{Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision, Rebuild: f.Bottle.Stable.Rebuild, Dependencies: f.Dependencies}
+		m := formulaMetadata{
+			Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision,
+			Rebuild: f.Bottle.Stable.Rebuild, Dependencies: f.Dependencies,
+		}
 		b := f.Bottle.Stable.Files.Tahoe
 		m.BottleTag = "arm64_tahoe"
 		if b == nil {
@@ -112,7 +115,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 			if _, err := readRegular(cache, 80*1024*1024); err != nil {
 				return nil, err
 			}
-			profile, err = w.sandbox("metadata", false, false, []string{cache, filepath.Join(w.root, "runtime/brew/Library")})
+			profile, err = w.sandbox("metadata", sandboxPermissions{}, []string{cache, filepath.Join(w.root, "runtime/brew/Library")})
 			if err != nil {
 				return nil, err
 			}

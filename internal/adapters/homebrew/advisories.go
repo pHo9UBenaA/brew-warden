@@ -171,9 +171,9 @@ func parseBrewAdvisoryStatus(raw []byte, candidate formulaMetadata, records []js
 // Homebrew owns version-range comparison. Only an explicit patch resolution for
 // the same upstream advisory can resolve an open upstream finding. An absent
 // record, unrelated fix, or lower finding count never does so.
-func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew brewAdvisoryStatus) (domain.Applicability, error) {
+func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew brewAdvisoryStatus) domain.Applicability {
 	if len(brew.Open) != 0 {
-		return domain.Affected, nil
+		return domain.Affected
 	}
 	var native publicFinding
 	for _, f := range osv.Findings {
@@ -183,19 +183,16 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 	}
 	for _, open := range native.Open {
 		ids := append([]string{open.ID}, open.Aliases...)
-		fixed := false
-		for _, patch := range brew.Patched {
-			if slices.ContainsFunc(patch.Upstream, func(id string) bool { return slices.Contains(ids, id) }) {
-				fixed = true
-			}
-		}
+		fixed := slices.ContainsFunc(brew.Patched, func(patch brewAdvisoryEntry) bool {
+			return slices.ContainsFunc(patch.Upstream, func(id string) bool { return slices.Contains(ids, id) })
+		})
 		if !fixed {
-			return domain.Affected, nil
+			return domain.Affected
 		}
 	}
 	// A native patch is already evaluated by the pinned scanner against the
 	// candidate recipe; a contradictory open Homebrew record was handled above.
-	return domain.NoKnownApplicableFindings, nil
+	return domain.NoKnownApplicableFindings
 }
 
 func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Client, candidates []formulaMetadata, now int64, revision string) ([]domain.Evidence, error) {
@@ -217,21 +214,7 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 	if err != nil {
 		return nil, err
 	}
-	// Retain the exact full response once using standard gzip, rather than repeat
-	// its 40+ MB content for each subject. The raw digest identifies decoded bytes.
-	var compressed bytes.Buffer
-	zipper := gzip.NewWriter(&compressed)
-	if _, err := zipper.Write(feed); err != nil {
-		return nil, err
-	}
-	if err := zipper.Close(); err != nil {
-		return nil, err
-	}
-	archive, err := json.Marshal(struct {
-		Encoding string
-		SHA256   domain.Digest
-		Data     []byte
-	}{"gzip", digestBytes(feed), compressed.Bytes()})
+	archive, err := compressAdvisoryFeed(feed)
 	if err != nil {
 		return nil, err
 	}
@@ -248,16 +231,17 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		if err != nil {
 			return nil, err
 		}
-		applies, err := combineAdvisories(candidate, report, status)
-		if err != nil {
-			return nil, err
-		}
+		applies := combineAdvisories(candidate, report, status)
 		observation, err := json.Marshal(struct {
 			Schema            int
 			Candidate         domain.Artifact
 			Scan, FeedArchive domain.Digest
 			Formula           json.RawMessage
-		}{1, candidate.artifact(), digestBytes(rawScan), digestBytes(archive), raw})
+		}{
+			Schema: 1, Candidate: candidate.artifact(),
+			Scan: digestBytes(rawScan), FeedArchive: digestBytes(archive),
+			Formula: raw,
+		})
 		if err != nil {
 			return nil, err
 		}
@@ -277,4 +261,22 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		evidence = append(evidence, e)
 	}
 	return evidence, nil
+}
+
+// Retain the full feed once, rather than repeat its 40+ MB for each subject.
+// SHA256 identifies decoded bytes; Data holds the gzip-compressed response.
+func compressAdvisoryFeed(feed []byte) ([]byte, error) {
+	var compressed bytes.Buffer
+	zipper := gzip.NewWriter(&compressed)
+	if _, err := zipper.Write(feed); err != nil {
+		return nil, err
+	}
+	if err := zipper.Close(); err != nil {
+		return nil, err
+	}
+	return json.Marshal(struct {
+		Encoding string
+		SHA256   domain.Digest
+		Data     []byte
+	}{Encoding: "gzip", SHA256: digestBytes(feed), Data: compressed.Bytes()})
 }

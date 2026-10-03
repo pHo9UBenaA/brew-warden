@@ -25,10 +25,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	if binary == "" {
 		t.Skip("requires an extracted distribution in a disposable VM")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("requires disposable VirtualMac")
-	}
+	requireDisposableMac(t)
 	if _, err := os.Lstat("/opt/homebrew/Cellar/xz"); !os.IsNotExist(err) {
 		t.Fatal("requires absent xz fixture")
 	}
@@ -66,7 +63,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 		}
 	}()
 	command := newCommand("brew", "install", "xz")
-	trigger := &killOnInstall{destination: os.Stdout, kill: func() error {
+	trigger := &killOnFetch{destination: os.Stdout, kill: func() error {
 		// Freeze the real owned Homebrew process before losing its wrapper.
 		// This makes child continuation and exclusion deterministic even if
 		// the bottle would otherwise pour before the second invocation.
@@ -135,7 +132,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	}
 }
 
-type killOnInstall struct {
+type killOnFetch struct {
 	mu          sync.Mutex
 	tail        string
 	triggered   bool
@@ -143,13 +140,13 @@ type killOnInstall struct {
 	kill        func() error
 }
 
-func (w *killOnInstall) Triggered() bool {
+func (w *killOnFetch) Triggered() bool {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	return w.triggered
 }
 
-func (w *killOnInstall) Write(p []byte) (int, error) {
+func (w *killOnFetch) Write(p []byte) (int, error) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
 	n, err := w.destination.Write(p)

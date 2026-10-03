@@ -5,7 +5,6 @@ package vm
 import (
 	"context"
 	"os"
-	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
@@ -21,10 +20,7 @@ func TestLiveCandidateCollection(t *testing.T) {
 	if source == "" {
 		t.Skip("requires explicit built runtime and public network")
 	}
-	model, err := exec.Command("/usr/sbin/sysctl", "-n", "hw.model").Output()
-	if err != nil || !strings.HasPrefix(string(model), "VirtualMac") {
-		t.Fatal("candidate collection requires a disposable VirtualMac")
-	}
+	requireDisposableMac(t)
 	directory, err := os.MkdirTemp(filepath.Dir(source), "live-collection-")
 	if err != nil {
 		t.Fatal(err)
@@ -36,8 +32,12 @@ func TestLiveCandidateCollection(t *testing.T) {
 	if err != nil {
 		walkErr := filepath.WalkDir(directory, func(path string, entry os.DirEntry, walkErr error) error {
 			if walkErr == nil && !entry.IsDir() && strings.HasSuffix(path, ".stderr") {
-				data, _ := os.ReadFile(path)
-				t.Logf("%s: %s", filepath.Base(path), data)
+				data, readErr := os.ReadFile(path)
+				if readErr != nil {
+					t.Logf("cannot read %s: %v", path, readErr)
+				} else {
+					t.Logf("%s: %s", filepath.Base(path), data)
+				}
 			}
 			return walkErr
 		})

@@ -62,19 +62,25 @@ func Execute(ctx context.Context, original ports.Prepared, session ports.Executi
 	}
 	actual, runErr := session.Run(ctx, fresh.Assessment.Binding)
 	result.ExitKnown, result.ExitCode = actual.ExitKnown, actual.ExitCode
-	result.Outcome = domain.AttemptUnknown
-	if actual.ExitKnown && actual.AfterState.Valid() {
-		if runErr == nil && actual.ExitCode == 0 && actual.MatchesPlan {
-			result.Outcome = domain.AttemptSucceeded
-		} else if actual.ExitCode != 0 {
-			result.Outcome = domain.AttemptFailed
-			if actual.AfterState != original.BeforeState {
-				result.Outcome = domain.AttemptPartial
-			}
-		}
-	}
+	result.Outcome = executionOutcome(actual, original.BeforeState, runErr)
 	if result.Outcome != domain.AttemptSucceeded {
 		return result, errors.Join(runErr, errors.New("execution did not complete with a verified state; retry with fresh checks"))
 	}
 	return result, nil
+}
+
+func executionOutcome(actual ports.ExecutionResult, before domain.Digest, runErr error) domain.AttemptOutcome {
+	if !actual.ExitKnown || !actual.AfterState.Valid() {
+		return domain.AttemptUnknown
+	}
+	if actual.ExitCode == 0 {
+		if runErr == nil && actual.MatchesPlan {
+			return domain.AttemptSucceeded
+		}
+		return domain.AttemptUnknown
+	}
+	if actual.AfterState != before {
+		return domain.AttemptPartial
+	}
+	return domain.AttemptFailed
 }

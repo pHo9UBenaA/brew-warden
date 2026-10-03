@@ -97,7 +97,10 @@ func TestInstalledLinkRejectsPartialPourAndMismatchedRecords(t *testing.T) {
 func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 	node := domain.Node{Artifact: metadataFixture().Formulae[0].artifact()}
 	active := node.Artifact.Version
-	normal := installedFormula{Name: node.Artifact.Name, LinkedKeg: &active, Installed: []installedVersion{{Version: active, Poured: true, Built: true, Options: []string{}}}}
+	normal := installedFormula{
+		Name: node.Artifact.Name, ActiveVersion: &active,
+		Installed: []installedVersion{{Version: active, Poured: true, Built: true, Options: []string{}}},
+	}
 	for _, tc := range []struct {
 		name   string
 		mutate func(*installedFormula)
@@ -106,22 +109,22 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		{"current", func(*installedFormula) {}, "keep"},
 		{"absent", func(s *installedFormula) {
 			s.Installed = nil
-			s.LinkedKeg = nil
+			s.ActiveVersion = nil
 		}, "install"},
 		{"outdated", func(s *installedFormula) {
 			old := "1.0"
-			s.LinkedKeg = &old
+			s.ActiveVersion = &old
 			s.Installed[0].Version = old
 			s.Outdated = true
 		}, "upgrade"},
 		{"newer installed", func(s *installedFormula) {
 			newer := "999.0"
-			s.LinkedKeg = &newer
+			s.ActiveVersion = &newer
 			s.Installed[0].Version = newer
 		}, ""},
 		{"active version missing", func(s *installedFormula) {
 			missing := "missing"
-			s.LinkedKeg = &missing
+			s.ActiveVersion = &missing
 		}, ""},
 		{"duplicate active version with unsupported flags", func(s *installedFormula) {
 			unsupported := s.Installed[0]
@@ -129,7 +132,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 			s.Installed = append(s.Installed, unsupported)
 		}, ""},
 		{"pinned", func(s *installedFormula) { s.Pinned = true }, ""},
-		{"unlinked", func(s *installedFormula) { s.LinkedKeg = nil }, ""},
+		{"unlinked", func(s *installedFormula) { s.ActiveVersion = nil }, ""},
 		{"partial pour", func(s *installedFormula) { s.LinkIncomplete = true }, ""},
 		{"source installation", func(s *installedFormula) { s.Installed[0].Poured = false }, ""},
 	} {

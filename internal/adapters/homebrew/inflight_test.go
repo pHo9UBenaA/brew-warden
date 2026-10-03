@@ -2,7 +2,6 @@ package homebrew
 
 import (
 	"context"
-	"encoding/json"
 	"errors"
 	"os"
 	"os/exec"
@@ -21,7 +20,7 @@ func inFlightFixture(pid int) inFlight {
 }
 
 func FuzzInFlightRecord(f *testing.F) {
-	valid, _ := json.Marshal(inFlightFixture(500))
+	valid := marshalFixture(f, inFlightFixture(500))
 	for _, seed := range [][]byte{valid, []byte(`{"schema":1,"collection":"../outside"}`), []byte(`{"schema":1,"pid":500,"session":500}`), []byte("{")} {
 		f.Add(seed)
 	}
@@ -48,17 +47,26 @@ func TestLegacyJournalCannotBeSilentlyMigrated(t *testing.T) {
 }
 
 func TestInFlightRejectsCorruptAndUnsafeRecords(t *testing.T) {
+	fixture := inFlightFixture(500)
+	if !fixture.valid() {
+		t.Fatal("invalid baseline in-flight fixture", fixture)
+	}
+	valid := string(marshalFixture(t, fixture))
 	for _, tc := range []struct {
 		name, data string
 	}{
 		{"malformed", "{"},
-		{"missing identity", `{"schema":1,"plan":"","attempt":"","pid":500,"session":500}`},
-		{"unbound session", `{"schema":1,"plan":"` + strings.Repeat("a", 64) + `","attempt":"` + strings.Repeat("b", 64) + `","pid":500,"session":501}`},
-		{"unknown schema", `{"schema":99,"plan":"` + strings.Repeat("a", 64) + `","attempt":"` + strings.Repeat("b", 64) + `","pid":500,"session":500}`},
-		{"workspace traversal", `{"schema":1,"plan":"` + strings.Repeat("a", 64) + `","attempt":"` + strings.Repeat("b", 64) + `","pid":500,"session":500,"collection":"../outside"}`},
-		{"workspace substitution", `{"schema":1,"plan":"` + strings.Repeat("a", 64) + `","attempt":"` + strings.Repeat("b", 64) + `","pid":500,"session":500,"collection":"collection-trap"}`},
+		{"missing identity", strings.Replace(valid, `"plan":"`+strings.Repeat("a", 64)+`"`, `"plan":""`, 1)},
+		{"unbound session", strings.Replace(valid, `"session":500`, `"session":501`, 1)},
+		{"unknown schema", strings.Replace(valid, `"schema":1`, `"schema":99`, 1)},
+		{"workspace traversal", strings.Replace(valid, `"collection":"collection-12345"`, `"collection":"../outside"`, 1)},
+		{"workspace substitution", strings.Replace(valid, `"collection":"collection-12345"`, `"collection":"collection-trap"`, 1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
+			var decoded inFlight
+			if err := decodeStrict([]byte(tc.data), &decoded); err == nil && decoded.valid() {
+				t.Fatal("mutation did not invalidate record", decoded)
+			}
 			directory := t.TempDir()
 			if err := os.WriteFile(filepath.Join(directory, "inflight.json"), []byte(tc.data), 0600); err != nil {
 				t.Fatal(err)
@@ -94,7 +102,7 @@ func TestInFlightParentExitHelper(t *testing.T) {
 	}
 	record := inFlightFixture(child.Process.Pid)
 	if os.Getenv("BREWWARDEN_INFLIGHT_PENDING") == "1" {
-		raw, _ := json.Marshal(record)
+		raw := marshalFixture(t, record)
 		if err := writeNew(filepath.Join(directory, "inflight.pending"), raw, 0600); err != nil {
 			_ = syscall.Kill(-child.Process.Pid, syscall.SIGKILL)
 			os.Exit(3)

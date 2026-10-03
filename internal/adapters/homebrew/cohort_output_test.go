@@ -46,12 +46,12 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 				t.Fatal(err)
 			}
 			delete(document, "skipped_formulae")
-			missing, _ := json.Marshal(document)
+			missing := marshalFixture(t, document)
 			if _, err := parsePublicVulns(missing, 0, selected); err == nil {
 				t.Fatal("incomplete public scanner response accepted")
 			}
 			document["skipped_formulae"] = json.RawMessage(`["jq"]`)
-			skipped, _ := json.Marshal(document)
+			skipped := marshalFixture(t, document)
 			if _, err := parsePublicVulns(skipped, 0, selected); err == nil {
 				t.Fatal("skipped requested subject accepted")
 			}
@@ -66,8 +66,8 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 				t.Fatal("invalid captured formulae", err)
 			}
 			delete(formulae[0], "dependencies")
-			envelope["formulae"], _ = json.Marshal(formulae)
-			broken, _ := json.Marshal(envelope)
+			envelope["formulae"] = marshalFixture(t, formulae)
+			broken := marshalFixture(t, envelope)
 			if bytes.Equal(broken, info) {
 				t.Fatal("capture was not mutated")
 			}

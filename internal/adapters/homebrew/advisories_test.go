@@ -76,9 +76,9 @@ func TestAdvisoryCombination(t *testing.T) {
 		{"homebrew open", brewAdvisoryStatus{Open: []brewAdvisoryEntry{{ID: "BREW-example"}}}, domain.Affected},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			got, err := combineAdvisories(c, report, tc.status)
-			if err != nil || got != tc.want {
-				t.Fatal(got, err)
+			got := combineAdvisories(c, report, tc.status)
+			if got != tc.want {
+				t.Fatalf("applicability: got %v, want %v", got, tc.want)
 			}
 		})
 	}

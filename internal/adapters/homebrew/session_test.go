@@ -1,7 +1,6 @@
 package homebrew
 
 import (
-	"encoding/json"
 	"os"
 	"path/filepath"
 	"strings"
@@ -25,10 +24,7 @@ func planFixture() executionPlan {
 func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 	p := planFixture()
 	p.Waivers = []domain.AgeWaiver{{Artifact: p.Targets[0], Reason: "Explicit emergency test"}}
-	raw, err := json.Marshal(p)
-	if err != nil {
-		t.Fatal(err)
-	}
+	raw := marshalFixture(t, p)
 	var restored executionPlan
 	if err := decodeStrict(raw, &restored); err != nil {
 		t.Fatal(err)
@@ -53,10 +49,7 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 				t.Fatal(err)
 			}
 			change(&changed)
-			modified, err := json.Marshal(changed)
-			if err != nil {
-				t.Fatal(err)
-			}
+			modified := marshalFixture(t, changed)
 			next, err := changed.prepared(digestBytes(modified))
 			if err != nil {
 				t.Fatal(err)
@@ -66,10 +59,16 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 			}
 		})
 	}
-	for _, bad := range []string{strings.Replace(string(raw), `"Revision":0,`, "", 1), strings.Replace(string(raw), `"Revision":0`, `"revision":0`, 1), strings.Replace(string(raw), `"minimumAge":0`, `"minimumAge":0,"minimumAge":1`, 1)} {
-		if err := decodeStrict([]byte(bad), &executionPlan{}); err == nil {
-			t.Fatal("ambiguous or incomplete plan accepted")
-		}
+	for name, bad := range map[string]string{
+		"missing revision":      strings.Replace(string(raw), `"Revision":0,`, "", 1),
+		"mis-cased revision":    strings.Replace(string(raw), `"Revision":0`, `"revision":0`, 1),
+		"duplicate minimum age": strings.Replace(string(raw), `"minimumAge":0`, `"minimumAge":0,"minimumAge":1`, 1),
+	} {
+		t.Run(name, func(t *testing.T) {
+			if err := decodeStrict([]byte(bad), &executionPlan{}); err == nil {
+				t.Fatal("ambiguous or incomplete plan accepted")
+			}
+		})
 	}
 }
 func TestExecutionPlanBindsReviewedHomebrewRevision(t *testing.T) {
@@ -103,7 +102,7 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	if err := writeNew(filepath.Join(root, "bottle"), data, 0600); err != nil {
 		t.Fatal(err)
 	}
-	raw, _ := json.Marshal(p)
+	raw := marshalFixture(t, p)
 	if err := writeNew(filepath.Join(root, "plan.json"), raw, 0600); err != nil {
 		t.Fatal(err)
 	}

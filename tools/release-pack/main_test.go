@@ -14,7 +14,11 @@ import (
 func TestArchiveDeterminismAndInventory(t *testing.T) {
 	root := t.TempDir()
 	first, second := filepath.Join(root, "a.tar.gz"), filepath.Join(root, "b.tar.gz")
-	files := []item{{Name: "bwd", Data: []byte("executable"), Mode: 0755}, {Name: "brewwarden", Link: "bwd", Mode: 0755}, {Name: "licenses/example", Data: []byte("notice"), Mode: 0644}}
+	files := []item{
+		{Name: "bwd", Data: []byte("executable"), Mode: 0755},
+		{Name: "brewwarden", Link: "bwd", Mode: 0755},
+		{Name: "licenses/example", Data: []byte("notice"), Mode: 0644},
+	}
 	if err := archive(first, files); err != nil {
 		t.Fatal(err)
 	}

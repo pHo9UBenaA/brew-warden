@@ -87,7 +87,12 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 			_, _ = fmt.Fprintln(errOut, "runtime_unavailable: "+err.Error())
 			return 1
 		}
-		_, err := fmt.Fprintf(out, "Runtime integrity and supported platform verified.\nCandidate eligibility: verified official bottles for arm64_tahoe with complete required evidence.\nMinimum release age: %d seconds.\nMetadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n", policy.MinimumAgeSeconds())
+		_, err := fmt.Fprintf(out,
+			"Runtime integrity and supported platform verified.\n"+
+				"Candidate eligibility: verified official bottles for arm64_tahoe with complete required evidence.\n"+
+				"Minimum release age: %d seconds.\n"+
+				"Metadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n",
+			policy.MinimumAgeSeconds())
 		if err != nil {
 			return 1
 		}

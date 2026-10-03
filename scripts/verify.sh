@@ -2,7 +2,7 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
-# Missing product directories are intentional; check each existing tree below.
+# Check formatting in every existing source tree.
 for tree in tools internal cmd tests; do
   if [ -d "$tree" ]; then
     formatted=$(gofmt -l "$tree")

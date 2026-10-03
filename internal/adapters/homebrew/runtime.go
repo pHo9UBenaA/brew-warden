@@ -91,7 +91,8 @@ func reviewedBrewSource(prefix string) (string, error) {
 	if err != nil || reviewedBrewRevisions[revision] == "" {
 		return "", errors.New("unsupported Homebrew source revision")
 	}
-	changes, err := runInstalledGit(prefix, "status", "--porcelain=v1", "--untracked-files=all", "--", "bin/brew", "Library/Homebrew", ":!Library/Homebrew/vendor/portable-ruby", ":!Library/Taps")
+	changes, err := runInstalledGit(prefix, "status", "--porcelain=v1", "--untracked-files=all", "--",
+		"bin/brew", "Library/Homebrew", ":!Library/Homebrew/vendor/portable-ruby", ":!Library/Taps")
 	if err != nil || changes != "" {
 		return "", errors.New("installed Homebrew source differs from reviewed release")
 	}

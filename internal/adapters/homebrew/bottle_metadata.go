@@ -4,7 +4,6 @@ import (
 	"errors"
 	"os"
 	"path/filepath"
-	"slices"
 	"strconv"
 	"strings"
 
@@ -108,7 +107,12 @@ func (w workspace) checkBottleMetadata(candidates []formulaMetadata) error {
 			version += "-" + strconv.Itoa(candidate.Rebuild)
 		}
 		suffix := "--" + candidate.Name + "-" + version + ".bottle_manifest.json"
-		matches := slices.DeleteFunc(append([]os.DirEntry{}, entries...), func(e os.DirEntry) bool { return !strings.HasSuffix(e.Name(), suffix) })
+		var matches []os.DirEntry
+		for _, entry := range entries {
+			if strings.HasSuffix(entry.Name(), suffix) {
+				matches = append(matches, entry)
+			}
+		}
 		if len(matches) != 1 {
 			return errors.New("selected bottle manifest missing or ambiguous")
 		}
