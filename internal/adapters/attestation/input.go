@@ -30,16 +30,20 @@ func bottleName(a domain.Artifact) string {
 }
 
 type boundedOutput struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	overflow bool
 }
 
+// Do not embed bytes.Buffer: its ReadFrom would bypass Write's bound in io.Copy.
+func (b *boundedOutput) Bytes() []byte  { return b.buffer.Bytes() }
+func (b *boundedOutput) String() string { return b.buffer.String() }
+
 func (b *boundedOutput) Write(p []byte) (int, error) {
-	if len(p) > maxResponse-b.Len() {
+	if len(p) > maxResponse-b.buffer.Len() {
 		b.overflow = true
 		return 0, errors.New("verifier output exceeds limit")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }
 
 func hashFile(path string, maxBytes int64) (domain.Digest, error) {

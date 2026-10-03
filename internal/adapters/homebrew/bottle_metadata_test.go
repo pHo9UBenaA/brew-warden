@@ -25,7 +25,7 @@ func TestBottleMetadataBindsDigestAndCompleteClosure(t *testing.T) {
 		want         bool
 	}{
 		{"matching", string(root.BottleSHA256), "[" + historicalDependency + "]", true},
-		{"different bottle", "wrong", `[]`, false},
+		{"different bottle", "wrong", "[" + historicalDependency + "]", false},
 		{"missing dependency", string(root.BottleSHA256), `[]`, false},
 		{"additional dependency", string(root.BottleSHA256), `[{"full_name":"unplanned","version":"1","revision":0}]`, false},
 		{"duplicate dependency", string(root.BottleSHA256), "[" + historicalDependency + "," + historicalDependency + "]", false},

@@ -63,16 +63,12 @@ func TestInFlightRejectsCorruptAndUnsafeRecords(t *testing.T) {
 		{"workspace substitution", strings.Replace(valid, `"collection":"collection-12345"`, `"collection":"collection-trap"`, 1)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			var decoded inFlight
-			if err := decodeStrict([]byte(tc.data), &decoded); err == nil && decoded.valid() {
-				t.Fatal("mutation did not invalidate record", decoded)
-			}
 			directory := t.TempDir()
 			if err := os.WriteFile(filepath.Join(directory, "inflight.json"), []byte(tc.data), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if err := clearStoppedInFlight(directory); err == nil {
-				t.Fatal("unsafe in-flight state permitted a new mutation")
+			if err := clearStoppedInFlight(directory); err == nil || !strings.Contains(err.Error(), "invalid in-flight execution record") {
+				t.Fatal("want invalid-record refusal before process inspection or cleanup", err)
 			}
 		})
 	}

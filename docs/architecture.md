@@ -44,10 +44,12 @@ The two entrypoints share one CLI routing and configuration path through
 composition. A missing trusted distribution build marker disables execution within that path; it
 does not select a separate command parser. Pure domain decisions and application
 workflows remain independent of CLI presentation. The workflow
-revalidates a bound session, evaluates policy, and requires the Homebrew adapter
+presents exact candidate identities before execution, revalidates a one-use bound
+session, evaluates policy, and requires the Homebrew adapter
 to record its owned process before the launch gate opens. The adapter holds an
-operation lock and rejects active or unreadable in-flight state; no stored plan
-can authorize a replay. Distribution builds register the concrete Homebrew engine. Development
+operation lock and rejects active or unreadable in-flight state; it checks the
+complete process session before removing a stale record. No stored plan can
+authorize a replay. Distribution builds register the concrete Homebrew engine. Development
 builds without a distribution build marker remain diagnostic-only. There is no
 unchecked pass-through. `ports.ConfigSource` connects the CLI to `localstate`,
 the adapter owning local JSON configuration. Domain acceptance tests live under `tests` and provide
@@ -56,8 +58,8 @@ layers with their first real behavior; empty interfaces and placeholder
 applications would not strengthen the design.
 
 The Homebrew adapter owns public candidate scanning and official advisory feed/API
-observations. The attestation adapter owns digest-bound age observations. It combines the two
-advisory sources before returning one attributed vulnerability claim per artifact.
+observations. It combines the two advisory sources before returning one
+attributed vulnerability claim per artifact.
 Homebrew performs version-range comparison through its public formula API; the
 wrapper does not maintain a duplicate OSV client or upstream release provider.
 
@@ -104,12 +106,3 @@ tests together. Tests must demonstrate valid wiring and forbidden reverse edges
 using existing target packages. Core tests use supplied evidence and ports;
 adapter tests separately exercise actual I/O contracts. Integration tests belong
 under tests when they need multiple concrete layers.
-
-The application service presents exact candidate identities before execution
-and requires a one-use bound session. The Homebrew adapter refuses planning while
-an owned child may still be active, checks the complete process session before
-removing a stale record, and never turns that record into success or permission
-to replay. CLI code owns argument parsing and presentation, including per-artifact
-age reasons. Composition selects the installed gh verifier and the reviewed
-installed Homebrew adapter; the distribution build marker enables that path.
-The providers and clock are constructed there.

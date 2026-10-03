@@ -73,7 +73,7 @@ func TestAdvisoryCombination(t *testing.T) {
 		{"absent record", brewAdvisoryStatus{}, domain.Affected},
 		{"unrelated fix", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2020-0000"}}}}, domain.Affected},
 		{"matched patch", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}}}, domain.NoKnownApplicableFindings},
-		{"homebrew open", brewAdvisoryStatus{Open: []brewAdvisoryEntry{{ID: "BREW-example"}}}, domain.Affected},
+		{"homebrew open despite patched OSV", brewAdvisoryStatus{Open: []brewAdvisoryEntry{{ID: "BREW-example"}}, Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}}}, domain.Affected},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := combineAdvisories(c, report, tc.status)

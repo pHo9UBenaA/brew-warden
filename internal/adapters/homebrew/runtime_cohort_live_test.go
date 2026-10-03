@@ -26,7 +26,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	digest, err := (Runtime{}).materialize(filepath.Join(root, "runtime"))
+	digest, err := (Runtime{}).materialize(context.Background(), filepath.Join(root, "runtime"))
 	if err != nil || !digest.Valid() {
 		t.Fatalf("want bound reviewed runtime: digest=%s error=%v", digest, err)
 	}

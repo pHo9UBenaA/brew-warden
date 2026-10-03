@@ -1,6 +1,7 @@
 package homebrew
 
 import (
+	"context"
 	"os"
 	"os/exec"
 	"path/filepath"
@@ -37,18 +38,18 @@ func TestReviewedReleaseGitSourceMatrix(t *testing.T) {
 			if output, err := command.CombinedOutput(); err != nil {
 				t.Fatalf("reviewed upstream commit unavailable: %v: %s", err, output)
 			}
-			if got, err := reviewedBrewSource(prefix); err != nil || got != revision {
+			if got, err := reviewedBrewSource(context.Background(), prefix); err != nil || got != revision {
 				t.Fatalf("real upstream source not selected: %s %v", got, err)
 			}
 			destination := filepath.Join(t.TempDir(), "inspection")
-			if digest, err := (Runtime{}).materializeFrom(destination, prefix); err != nil || !digest.Valid() {
+			if digest, err := (Runtime{}).materializeFrom(context.Background(), destination, prefix); err != nil || !digest.Valid() {
 				t.Fatalf("real release source cannot be copied and bound: %s %v", digest, err)
 			}
 			modified := filepath.Join(prefix, "Library/Homebrew/unreviewed.rb")
 			if err := os.WriteFile(modified, []byte("# unreviewed executable source\n"), 0600); err != nil {
 				t.Fatal(err)
 			}
-			if _, err := reviewedBrewSource(prefix); err == nil {
+			if _, err := reviewedBrewSource(context.Background(), prefix); err == nil {
 				t.Fatal("untracked executable Homebrew source accepted")
 			}
 			if err := os.Remove(modified); err != nil {

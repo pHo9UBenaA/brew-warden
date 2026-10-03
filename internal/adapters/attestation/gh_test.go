@@ -247,6 +247,16 @@ func ghCommandFixture(t *testing.T) (domain.Artifact, string, string) {
 func TestPublicGHCommandBoundary(t *testing.T) {
 	a, bottle, tool := ghCommandFixture(t)
 	verified := "[" + ghResult(a, "2026-09-10T00:00:00Z") + "]"
+	version, err := filepath.Abs("testdata/gh-2.66.0-version.txt")
+	if err != nil {
+		t.Fatal(err)
+	}
+	diagnostic, err := filepath.Abs("testdata/gh-2.66.0-no-auth.stderr")
+	if err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("GH_TEST_VERSION", version)
+	t.Setenv("GH_TEST_NO_AUTH", diagnostic)
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
 	for _, tc := range []struct {
 		name, script, reason string
@@ -254,8 +264,10 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 	}{
 		{"verified", "printf '%s' '" + verified + "'", "", true},
 		{"empty result", "printf '[]'", "", false},
+		{"stdout overflow", "/usr/bin/head -c 9000000 /dev/zero", "gh output exceeded limit", false},
+		{"stderr overflow", "/usr/bin/head -c 9000000 /dev/zero >&2", "gh output exceeded limit", false},
 		{"failed request", "printf '%s' '" + verified + "'; exit 2", "", false},
-		{"authentication", "echo 'To get started, run gh auth login. secret-marker' >&2; exit 4", "gh authentication required", false},
+		{"authentication", "/bin/cat \"$GH_TEST_NO_AUTH\" >&2; echo secret-marker >&2; exit 4", "gh authentication required", false},
 		{"rate limit", "echo 'API rate limit exceeded. secret-marker' >&2; exit 1", "rate limit reached", false},
 		{"bottle changed", "printf changed > \"$3\"; printf '%s' '" + verified + "'", "", false},
 	} {
@@ -263,36 +275,43 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 			if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
 				t.Fatal("cannot restore bottle fixture", err)
 			}
+			versionChecked := filepath.Join(filepath.Dir(tool), "version-checked")
+			if err := os.Remove(versionChecked); err != nil && !os.IsNotExist(err) {
+				t.Fatal(err)
+			}
+			t.Setenv("GH_TEST_VERSION_CHECKED", versionChecked)
 			script := `#!/bin/sh
 if [ "$1" = version ]; then
-  printf 'gh version 2.101.0 (fixture)\n'
-  exit 0
+  test ! -e "$GH_TEST_VERSION_CHECKED" || exit 17
+  touch "$GH_TEST_VERSION_CHECKED"
+  exec /bin/cat "$GH_TEST_VERSION"
 fi
 test "$1" = attestation && test "$2" = verify &&
 test "$3" = '` + bottle + `' && test "$4" = --repo &&
 test "$5" = Homebrew/homebrew-core && test "$6" = --predicate-type &&
-test "$8" = --format && test "${10}" = --limit && test "${11}" = 100 || exit 5
+test "$7" = https://slsa.dev/provenance/v1 && test "$8" = --format &&
+test "$9" = json && test "${10}" = --limit && test "${11}" = 100 || exit 5
 ` + tc.script + "\n"
 			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
 				t.Fatal(err)
 			}
-			got, raw, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), a, bottle, now)
+			provenance, age, raw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
 			if (err == nil) != tc.ok {
 				t.Fatalf("want verification success=%t, got error=%v", tc.ok, err)
 			}
-			if tc.ok && (got == 0 || string(raw) != verified) {
-				t.Fatalf("want verified response %q with nonzero timestamp, got timestamp=%d response=%q", verified, got, raw)
+			if !tc.ok && (provenance != (domain.Evidence{}) || age != (domain.Evidence{}) || raw != nil) {
+				t.Fatalf("failed verification returned evidence: %+v %+v %q", provenance, age, raw)
 			}
 			if tc.reason != "" && (err == nil || !strings.Contains(err.Error(), tc.reason) || strings.Contains(err.Error(), "secret-marker")) {
 				t.Fatalf("want redacted gh error containing %q, got %v", tc.reason, err)
 			}
 			if tc.ok {
-				provenance, age, evidenceRaw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
-				if err != nil || provenance.Claim != domain.Provenance || age.Claim != domain.Publication ||
-					age.Publication != domain.VerifiedAttestation || age.PublishedAt != got ||
-					provenance.RawSHA256 != EvidenceDigest(evidenceRaw) || age.RawSHA256 != provenance.RawSHA256 ||
-					provenance.Subject != a || age.Subject != a {
-					t.Fatalf("want provenance and age for %+v at %d with response digest %s: provenance=%+v age=%+v error=%v", a, got, EvidenceDigest(evidenceRaw), provenance, age, err)
+				wantTime := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC).Unix()
+				if provenance.Claim != domain.Provenance || age.Claim != domain.Publication ||
+					age.Publication != domain.VerifiedAttestation || age.PublishedAt != wantTime || string(raw) != verified ||
+					provenance.RawSHA256 != EvidenceDigest(raw) || age.RawSHA256 != provenance.RawSHA256 ||
+					provenance.Subject != a || age.Subject != a || provenance.ProviderVersion != "gh/2.66.0" || age.ProviderVersion != provenance.ProviderVersion {
+					t.Fatalf("want attributed provenance and age for %+v at %d: provenance=%+v age=%+v", a, wantTime, provenance, age)
 				}
 			}
 		})
@@ -315,7 +334,7 @@ exit 42
 		t.Fatal(err)
 	}
 	const now = int64(1800000000)
-	if _, _, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), artifact, bottle, now); err == nil || !strings.Contains(err.Error(), "unsupported installed gh version") {
+	if _, _, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, now); err == nil || !strings.Contains(err.Error(), "unsupported installed gh version") {
 		t.Fatalf("want unsupported gh version refusal, got %v", err)
 	}
 	if _, err := os.Stat(started); !os.IsNotExist(err) {
@@ -342,7 +361,7 @@ exec /bin/sleep 30
 	defer cancel()
 	completed := make(chan error, 1)
 	go func() {
-		_, _, err := (PublicGH{Path: tool}).VerifyBottle(ctx, artifact, bottle, 1800000000)
+		_, _, _, err := (PublicGH{Path: tool}).VerifyEvidence(ctx, artifact, bottle, 1800000000)
 		completed <- err
 	}()
 	// Wait for the actual attestation invocation, not an arbitrary sleep that

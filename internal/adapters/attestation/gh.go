@@ -27,7 +27,7 @@ type PublicGH struct {
 }
 
 // InstalledGH resolves the user's installed command without installing or
-// upgrading it. Check and VerifyBottle validate the supported version cohort.
+// upgrading it. Check and VerifyEvidence validate the supported version cohort.
 func InstalledGH() (PublicGH, error) {
 	path, err := exec.LookPath("gh")
 	if err != nil {
@@ -98,31 +98,32 @@ func (v PublicGH) Check(ctx context.Context) error {
 	return err
 }
 
-// VerifyBottle returns the oldest verified timestamp for the exact bytes, as
-// well as the raw CLI response. The caller must bind both to its pending plan.
-func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle string, now int64) (int64, []byte, error) {
+// verifyBottle retains the checked version alongside the verified response;
+// attributing evidence must not launch a second, independent version probe.
+func (v PublicGH) verifyBottle(ctx context.Context, a domain.Artifact, bottle string, now int64) (int64, []byte, string, error) {
 	if ctx == nil || !a.Valid() || !filepath.IsAbs(v.Path) || !filepath.IsAbs(bottle) || filepath.Base(bottle) != bottleName(a) || now <= 0 || now > 1<<62 {
-		return 0, nil, errors.New("invalid public attestation inputs")
+		return 0, nil, "", errors.New("invalid public attestation inputs")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	verifierDigest, err := hashFile(v.Path, 128*1024*1024)
 	if err != nil {
-		return 0, nil, errors.New("installed gh unavailable")
+		return 0, nil, "", errors.New("installed gh unavailable")
 	}
 	bottleDigest, err := hashFile(bottle, 2*1024*1024*1024)
 	if err != nil || bottleDigest != a.SHA256 {
-		return 0, nil, errors.New("bottle integrity mismatch")
+		return 0, nil, "", errors.New("bottle integrity mismatch")
 	}
-	if err := v.Check(ctx); err != nil {
-		return 0, nil, err
+	version, err := v.checkedVersion(ctx)
+	if err != nil {
+		return 0, nil, "", err
 	}
 	raw, err := runGH(ctx, v.Path, []string{"attestation", "verify", bottle,
 		"--repo", "Homebrew/homebrew-core",
 		"--predicate-type", "https://slsa.dev/provenance/v1",
 		"--format", "json", "--limit", strconv.Itoa(attestationResultLimit)})
 	if err != nil {
-		return 0, nil, fmt.Errorf("public attestation verification unavailable: %w", err)
+		return 0, nil, "", fmt.Errorf("public attestation verification unavailable: %w", err)
 	}
 	for _, input := range []struct {
 		path     string
@@ -131,14 +132,14 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 	}{{v.Path, verifierDigest, 128 * 1024 * 1024}, {bottle, bottleDigest, 2 * 1024 * 1024 * 1024}} {
 		digest, err := hashFile(input.path, input.maxBytes)
 		if err != nil || digest != input.digest {
-			return 0, nil, errors.New("attestation input changed during verification")
+			return 0, nil, "", errors.New("attestation input changed during verification")
 		}
 	}
 	oldest, err := oldestVerifiedTimestamp(raw, a, now)
 	if err != nil {
-		return 0, nil, err
+		return 0, nil, "", err
 	}
-	return oldest, raw, nil
+	return oldest, raw, version, nil
 }
 
 func runGH(ctx context.Context, path string, args []string) ([]byte, error) {
@@ -243,11 +244,7 @@ func decodeJSONArray(data []byte, out *[]json.RawMessage) error {
 // VerifyEvidence supplies two attributed claims from the same verified bytes;
 // neither process success nor an unsigned publication date can satisfy age.
 func (v PublicGH) VerifyEvidence(ctx context.Context, a domain.Artifact, bottle string, now int64) (domain.Evidence, domain.Evidence, []byte, error) {
-	oldest, raw, err := v.VerifyBottle(ctx, a, bottle, now)
-	if err != nil {
-		return domain.Evidence{}, domain.Evidence{}, nil, err
-	}
-	version, err := v.checkedVersion(ctx)
+	oldest, raw, version, err := v.verifyBottle(ctx, a, bottle, now)
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}

@@ -127,14 +127,15 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 	active := node.Artifact.Version
 	normal := installedFormula{
 		Name: node.Artifact.Name, ActiveVersion: &active,
-		Installed: []installedVersion{{Version: active, Poured: true, Built: true, Options: []string{}}},
+		Installed: []installedVersion{{Version: active, OnRequest: true, Poured: true, Built: true, Options: []string{}}},
 	}
 	for _, tc := range []struct {
 		name   string
 		mutate func(*installedFormula)
 		want   string
 	}{
-		{"current", func(*installedFormula) {}, "keep"},
+		{"current requested root", func(*installedFormula) {}, "keep"},
+		{"current dependency promoted to root", func(s *installedFormula) { s.Installed[0].OnRequest = false }, "install"},
 		{"absent", func(s *installedFormula) {
 			s.Installed = nil
 			s.ActiveVersion = nil
@@ -168,7 +169,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 			state := normal
 			state.Installed = append([]installedVersion{}, normal.Installed...)
 			tc.mutate(&state)
-			got, err := publicActions([]installedFormula{state}, []domain.Node{node}, collectionInputs{Operation: "install"})
+			got, err := publicActions([]installedFormula{state}, []domain.Node{node}, collectionInputs{Operation: "install", Targets: []string{node.Artifact.Name}})
 			if tc.want == "" {
 				if err == nil {
 					t.Fatal("unsupported state accepted")
@@ -177,6 +178,13 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 				t.Fatalf("want one %q action, got %+v: error=%v", tc.want, got, err)
 			}
 		})
+	}
+	normal.Installed[0].OnRequest = false
+	for _, request := range []collectionInputs{{Operation: "install", Targets: []string{"another-root"}}, {Operation: "upgrade", Targets: []string{node.Artifact.Name}}} {
+		actions, err := publicActions([]installedFormula{normal}, []domain.Node{node}, request)
+		if err != nil || len(actions) != 1 || actions[0].Operation != "keep" {
+			t.Fatalf("non-install-root must retain dependency ownership: request=%+v actions=%+v err=%v", request, actions, err)
+		}
 	}
 	absent := installedFormula{Name: node.Artifact.Name, Installed: []installedVersion{}}
 	if _, err := publicActions([]installedFormula{absent}, []domain.Node{node}, collectionInputs{Operation: "upgrade", Targets: []string{node.Artifact.Name}}); err == nil {

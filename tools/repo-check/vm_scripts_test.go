@@ -29,10 +29,29 @@ func vmScriptFixture(t *testing.T) (string, string) {
 		}
 	}
 	for name, content := range map[string]string{
-		"reviewed/bin/brew":                 "#!/bin/sh\n",
-		"reviewed/Library/Homebrew/test.rb": "# isolated fixture\n",
-		"gh":                                "#!/bin/sh\n",
-		"archive.tar.gz":                    "not used before VM setup fails\n",
+		"reviewed/bin/brew":                    "#!/bin/sh\n",
+		"reviewed/Library/Homebrew/test.rb":    "# isolated fixture\n",
+		"gh":                                   "#!/bin/sh\n",
+		"archive.tar.gz":                       "not used before VM setup fails\n",
+		".cache/tart/guest/credential-storage": "private-files-v1\n",
+		".cache/tart/guest/home/.config/gh/hosts.yml":      "disposable-fake-token\n",
+		".cache/tart/guest/home/.local/state/gh/state.yml": "disposable-state\n",
+		".cache/tart/guest/home/device.log":                "old private login log\n",
+		".cache/tart/guest/home/device.pid":                "99999999\n",
+		".cache/tart/guest/login-output":                   "! First copy your one-time code: ABCD-1234\nOpen this URL to continue in your web browser: https://github.com/login/device\nsecret-marker must not be displayed\n",
+		".cache/tart/guest/gh/gh": `#!/bin/sh
+root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
+case "$1:$2" in
+  auth:status) exit 1 ;;
+  auth:logout)
+    test ! -e "$root/../deny-logout" || exit 17
+    exit 0 ;;
+  auth:login)
+    test "$7:$8" = --web:--insecure-storage || exit 64
+    /bin/cat "$root/login-output" ;;
+  *) exit 64 ;;
+esac
+`,
 		"fake-tart": `#!/bin/sh
 printf '%s:%s\n' "$1" "${2:-}" >> "$TART_HOME/actions"
 case "$1" in
@@ -44,11 +63,17 @@ case "$1" in
         /usr/bin/id) exit 0 ;;
         /usr/sbin/sysctl) printf 'VirtualMac2,1\n'; exit 0 ;;
         /usr/bin/arch) printf 'arm64\n'; exit 0 ;;
+        /usr/bin/grep)
+          exec /usr/bin/grep -Fxq private-files-v1 "$TART_HOME/guest/credential-storage" ;;
+        /usr/bin/env) exit 1 ;; # Reachable guest, failed gh auth-status boundary.
         /bin/sh)
           case "${5:-}" in
-            *'grep -Ei'*) printf '%s\n' '! First copy your one-time code: ABCD-1234' 'Open this URL to continue in your web browser: https://github.com/login/device'; exit 0 ;;
+            *'rm -rf'*) test ! -e "$TART_HOME/deny-rm" || exit 23 ;;
           esac
-          test ! -e "$TART_HOME/deny-rm"; exit $? ;;
+          # Run the actual bounded guest command on disposable local files.
+          # No command may reach the real /private/tmp guest path or host auth.
+          program=$(printf '%s' "$5" | /usr/bin/sed "s|/private/tmp/bw-acceptance|$TART_HOME/guest|g")
+          exec /bin/sh -c "$program" ;;
       esac
     fi
     exit 29 ;;
@@ -180,8 +205,11 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 	if err := os.WriteFile(state, []byte("awaiting-device-approval\n"), 0600); err != nil {
 		t.Fatal(err)
 	}
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	out, err = run("complete", "pending")
-	if err == nil || !strings.Contains(out, "Guest agent unavailable") {
+	if err == nil || !strings.Contains(out, "Guest gh is not authenticated") {
 		t.Fatalf("unapproved guest passed the readiness gate: %v: %s", err, out)
 	}
 	if actions := vmActions(t, root); strings.Contains(actions, "stop:") {
@@ -209,22 +237,67 @@ func TestVMFinishRemovesGuestCredentialsAndStops(t *testing.T) {
 	if actions := vmActions(t, root); !strings.Contains(actions, "stop:new-vm\n") {
 		t.Fatalf("normal cleanup left guest running: %s", actions)
 	}
+	for _, name := range []string{".config/gh/hosts.yml", ".local/state/gh/state.yml", "device.log", "device.pid"} {
+		if _, err := os.Lstat(filepath.Join(root, ".cache/tart/guest/home", name)); !os.IsNotExist(err) {
+			t.Fatalf("guest credential file %s remains: %v", name, err)
+		}
+	}
 }
 
-func TestVMFinishStopsAfterGuestCredentialRemovalFails(t *testing.T) {
-	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
-		t.Fatal(err)
+func TestVMFinishStopsAfterGuestCredentialCleanupFails(t *testing.T) {
+	for _, failure := range []string{"deny-rm", "deny-logout", "legacy-storage"} {
+		t.Run(failure, func(t *testing.T) {
+			root, tart := vmScriptFixture(t)
+			for _, marker := range []string{"guest-reachable", failure} {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart", marker), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if failure == "legacy-storage" {
+				if err := os.Remove(filepath.Join(root, ".cache/tart/guest/credential-storage")); err != nil {
+					t.Fatal(err)
+				}
+			}
+			out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm")
+			if err == nil || !strings.Contains(out, "credential cleanup unconfirmed") || strings.Contains(out, "Guest credentials removed") {
+				t.Fatalf("cleanup failure was certified: %v: %s", err, out)
+			}
+			if !strings.Contains(vmActions(t, root), "stop:new-vm\n") {
+				t.Fatal("failed cleanup did not stop guest")
+			}
+			if failure == "deny-logout" {
+				if _, err := os.Stat(filepath.Join(root, ".cache/tart/guest/home/.config/gh/hosts.yml")); !os.IsNotExist(err) {
+					t.Fatal("logout failure skipped file cleanup", err)
+				}
+			}
+		})
 	}
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-rm"), nil, 0600); err != nil {
-		t.Fatal(err)
-	}
-	out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm")
-	if err == nil || !strings.Contains(out, "Guest credential removal failed") {
-		t.Fatalf("credential removal failure was accepted: %v: %s", err, out)
-	}
-	if actions := vmActions(t, root); !strings.Contains(actions, "stop:new-vm\n") {
-		t.Fatalf("credential removal failure left guest running: %s", actions)
+}
+
+func TestVMFinishAcceptsUnauthenticatedGuest(t *testing.T) {
+	for _, state := range []string{"new guest", "empty hosts file"} {
+		t.Run(state, func(t *testing.T) {
+			root, tart := vmScriptFixture(t)
+			if state == "new guest" {
+				if err := os.RemoveAll(filepath.Join(root, ".cache/tart/guest")); err != nil {
+					t.Fatal(err)
+				}
+			} else {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest/home/.config/gh/hosts.yml"), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+				// No credential exists to log out; that command would fail.
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart/deny-logout"), nil, 0600); err != nil {
+					t.Fatal(err)
+				}
+			}
+			if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0600); err != nil {
+				t.Fatal(err)
+			}
+			if out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm"); err != nil {
+				t.Fatalf("unauthenticated guest cleanup: %s: %v", out, err)
+			}
+		})
 	}
 }
 
@@ -245,15 +318,18 @@ func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
 		t.Fatal(err)
 	}
 	out, err := runVMScriptFixture(t, root, tart, "auth", "new-vm")
-	if err != nil || !strings.Contains(out, "ABCD-1234") || !strings.Contains(out, "https://github.com/login/device") {
+	if err != nil || !strings.Contains(out, "ABCD-1234") || !strings.Contains(out, "https://github.com/login/device") || strings.Contains(out, "secret-marker") {
 		t.Fatalf("older gh device login code was hidden: %v: %s", err, out)
 	}
 }
 
 func TestVMAuthStatusRefusesUnauthenticatedGuest(t *testing.T) {
 	root, tart := vmScriptFixture(t)
+	if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0600); err != nil {
+		t.Fatal(err)
+	}
 	out, err := runVMScriptFixture(t, root, tart, "auth-status", "new-vm")
-	if err == nil || !strings.Contains(out, "Guest agent unavailable") {
-		t.Fatalf("unreachable guest was accepted as authenticated: %v: %s", err, out)
+	if err == nil || !strings.Contains(out, "Guest gh is not authenticated") {
+		t.Fatalf("unauthenticated guest was accepted: %v: %s", err, out)
 	}
 }

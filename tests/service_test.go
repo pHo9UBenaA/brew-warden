@@ -66,9 +66,9 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 		{"history"}, {"status"}, {"reconcile"},
 	} {
 		planner := &servicePlanner{}
-		s := application.Service{Planner: planner}
+		s := application.Service{Planner: planner, Clock: &executionClock{now: 1000}}
 		var out bytes.Buffer
-		if cli.RunWithRuntime(context.Background(), args, &out, &out, nil, &s) == 0 || planner.calls != 0 {
+		if cli.RunWithRuntime(context.Background(), args, &out, &out, nil, &s) == 0 || planner.calls != 0 || !strings.HasPrefix(out.String(), "invocation_invalid:") {
 			t.Fatal("unsupported invocation reached planner", args, out.String())
 		}
 	}

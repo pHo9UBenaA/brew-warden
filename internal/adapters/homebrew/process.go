@@ -83,30 +83,54 @@ func (w workspace) command(ctx context.Context, profile string, args ...string) 
 func (w workspace) invoke(ctx context.Context, label, profile string, args ...string) ([]byte, error) {
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
-	command := w.command(ctx, profile, args...)
+	return w.invokeCommand(ctx, label, w.command(ctx, profile, args...))
+}
+
+// Keep safe classifications after collection cleanup; never expose raw stderr,
+// which can contain credentials, terminal controls or user-owned paths.
+func (w workspace) invokeCommand(ctx context.Context, label string, command *exec.Cmd) ([]byte, error) {
 	stdout, stderr := &processOutput{}, &processOutput{}
 	command.Stdout = stdout
 	command.Stderr = stderr
-	err := command.Run()
-	// Retain bounded diagnostics even on failure; callers emit fixed messages.
-	if writeErr := writeNew(filepath.Join(w.root, label+".stderr"), stderr.Bytes(), 0600); writeErr != nil {
-		return nil, writeErr
+	runErr := command.Run()
+	var failure error
+	switch {
+	case ctx.Err() != nil:
+		failure = ctx.Err()
+	case stdout.overflow || stderr.overflow:
+		failure = errors.New("output exceeded limit")
+	case runErr != nil:
+		var exit *exec.ExitError
+		if errors.As(runErr, &exit) {
+			failure = fmt.Errorf("command exited with status %d", exit.ExitCode())
+		} else {
+			failure = errors.New("command could not start or complete; check Homebrew prerequisites")
+		}
 	}
-	if err != nil || stdout.overflow || stderr.overflow {
-		return nil, fmt.Errorf("homebrew %s failed", label)
+	// Diagnostics exist only for this pending workspace, not execution history.
+	writeErr := writeNew(filepath.Join(w.root, label+".stderr"), stderr.Bytes(), 0600)
+	if writeErr != nil {
+		failure = errors.Join(failure, errors.New("could not save private command diagnostics"))
+	}
+	if failure != nil {
+		return nil, fmt.Errorf("homebrew %s: %w", label, failure)
 	}
 	return stdout.Bytes(), nil
 }
 
 type processOutput struct {
-	bytes.Buffer
+	buffer   bytes.Buffer
 	overflow bool
 }
 
+// Do not embed bytes.Buffer: its ReadFrom would bypass Write's bound in io.Copy.
+func (b *processOutput) Bytes() []byte  { return b.buffer.Bytes() }
+func (b *processOutput) String() string { return b.buffer.String() }
+
 func (b *processOutput) Write(p []byte) (int, error) {
-	if len(p) > maxManifest-b.Len() {
+	if len(p) > maxManifest-b.buffer.Len() {
 		b.overflow = true
 		return 0, errors.New("native output exceeds limit")
 	}
-	return b.Buffer.Write(p)
+	return b.buffer.Write(p)
 }

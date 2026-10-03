@@ -26,7 +26,7 @@ type frozenInput struct {
 }
 type executionEnvironment struct {
 	Runtime      domain.Digest `json:"runtime" required:"true"`
-	BrewRevision string        `json:"brewRevision,omitempty"`
+	BrewRevision string        `json:"brewRevision" required:"true"`
 	OSVersion    string        `json:"osVersion" required:"true"`
 	Prefix       string        `json:"prefix" required:"true"`
 }
@@ -47,7 +47,7 @@ type executionPlan struct {
 
 func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	policy, err := domain.NewPolicy(p.MinimumAgeSeconds)
-	supportedSchema := p.Schema == 1 || p.Schema == 2 || p.Schema == 3
+	supportedSchema := p.Schema == 3
 	validInterval := p.IssuedAt > 0 && p.ExpiresAt > p.IssuedAt && p.ExpiresAt <= p.IssuedAt+600
 	if err != nil || !supportedSchema || !p.Attempt.Valid() || !p.BeforeState.Valid() || !validInterval {
 		return ports.Prepared{}, errors.New("invalid persisted execution plan")
@@ -55,7 +55,7 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	environment := p.Environment
 	validOSVersion := strings.HasPrefix(environment.OSVersion, "26.") &&
 		len(environment.OSVersion) <= 16 && strings.Trim(environment.OSVersion, "0123456789.") == ""
-	reviewedRevision := p.Schema < 3 || reviewedBrewRevisions[environment.BrewRevision] != ""
+	reviewedRevision := reviewedBrewRevisions[environment.BrewRevision] != ""
 	validInventory := len(p.Nodes) > 0 && len(p.Nodes) <= 128 &&
 		len(p.Actions) == len(p.Nodes) && len(p.Inputs) > 0 && len(p.Inputs) <= 10000
 	if !environment.Runtime.Valid() || !reviewedRevision || environment.Prefix != "/opt/homebrew" || !validOSVersion || !validInventory {

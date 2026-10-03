@@ -168,7 +168,6 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	ctx, cancel := context.WithTimeout(ctx, 2*time.Minute)
 	defer cancel()
 	cmd := w.command(ctx, profile, args...)
-	cmd.Env = slices.DeleteFunc(cmd.Env, func(s string) bool { return s == "HOMEBREW_NO_INSTALL_FROM_API=1" || s == "HOMEBREW_DEVELOPER=1" })
 	out, stderr := &processOutput{}, &processOutput{}
 	cmd.Stdout, cmd.Stderr = out, stderr
 	err = cmd.Run()

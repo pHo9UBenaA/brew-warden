@@ -72,10 +72,20 @@ fixture remains bound to the legacy complete-runtime fingerprint. If
 preparation fails after a successful clone, the runner attempts guest credential
 removal and stops only that newly created clone; it retains private diagnostics
 and reports any cleanup it cannot confirm. A failed `doctor` never counts as
-success. `auth` starts the standard gh device flow inside a private guest HOME; approval
-is human-mediated. Standard gh device login asks for `repo`, `read:org`, and
-`gist` scopes. `finish` removes guest credentials and stops the VM; also revoke
-the temporary GitHub CLI OAuth authorization from the account afterward.
+success. Use a base without existing GitHub CLI credentials. `auth` starts the
+standard gh device flow with explicit `GH_CONFIG_DIR` and `--insecure-storage`;
+approval is human-mediated. Tokens are intentionally plaintext under the private
+guest HOME, never in the host or guest credential store. This disposable-test
+tradeoff makes the bounded config directory the cleanup owner. The storage
+option and logout limitations were inspected in gh 2.101.0 `pkg/cmd/auth/login`
+and `internal/config` at `0cf1092493af067646fc5f3db9421c6a6ec9c938`.
+Standard device login asks for `repo`, `read:org`, and `gist` scopes. `finish`
+terminates pending guest-owned device login, logs out when a config exists,
+removes private config/log files and always attempts to stop the VM. A failed
+logout, file removal or unknown/legacy storage contract reports cleanup
+unconfirmed and prevents readiness; it does not delete the retained VM.
+Legacy guests that used default credential storage need manual Keychain cleanup.
+Also revoke the temporary GitHub CLI OAuth authorization afterward.
 Evidence under ignored `.cache/` is disposable, not the sole record of results.
 Never upload VM output containing credentials or copy host credentials into it.
 
@@ -99,6 +109,10 @@ authentication; `suite` is the complete fixed-order acceptance gate.
   provisioned older active keg and verifies the exact newer one is linked.
 - `run VM survey TARGETS` collects evidence without installing. Its successful
   exit means the survey ran, **not** that every requested formula was eligible.
+- `run VM ownership` requires a fresh packaged jq install with dependency-only
+  oniguruma. It checks that an unchanged jq install preserves dependency ownership,
+  then an explicit packaged oniguruma install promotes ownership without changing
+  the payload or installation time.
 - `run VM crash` kills the packaged parent after launch, verifies the owned
   child excludes another mutation, then retries with fresh checks once it
   stops. The runner confines authenticated gh configuration to the guest.

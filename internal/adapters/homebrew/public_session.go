@@ -41,6 +41,7 @@ type installedFormula struct {
 }
 type installedVersion struct {
 	Version       string                `json:"version" required:"true"`
+	OnRequest     bool                  `json:"installed_on_request" required:"true"`
 	Options       []string              `json:"used_options" required:"true"`
 	Poured        bool                  `json:"poured_from_bottle" required:"true"`
 	Built         bool                  `json:"built_as_bottle" required:"true"`
@@ -272,6 +273,10 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 		// Public receipt flags describe installation state, not payload integrity.
 		if version.Version == candidateKegVersion {
 			operation = "keep"
+			if request.Operation == "install" && slices.Contains(request.Targets, state.Name) && !version.OnRequest {
+				// Public install promotes the receipt without reinstalling payload.
+				operation = "install"
+			}
 		} else if state.Outdated {
 			operation = "upgrade"
 		} else {
@@ -302,18 +307,29 @@ func acquireOperationLock(directory string) (*os.File, error) {
 
 // Compare the actual prefix's executable source with the reviewed inspection
 // runtime. Extra installed formulae/taps are not an executable source inventory.
-func (w workspace) checkPublicRuntime(revision string) error {
+func (w workspace) checkPublicRuntime(ctx context.Context, revision string) error {
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	if reviewedBrewRevisions[revision] == "" {
 		return errors.New("unrecognized Homebrew execution source")
 	}
-	if actual, err := reviewedBrewSource("/opt/homebrew"); err == nil && actual != revision {
+	if actual, err := reviewedBrewSource(ctx, "/opt/homebrew"); errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return err
+	} else if err == nil && actual != revision {
 		return errors.New("installed Homebrew release changed before execution")
 	} else if err != nil && revision != brewRevision {
 		return errors.New("installed Homebrew release is no longer reviewed")
 	}
 	source := filepath.Join(w.root, "runtime/brew")
 	for _, directory := range []string{"bin", "Library"} {
+		if err := ctx.Err(); err != nil {
+			return err
+		}
 		err := filepath.WalkDir(filepath.Join(source, directory), func(path string, entry os.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -343,6 +359,9 @@ func (w workspace) checkPublicRuntime(revision string) error {
 			if err != nil {
 				return err
 			}
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			installedBytes, err := readRegular(destination, 128*1024*1024)
 			if err != nil || digestBytes(copiedBytes) != digestBytes(installedBytes) {
 				return errors.New("installed Homebrew differs from supported build")
@@ -353,7 +372,7 @@ func (w workspace) checkPublicRuntime(revision string) error {
 			return err
 		}
 	}
-	return nil
+	return ctx.Err()
 }
 func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers []domain.AgeWaiver, now int64, streams Streams) (ports.Prepared, ports.ExecutionSession, error) {
 	if c == nil || ctx == nil || !policy.Valid() || now < c.observedAt || now >= c.observedAt+3600 || len(c.nodes) == 0 {
@@ -372,7 +391,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	if err != nil || !slices.Equal(files, c.frozen) {
 		return fail(errors.New("collected inputs changed before planning"))
 	}
-	if err := s.w.checkPublicRuntime(c.runtimeRevision); err != nil {
+	if err := s.w.checkPublicRuntime(ctx, c.runtimeRevision); err != nil {
 		return fail(err)
 	}
 	s.lock, err = acquireOperationLock(filepath.Dir(c.root))
@@ -475,7 +494,11 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	s.prepared = fresh
 	s.plan.Nodes, s.plan.Targets = fresh.Assessment.Nodes, fresh.Assessment.Targets
 	remaining := map[string]plannedAction{}
+	requestedInstalls := []string{}
 	for _, action := range s.plan.Actions {
+		if action.Operation == "install" && slices.ContainsFunc(s.plan.Targets, func(a domain.Artifact) bool { return a.Name == action.Name }) {
+			requestedInstalls = append(requestedInstalls, action.Name)
+		}
 		if action.Operation != "keep" {
 			remaining[action.Name] = action
 		}
@@ -489,7 +512,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		if fresh.Assessment.Now < s.plan.IssuedAt || fresh.Assessment.Now >= s.plan.ExpiresAt || domain.Evaluate(fresh.Assessment).Outcome != domain.Allow {
 			return ports.ExecutionResult{}, errors.New("execution plan expired")
 		}
-		if err := s.w.checkPublicRuntime(s.plan.Environment.BrewRevision); err != nil {
+		if err := s.w.checkPublicRuntime(ctx, s.plan.Environment.BrewRevision); err != nil {
 			return ports.ExecutionResult{}, err
 		}
 		args := []string{selected.Operation, "--formula", "--force-bottle"}
@@ -507,7 +530,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	if err != nil {
 		return ports.ExecutionResult{ExitKnown: true, ExitCode: 0}, err
 	}
-	actions, err := publicActions(states, s.plan.Nodes, collectionInputs{Operation: "install"})
+	actions, err := publicActions(states, s.plan.Nodes, collectionInputs{Operation: "install", Targets: requestedInstalls})
 	matches := err == nil && !slices.ContainsFunc(actions, func(action plannedAction) bool { return action.Operation != "keep" })
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }

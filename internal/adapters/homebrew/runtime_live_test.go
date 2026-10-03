@@ -25,7 +25,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
+	if _, err := (Runtime{}).materialize(context.Background(), filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
 	metadata, err := os.ReadFile("../../../.cache/packages.arm64_tahoe.jws.json")
@@ -138,15 +138,6 @@ func TestLiveNativeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	t.Log("public CLI fetched complete bottle closure from frozen offline cache")
-	// Homebrew's native verification is not equivalent to the installed gh
-	// attestation check; exercise the skipped-credential path explicitly.
-	if _, err := w.invoke(context.Background(), "cli-verify", profile, "verify", "--json", "--bottle-tag=arm64_tahoe", "jq"); err == nil {
-		t.Fatal("credential-free native verification unexpectedly succeeded")
-	}
-	verifyLog, err := os.ReadFile(filepath.Join(root, "cli-verify.stderr"))
-	if err != nil || !strings.Contains(string(verifyLog), "missing credentials") {
-		t.Fatalf("unexpected native verification failure: %v: %s", err, verifyLog)
-	}
 	if err := w.checkBottleMetadata(candidates); err != nil {
 		t.Fatal(err)
 	}

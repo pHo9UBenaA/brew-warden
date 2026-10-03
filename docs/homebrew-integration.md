@@ -44,8 +44,7 @@ version tables across core policy, CLI, documentation, and multiple adapters.
 
 The public product path requires disposable macOS VM acceptance for installation,
 upgrade, unchanged dependencies, age exceptions, input refusal, partial outcomes
-and interruption with fresh retry. Representative authenticated final-path
-cases passed in a disposable Tahoe VM; [verification](verification.md) lists
+and interruption with fresh retry. [Verification](verification.md) lists
 the repeatable entrypoints and limits, while [support](support.md) owns the
 current compatibility matrix. The [Homebrew adapter](../internal/adapters/homebrew/README.md)
 owns exact guarantees and pins.

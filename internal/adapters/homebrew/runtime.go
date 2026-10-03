@@ -62,19 +62,26 @@ type runtimeManifest struct {
 	Files        []runtimeEntry `json:"files"`
 }
 
-func (r Runtime) materialize(destination string) (domain.Digest, error) {
-	return r.materializeFrom(destination, "/opt/homebrew")
+func (r Runtime) materialize(ctx context.Context, destination string) (domain.Digest, error) {
+	return r.materializeFrom(ctx, destination, "/opt/homebrew")
 }
 
-func runInstalledGit(prefix string, args ...string) (string, error) {
-	ctx, cancel := context.WithTimeout(context.Background(), 15*time.Second)
+func runInstalledGit(ctx context.Context, prefix string, args ...string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
+	ctx, cancel := context.WithTimeout(ctx, 15*time.Second)
 	defer cancel()
 	command := exec.CommandContext(ctx, "/usr/bin/git", append([]string{"-c", "core.fsmonitor=false", "-C", prefix}, args...)...)
 	command.Env = []string{"HOME=/nonexistent", "PATH=/usr/bin:/bin", "GIT_OPTIONAL_LOCKS=0", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null"}
 	command.Dir = "/"
 	output, diagnostics := &processOutput{}, &processOutput{}
 	command.Stdout, command.Stderr = output, diagnostics
-	if err := command.Run(); err != nil || output.overflow || diagnostics.overflow || ctx.Err() != nil {
+	err := command.Run()
+	if ctx.Err() != nil {
+		return "", ctx.Err()
+	}
+	if err != nil || output.overflow || diagnostics.overflow {
 		return "", errors.New("reviewed Homebrew source is unavailable")
 	}
 	return strings.TrimSpace(output.String()), nil
@@ -83,25 +90,39 @@ func runInstalledGit(prefix string, args ...string) (string, error) {
 // Release identity comes from the local upstream Git checkout, not from a
 // printable version string. Untracked Ruby distributions and taps are data;
 // tracked/extra executable Homebrew source must remain at the reviewed commit.
-func reviewedBrewSource(prefix string) (string, error) {
+func reviewedBrewSource(ctx context.Context, prefix string) (string, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if !filepath.IsAbs(prefix) {
 		return "", errors.New("unsupported Homebrew prefix")
 	}
-	revision, err := runInstalledGit(prefix, "rev-parse", "--verify", "HEAD")
-	if err != nil || reviewedBrewRevisions[revision] == "" {
+	revision, err := runInstalledGit(ctx, prefix, "rev-parse", "--verify", "HEAD")
+	if err != nil {
+		return "", err
+	}
+	if reviewedBrewRevisions[revision] == "" {
 		return "", errors.New("unsupported Homebrew source revision")
 	}
-	changes, err := runInstalledGit(prefix, "status", "--porcelain=v1", "--untracked-files=all", "--",
+	changes, err := runInstalledGit(ctx, prefix, "status", "--porcelain=v1", "--untracked-files=all", "--",
 		"bin/brew", "Library/Homebrew", ":!Library/Homebrew/vendor/portable-ruby", ":!Library/Taps")
-	if err != nil || changes != "" {
+	if err != nil {
+		return "", err
+	}
+	if changes != "" {
 		return "", errors.New("installed Homebrew source differs from reviewed release")
 	}
 	return revision, nil
 }
 
-func (r Runtime) installedRevision(digest domain.Digest) (string, error) {
-	if revision, err := reviewedBrewSource("/opt/homebrew"); err == nil {
+func (r Runtime) installedRevision(ctx context.Context, digest domain.Digest) (string, error) {
+	if revision, err := reviewedBrewSource(ctx, "/opt/homebrew"); err == nil {
 		return revision, nil
+	} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+		return "", err
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	if digest == supportedRuntimeDigest {
 		return brewRevision, nil // Legacy tar-only reviewed native fixture.
@@ -113,7 +134,10 @@ func (r Runtime) installedRevision(digest domain.Digest) (string, error) {
 // The copied runtime digest binds the entire implementation for this operation;
 // file-by-file comparison before execution detects changes. No runtime files
 // or inventory are read from the distribution or .cache.
-func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, error) {
+func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string) (domain.Digest, error) {
+	if err := ctx.Err(); err != nil {
+		return "", err
+	}
 	if !filepath.IsAbs(destination) || !filepath.IsAbs(prefix) {
 		return "", errors.New("invalid Homebrew inspection prefix")
 	}
@@ -140,9 +164,14 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 	if pin == "" {
 		// The legacy 7.0.4 tar-only acceptance fixture is matched by its full
 		// fingerprint below. Normal installations select a reviewed Git release.
-		if resolved, err := reviewedBrewSource(prefix); err == nil {
+		if resolved, err := reviewedBrewSource(ctx, prefix); err == nil {
 			revision, sourceReviewed = resolved, true
+		} else if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+			return "", err
 		}
+	}
+	if err := ctx.Err(); err != nil {
+		return "", err
 	}
 	if err := os.Mkdir(destination, 0700); err != nil {
 		return "", err
@@ -154,7 +183,13 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 	manifest := runtimeManifest{Schema: 2, BrewRevision: revision, Files: []runtimeEntry{}}
 	var totalFileBytes int64
 	for _, root := range []string{"bin/brew", "Library/Homebrew"} {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		err := filepath.WalkDir(filepath.Join(prefix, root), func(file string, item os.DirEntry, walkErr error) error {
+			if err := ctx.Err(); err != nil {
+				return err
+			}
 			if walkErr != nil {
 				return walkErr
 			}
@@ -200,6 +235,9 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 				if err != nil {
 					return err
 				}
+				if err := ctx.Err(); err != nil {
+					return err
+				}
 				entry.SHA256 = digestBytes(data)
 				if err := writeNew(dst, data, os.FileMode(entry.Mode)); err != nil {
 					return err
@@ -213,6 +251,9 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 		}
 	}
 	for _, entry := range manifest.Files {
+		if err := ctx.Err(); err != nil {
+			return "", err
+		}
 		if entry.Link != "" {
 			resolved, err := filepath.EvalSymlinks(filepath.Join(destination, filepath.FromSlash(entry.Path)))
 			if err != nil || !strings.HasPrefix(resolved, brew+string(filepath.Separator)) {
@@ -233,12 +274,15 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 		return digest, errors.New("installed Homebrew version or runtime differs from supported build")
 	}
 	if pin == "" && sourceReviewed {
-		fresh, err := reviewedBrewSource(prefix)
-		if err != nil || fresh != revision {
+		fresh, err := reviewedBrewSource(ctx, prefix)
+		if err != nil {
+			return digest, err
+		}
+		if fresh != revision {
 			return digest, errors.New("installed Homebrew source changed during inspection")
 		}
 	}
-	return digest, nil
+	return digest, ctx.Err()
 }
 
 func safeRelative(value string) bool {

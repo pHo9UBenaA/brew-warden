@@ -1,12 +1,109 @@
 package main
 
 import (
+	"archive/tar"
+	"errors"
+	"io"
 	"os"
 	"os/exec"
 	"path/filepath"
 	"strings"
 	"testing"
 )
+
+func TestWorktreeProbeArchivesCurrentFilesWithoutTrackedDeletions(t *testing.T) {
+	root := t.TempDir()
+	for name, content := range map[string]string{
+		"deleted\nfile": "obsolete", "modified file": "old", "dangling": "old",
+		".gitignore": "/.cache/\n/ignored\n", "tests/container/Dockerfile": "fixture",
+		"scripts/container-check.sh": "exit 0\n",
+		"fake-bin/docker":            "#!/bin/sh\nexit 37\n",
+	} {
+		path := filepath.Join(root, name)
+		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+			t.Fatal(err)
+		}
+		if err := os.WriteFile(path, []byte(content), 0700); err != nil {
+			t.Fatal(err)
+		}
+	}
+	raw, err := os.ReadFile("../../scripts/probe-container.sh")
+	if err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(filepath.Join(root, "scripts/probe-container.sh"), raw, 0700); err != nil {
+		t.Fatal(err)
+	}
+	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit", "-qm", "fixture"}} {
+		command := exec.Command("git", args...)
+		command.Dir = root
+		if out, err := command.CombinedOutput(); err != nil {
+			t.Fatalf("git fixture: %s: %v", out, err)
+		}
+	}
+	if err := os.Remove(filepath.Join(root, "deleted\nfile")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Remove(filepath.Join(root, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Symlink("missing-target", filepath.Join(root, "dangling")); err != nil {
+		t.Fatal(err)
+	}
+	for name, content := range map[string]string{"modified file": "current", "new\nfile": "new", "ignored": "private"} {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
+			t.Fatal(err)
+		}
+	}
+	command := exec.Command("sh", "scripts/probe-container.sh", "--worktree")
+	command.Dir = root
+	command.Env = append(os.Environ(), "PATH="+filepath.Join(root, "fake-bin")+":"+os.Getenv("PATH"))
+	out, err := command.CombinedOutput()
+	var exit *exec.ExitError
+	if !errors.As(err, &exit) || exit.ExitCode() != 37 {
+		t.Fatalf("probe did not reach Docker boundary: %s: %v", out, err)
+	}
+	archives, err := filepath.Glob(filepath.Join(root, ".cache/container-probe.*/source.tar"))
+	if err != nil || len(archives) != 1 {
+		t.Fatalf("want one archive: %q: %v", archives, err)
+	}
+	file, err := os.Open(archives[0])
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer file.Close()
+	reader := tar.NewReader(file)
+	contents := map[string]string{}
+	for {
+		header, err := reader.Next()
+		if err == io.EOF {
+			break
+		}
+		if err != nil {
+			t.Fatal(err)
+		}
+		if header.Name == "dangling" && (header.Typeflag != tar.TypeSymlink || header.Linkname != "missing-target") {
+			t.Fatal("lost dangling symlink", header)
+		}
+		data, err := io.ReadAll(reader)
+		if err != nil {
+			t.Fatal(err)
+		}
+		contents[header.Name] = string(data)
+	}
+	if _, found := contents["deleted\nfile"]; found {
+		t.Fatal("archived deleted tracked path")
+	}
+	if _, found := contents["ignored"]; found {
+		t.Fatal("archived ignored data")
+	}
+	if _, found := contents["dangling"]; !found {
+		t.Fatal("omitted dangling symlink")
+	}
+	if contents["modified file"] != "current" || contents["new\nfile"] != "new" {
+		t.Fatal("archive lost current worktree bytes", contents)
+	}
+}
 
 func TestCheckRequiresPinnedTools(t *testing.T) {
 	root := t.TempDir()

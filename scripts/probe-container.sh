@@ -11,7 +11,15 @@ probe_root=$(mktemp -d "$PWD/.cache/container-probe.XXXXXXXX")
 context="$probe_root/context"
 mkdir -p "$context"
 if [ "${1:-}" = --worktree ]; then
-  git ls-files --cached --others --exclude-standard -z | tar --null -T - -cf "$probe_root/source.tar"
+  git ls-files --cached --others --exclude-standard -z > "$probe_root/inventory"
+  # The index still lists unstaged deletions. Keep current files (including
+  # dangling symlinks), with NUL delimiters through the archive boundary.
+  xargs -0 sh -c '
+    for file do
+      if [ -e "$file" ] || [ -L "$file" ]; then printf "%s\000" "$file"; fi
+    done
+  ' sh < "$probe_root/inventory" > "$probe_root/current-files"
+  tar --null -T "$probe_root/current-files" -cf "$probe_root/source.tar"
   git status --porcelain=v1 > "$probe_root/source-status"
   git diff --binary HEAD > "$probe_root/source.patch"
 else

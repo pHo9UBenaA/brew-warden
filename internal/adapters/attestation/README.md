@@ -37,10 +37,10 @@ verified but too-young timestamp can be waived by the age exception policy.
 
 Subprocess tests check digest binding, multiple attestations and timestamps,
 oldest-time selection, `all` bottles, result limits, invalid output, version
-checks, failed commands, changed bytes and cancellation. Real gh output from
-representative sigstore-go cohorts supplies parser regression cases, including
-wrong signer/subject and unknown-log refusals. Offline bundle verification
-alone does not prove authenticated online acquisition; both admitted endpoint
-cohorts also passed native authenticated product acceptance. The distribution
+checks, failed commands, changed bytes and cancellation. Two retained real gh
+outputs cover representative formats and UTC/offset timestamps; separate parser
+negatives cover wrong signer/subject and unknown-log refusals. Offline bundle verification
+alone does not prove authenticated online acquisition; native authenticated
+product acceptance is also required. The distribution
 bundles neither a verifier nor Homebrew runtime. See
 [verification](../../../docs/verification.md) for repeatable checks and limits.

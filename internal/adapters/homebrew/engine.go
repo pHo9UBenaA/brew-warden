@@ -117,7 +117,7 @@ func (e Engine) Check(ctx context.Context) error {
 	if err != nil {
 		return err
 	}
-	_, err = e.Collector.Runtime.materialize(filepath.Join(temporary, "runtime"))
+	_, err = e.Collector.Runtime.materialize(ctx, filepath.Join(temporary, "runtime"))
 	if err != nil {
 		return err
 	}

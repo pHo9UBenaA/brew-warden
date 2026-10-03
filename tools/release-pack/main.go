@@ -61,7 +61,7 @@ func run(args []string) error {
 		return err
 	}
 	docs = append(docs, adapterDocs...)
-	docs = append(docs, "CONTRIBUTING.md")
+	docs = append(docs, "CONTRIBUTING.md", "scripts/macos-vm.md")
 	for _, file := range docs {
 		if err := add(filepath.ToSlash(file), file, 0644); err != nil {
 			return err

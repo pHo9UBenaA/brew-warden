@@ -17,7 +17,7 @@ guest_path="$guest_root/gh:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 usage() {
   printf 'Usage: %s prepare BASE NEW_VM REVIEWED_BREW_TREE GH_BINARY PRODUCT_ARCHIVE\n' "$0" >&2
   printf '       %s auth|auth-status|suite|finish VM\n' "$0" >&2
-  printf '       %s run VM doctor|native|general|public|survey|upgrade|crash|command [CASE_ARGS...]\n' "$0" >&2
+  printf '       %s run VM doctor|native|general|public|survey|upgrade|ownership|crash|command [CASE_ARGS...]\n' "$0" >&2
   printf '       %s fixture VM absent-jq|absent-xz|older-xz|repair-jq\n' "$0" >&2
   exit 2
 }
@@ -124,7 +124,9 @@ prepare() {
     umask 077
     test ! -e /opt/brewwarden-original-homebrew &&
       test -f /opt/homebrew/bin/brew &&
-      mkdir -p /private/tmp/bw-acceptance/gh /private/tmp/bw-acceptance/home /private/tmp/bw-acceptance/product
+      test ! -e /private/tmp/bw-acceptance &&
+      mkdir -p /private/tmp/bw-acceptance/gh /private/tmp/bw-acceptance/home /private/tmp/bw-acceptance/product &&
+      printf "%s\n" private-files-v1 > /private/tmp/bw-acceptance/credential-storage
   ' || fail 'Guest prefix or private workspace is not fresh'
   tart_run exec -i "$vm" /bin/sh -c 'umask 077; cat > /private/tmp/bw-acceptance/gh/gh && chmod 0700 /private/tmp/bw-acceptance/gh/gh' < "$gh"
   tart_run exec -i "$vm" /usr/bin/tar -xzf - -C "$guest_root/product" < "$archive"
@@ -151,6 +153,8 @@ auth() {
   vm=$1
   valid_name "$vm"
   require_guest "$vm"
+  guest "$vm" /usr/bin/grep -Fxq private-files-v1 "$guest_root/credential-storage" ||
+    fail 'Guest credential storage is unconfirmed; prepare a fresh guest with private-file storage'
   if guest_auth "$vm"; then
     printf 'Guest gh is already authenticated.\n'
     return
@@ -162,10 +166,10 @@ auth() {
       exit 0
     fi
     : > /private/tmp/bw-acceptance/home/device.log
-    HOME=/private/tmp/bw-acceptance/home \
+    /usr/bin/env -i HOME=/private/tmp/bw-acceptance/home GH_CONFIG_DIR=/private/tmp/bw-acceptance/home/.config/gh \
       PATH=/private/tmp/bw-acceptance/gh:/usr/bin:/bin BROWSER=/usr/bin/true \
       /usr/bin/nohup /private/tmp/bw-acceptance/gh/gh auth login \
-        --hostname github.com --git-protocol https --web \
+        --hostname github.com --git-protocol https --web --insecure-storage \
         > /private/tmp/bw-acceptance/home/device.log 2>&1 < /dev/null &
     echo $! > /private/tmp/bw-acceptance/home/device.pid
   '
@@ -248,6 +252,11 @@ run_case() {
       [ "$#" -eq 1 ] || usage
       run_test TestLiveExplicitUpgradeChangesSelectedVersion "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_UPGRADE_TARGET="$1" "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m ;;
+    ownership)
+      [ "$#" -eq 0 ] || usage
+      run_test TestLiveDistributionPromotesExplicitInstallOwnership "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+        BREWWARDEN_VM_DISTRIBUTION_BINARY="$guest_bwd" \
+        "$guest_test" -test.run '^TestLiveDistributionPromotesExplicitInstallOwnership$' -test.v -test.timeout=20m ;;
     crash)
       [ "$#" -eq 0 ] || usage
       run_test TestLiveDistributionParentCrash "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
@@ -296,6 +305,7 @@ suite() {
   guest_auth "$vm" || fail 'Authorize guest gh before starting the local-only suite'
   run_case "$vm" doctor
   run_case "$vm" command brew install jq
+  run_case "$vm" ownership
   for fault in age age-exception changed-input exception-changed-input; do
     run_case "$vm" native "$fault"
   done
@@ -336,12 +346,44 @@ finish() {
     fi
     fail 'Guest agent unavailable; VM stop and credential cleanup unconfirmed'
   fi
-  require_guest "$vm"
-  # GH CLI may fall back to a plaintext guest config. Logout first, then
-  # discard only this VM's private credentials; never touch host auth state.
-  guest "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" \
-    "$guest_gh" auth logout --hostname github.com >/dev/null 2>&1 || true
   cleaned=1
+  # A failed identity check must still attempt to stop this owned guest.
+  (require_guest "$vm") || cleaned=0
+  # New guests have no workspace. Retained legacy logins have no verifiable
+  # storage contract: file deletion alone cannot certify their Keychain cleanup.
+  guest "$vm" /bin/sh -c '
+    test ! -e /private/tmp/bw-acceptance ||
+      /usr/bin/grep -Fxq private-files-v1 /private/tmp/bw-acceptance/credential-storage
+  ' || cleaned=0
+  # Stop a pending device flow before it can recreate credentials after removal.
+  guest "$vm" /bin/sh -c '
+    /usr/bin/pkill -KILL -f "^/private/tmp/bw-acceptance/gh/gh auth login "
+    code=$?
+    test "$code" -le 1 || exit 1
+    count=0
+    while test "$count" -lt 5; do
+      /usr/bin/pgrep -f "^/private/tmp/bw-acceptance/gh/gh auth login " >/dev/null
+      code=$?
+      test "$code" -ne 1 || exit 0
+      test "$code" -eq 0 || exit 1
+      sleep 1
+      count=$((count + 1))
+    done
+    exit 1
+  ' || cleaned=0
+  # File-only storage is intentional in this disposable guest. An absent or
+  # empty hosts file contains no token; nonempty config requires successful
+  # logout, not a guessed interpretation of auth-status failure.
+  guest "$vm" /bin/sh -c '
+    if test -s /private/tmp/bw-acceptance/home/.config/gh/hosts.yml; then
+      /usr/bin/env -i HOME=/private/tmp/bw-acceptance/home \
+        GH_CONFIG_DIR=/private/tmp/bw-acceptance/home/.config/gh \
+        PATH=/usr/bin:/bin /private/tmp/bw-acceptance/gh/gh auth logout --hostname github.com
+    else
+      test ! -e /private/tmp/bw-acceptance/home/.config/gh/hosts.yml ||
+        test -f /private/tmp/bw-acceptance/home/.config/gh/hosts.yml
+    fi
+  ' >/dev/null 2>&1 || cleaned=0
   guest "$vm" /bin/sh -c '
     rm -rf /private/tmp/bw-acceptance/home/.config/gh \
       /private/tmp/bw-acceptance/home/.local/state/gh \
@@ -349,7 +391,7 @@ finish() {
       /private/tmp/bw-acceptance/home/device.pid
   ' || cleaned=0
   tart_run stop "$vm" || fail 'Guest stop failed; credential cleanup and VM state unconfirmed'
-  [ "$cleaned" -eq 1 ] || fail 'Guest credential removal failed; VM stopped but cleanup unconfirmed'
+  [ "$cleaned" -eq 1 ] || fail 'Guest credential cleanup unconfirmed; VM stopped. Revoke the OAuth grant and inspect the retained guest'
   printf 'Guest credentials removed and VM stopped. If device login was approved, also revoke its GitHub CLI OAuth grant in your account settings.\n'
 }
 [ "$#" -ge 1 ] || usage

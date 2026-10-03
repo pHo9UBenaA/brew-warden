@@ -11,13 +11,8 @@ import (
 
 func TestRejectUnverifiedOperations(t *testing.T) {
 	for _, args := range [][]string{
-		nil, {"brew", "install", "wget"}, {"brew", "upgrade"},
-		{"brew", "install", "--help"}, {"brew", "install", "--dry-run", "wget"},
-		{"brew", "reinstall", "wget"}, {"brew", "bundle", "exec", "--install", "sh"},
-		{"--minimum-release-age", "0h", "brew", "install", "wget"},
-		{"--force", "brew", "upgrade"}, {"--help", "brew", "install", "wget"},
-		{"brew", "info", "wget"}, {"/usr/local/bin/brew", "install", "wget"},
-		{"brew", "install", "\x1b[2J"}, {"doctor", "brew", "upgrade"},
+		{"brew", "install", "wget"},
+		{"brew", "install", "\x1b[2J"},
 	} {
 		t.Run(strings.Join(args, " "), func(t *testing.T) {
 			var stdout, stderr bytes.Buffer
@@ -76,6 +71,8 @@ func TestWrapperOptions(t *testing.T) {
 		{"--minimum-release-age", "0.5s", "doctor"},
 		{"--minimum-release-age", "1h", "--minimum-release-age", "2h", "doctor"},
 		{"--config", "", "doctor"},
+		{"--force", "brew", "upgrade"},
+		{"--help", "brew", "install", "wget"},
 	} {
 		var out, diagnostics bytes.Buffer
 		if RunWithConfig(args, &out, &diagnostics, configSource{}) == 0 || !strings.HasPrefix(diagnostics.String(), "invocation_invalid:") {

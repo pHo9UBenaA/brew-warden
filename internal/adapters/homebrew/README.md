@@ -73,8 +73,14 @@ All checks finish before any package installation. A short-lived plan binds the
 policy, exact candidate artifacts, complete dependency graph, frozen inputs,
 observed selected installed state and one attempt. Revalidation checks those
 inputs and state again. Commands run in dependency order with `--force-bottle`;
-new non-root dependencies also use `--as-dependency`. Auto-update, cleanup,
-autoremove, additional confirmation and opportunistic installed-dependent
+new non-root dependencies also use `--as-dependency`. An explicit install of a
+current dependency-only root also uses public install: Homebrew promotes
+`installed_on_request` without reinstalling its payload. This behavior and the
+public info field were inspected in `install/check.rb` and `formula.rb` at the
+reviewed 6.0.19 and 7.0.6 release commits. Ownership is part of the observed
+before-state; root install actions bind promotion to the plan and require the
+post-execution ownership flag. Unchanged non-root dependencies remain `keep`.
+Auto-update, cleanup, autoremove, additional confirmation and opportunistic installed-dependent
 maintenance are disabled. A missing bottle cannot be replaced through a network
 fetch or source download during installation.
 
@@ -107,10 +113,10 @@ attempt journals require the matching older build for recovery before mutation.
 ## Validation
 
 Package tests cover strict metadata, OCI digest/closure mismatch, archive
-extraction, input substitution, operation locks, liveness and partial
-outcomes. Captured public info/scanner outputs exercise representative release
-cohorts, including missing dependency and skipped-subject refusals. An optional
-offline source-matrix test binds every reviewed release commit from an
+extraction, input substitution, ownership planning, operation locks, liveness
+and partial outcomes. One captured public info/scanner pair represents the
+observed equivalent release formats; parser negatives separately cover missing
+dependencies and skipped subjects. An optional offline source-matrix test binds every reviewed release commit from an
 explicitly supplied upstream Git checkout. A fixture or source copy alone does
 not prove that Homebrew authenticated its JWS, consumed the frozen plan or
 completed an installation. Disposable native adapter probes and authenticated

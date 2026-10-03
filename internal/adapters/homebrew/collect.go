@@ -86,11 +86,11 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 		return err
 	}
 	var err error
-	result.runtimeDigest, err = c.Runtime.materialize(filepath.Join(w.root, "runtime"))
+	result.runtimeDigest, err = c.Runtime.materialize(ctx, filepath.Join(w.root, "runtime"))
 	if err != nil {
 		return err
 	}
-	result.runtimeRevision, err = c.Runtime.installedRevision(result.runtimeDigest)
+	result.runtimeRevision, err = c.Runtime.installedRevision(ctx, result.runtimeDigest)
 	if err != nil {
 		return err
 	}

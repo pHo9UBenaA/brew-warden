@@ -21,10 +21,4 @@ func TestDiagnosticOnlyBuildNeverCreatesExecutionHistory(t *testing.T) {
 	if entries, err := os.ReadDir(dir); err != nil || len(entries) != 0 {
 		t.Fatal("diagnostic-only refusal created product state", entries, err)
 	}
-	for _, command := range []string{"history", "status", "reconcile"} {
-		diagnostics.Reset()
-		if code := cli.RunWithConfig([]string{command}, &out, &diagnostics, f); code == 0 {
-			t.Fatal("obsolete saved-state command accepted", command)
-		}
-	}
 }

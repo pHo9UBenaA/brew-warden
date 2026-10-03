@@ -31,7 +31,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
+	if _, err := (Runtime{}).materialize(context.Background(), filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
 	signed, err := os.ReadFile("../../../.cache/packages.arm64_tahoe.jws.json")
@@ -80,7 +80,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 			t.Fatalf("output limit exceeded: stdout_overflow=%t stderr_overflow=%t", out.overflow, stderr.overflow)
 		}
 		t.Logf("%s: exit=%d stdout-sha256=%s stderr=%s", label, status, digestBytes(out.Bytes()), stderr.String())
-		if status != 0 && out.Len() == 0 {
+		if status != 0 && len(out.Bytes()) == 0 {
 			return report{}, status
 		}
 		var r report
@@ -168,7 +168,7 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if err := w.initialize(); err != nil {
 		t.Fatal(err)
 	}
-	if _, err := (Runtime{}).materialize(filepath.Join(root, "runtime")); err != nil {
+	if _, err := (Runtime{}).materialize(context.Background(), filepath.Join(root, "runtime")); err != nil {
 		t.Fatal(err)
 	}
 	profile, err := w.sandbox("acquire", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library")})
