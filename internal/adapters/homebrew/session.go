@@ -31,22 +31,22 @@ type executionEnvironment struct {
 	Prefix       string        `json:"prefix" required:"true"`
 }
 type executionPlan struct {
-	Schema      int                  `json:"schema" required:"true"`
-	MinimumAge  int64                `json:"minimumAge" required:"true"`
-	Targets     []domain.Artifact    `json:"targets" required:"true"`
-	Nodes       []domain.Node        `json:"nodes" required:"true"`
-	Actions     []plannedAction      `json:"actions" required:"true"`
-	BeforeState domain.Digest        `json:"beforeState" required:"true"`
-	Environment executionEnvironment `json:"environment" required:"true"`
-	Inputs      []frozenInput        `json:"inputs" required:"true"`
-	Attempt     domain.Digest        `json:"attempt" required:"true"`
-	IssuedAt    int64                `json:"issuedAt" required:"true"`
-	ExpiresAt   int64                `json:"expiresAt" required:"true"`
-	Waivers     []domain.AgeWaiver   `json:"waivers" required:"true"`
+	Schema            int                  `json:"schema" required:"true"`
+	MinimumAgeSeconds int64                `json:"minimumAge" required:"true"`
+	Targets           []domain.Artifact    `json:"targets" required:"true"`
+	Nodes             []domain.Node        `json:"nodes" required:"true"`
+	Actions           []plannedAction      `json:"actions" required:"true"`
+	BeforeState       domain.Digest        `json:"beforeState" required:"true"`
+	Environment       executionEnvironment `json:"environment" required:"true"`
+	Inputs            []frozenInput        `json:"inputs" required:"true"`
+	Attempt           domain.Digest        `json:"attempt" required:"true"`
+	IssuedAt          int64                `json:"issuedAt" required:"true"`
+	ExpiresAt         int64                `json:"expiresAt" required:"true"`
+	Waivers           []domain.AgeWaiver   `json:"waivers" required:"true"`
 }
 
 func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
-	policy, err := domain.NewPolicy(p.MinimumAge)
+	policy, err := domain.NewPolicy(p.MinimumAgeSeconds)
 	supportedSchema := p.Schema == 1 || p.Schema == 2 || p.Schema == 3
 	validInterval := p.IssuedAt > 0 && p.ExpiresAt > p.IssuedAt && p.ExpiresAt <= p.IssuedAt+600
 	if err != nil || !supportedSchema || !p.Attempt.Valid() || !p.BeforeState.Valid() || !validInterval {
@@ -83,7 +83,8 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 			}
 		}
 	}
-	policyBytes, _ := json.Marshal(struct{ MinimumAge int64 }{p.MinimumAge})
+	// Keep the binding's serialized field name stable independently of Go names.
+	policyBytes, _ := json.Marshal(struct{ MinimumAge int64 }{p.MinimumAgeSeconds})
 	type graphNode struct {
 		Artifact     domain.Artifact
 		Dependencies []domain.Artifact

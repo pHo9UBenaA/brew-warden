@@ -134,7 +134,9 @@ cancel() {
   vm=$1
   valid_name "$vm"
   root="$PWD/.cache/product-ready.$vm"
-  [ -d "$root" ] && [ ! -L "$root" ] && [ "$(read_line "$root/state")" = awaiting-device-approval ] || fail 'No pending readiness run for this VM; cannot cancel an unrelated clone'
+  [ -d "$root" ] && [ ! -L "$root" ] &&
+    [ "$(read_line "$root/state")" = awaiting-device-approval ] ||
+    fail 'No pending readiness run for this VM; cannot cancel an unrelated clone'
   printf 'Cancelling pending VM readiness; NOT product-ready.\n'
   trap 'finish_on_exit 1' 0
   trap 'exit 130' INT
@@ -146,7 +148,9 @@ complete() {
   vm=$1
   valid_name "$vm"
   root="$PWD/.cache/product-ready.$vm"
-  [ -d "$root" ] && [ ! -L "$root" ] && [ "$(read_line "$root/state")" = awaiting-device-approval ] || fail 'No pending readiness run for this VM; start with a fresh clone'
+  [ -d "$root" ] && [ ! -L "$root" ] &&
+    [ "$(read_line "$root/state")" = awaiting-device-approval ] ||
+    fail 'No pending readiness run for this VM; start with a fresh clone'
   # Do not stop a still-pending device login: human approval is required.
   ./scripts/macos-vm-acceptance.sh auth-status "$vm" >/dev/null || fail 'Approve the guest device code first; no readiness checks were skipped'
   trap 'finish_on_exit $?' 0

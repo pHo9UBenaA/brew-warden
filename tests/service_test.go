@@ -14,25 +14,25 @@ import (
 )
 
 type servicePlanner struct {
-	p         ports.Prepared
-	s         ports.ExecutionSession
+	prepared  ports.Prepared
+	session   ports.ExecutionSession
 	calls     int
 	err       error
 	overrides []ports.AgeOverride
 	request   ports.Request
 }
 
-func (p *servicePlanner) Prepare(_ context.Context, r ports.Request, _ domain.Policy, o []ports.AgeOverride, _ int64) (ports.Prepared, ports.ExecutionSession, error) {
+func (p *servicePlanner) Prepare(_ context.Context, request ports.Request, _ domain.Policy, overrides []ports.AgeOverride, _ int64) (ports.Prepared, ports.ExecutionSession, error) {
 	p.calls++
-	p.overrides = o
-	p.request = r
-	return p.p, p.s, p.err
+	p.overrides = overrides
+	p.request = request
+	return p.prepared, p.session, p.err
 }
 
 func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
 	p := preparedExecution()
 	session := &executionSession{prepared: p}
-	planner := &servicePlanner{p: p, s: session}
+	planner := &servicePlanner{prepared: p, session: session}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}, Present: func(ports.Prepared) error { return io.ErrClosedPipe }}
 	if _, err := s.Run(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, domain.DefaultPolicy(), nil); err == nil || session.ran || !session.closed {
 		t.Fatal(err, session)
@@ -42,15 +42,15 @@ func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
 func TestFreshRetryRequiresNewBoundPlan(t *testing.T) {
 	p := preparedExecution()
 	first := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 2, AfterState: p.BeforeState}}
-	planner := &servicePlanner{p: p, s: first}
+	planner := &servicePlanner{prepared: p, session: first}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}}
 	request := ports.Request{Operation: "install", Targets: []string{"jq"}}
 	if _, err := s.Run(context.Background(), request, domain.DefaultPolicy(), nil); err == nil || !first.ran {
-		t.Fatal("failed operation did not run", err)
+		t.Fatalf("want failed operation to run: ran=%t error=%v", first.ran, err)
 	}
 	p.Assessment.Binding.Attempt = domain.Digest(strings.Repeat("f", 64))
 	second := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, AfterState: domain.Digest(strings.Repeat("c", 64)), MatchesPlan: true}}
-	planner.p, planner.s = p, second
+	planner.prepared, planner.session = p, second
 	if result, err := s.Run(context.Background(), request, domain.DefaultPolicy(), nil); err != nil || result.Outcome != domain.AttemptSucceeded || planner.calls != 2 || !second.ran {
 		t.Fatal("fresh retry did not use new plan", result, err)
 	}
@@ -77,12 +77,18 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 func TestRuntimeCLIPreservesExitCodeAndPrintableAgeReason(t *testing.T) {
 	p := preparedExecution()
 	session := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 7, AfterState: p.BeforeState}}
-	planner := &servicePlanner{p: p, s: session}
+	planner := &servicePlanner{prepared: p, session: session}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}}
 	var out bytes.Buffer
 	code := cli.RunWithRuntime(context.Background(), []string{"--age-exception", "jq=\u7dca\u6025\u4fee\u6b63", "brew", "install", "jq"}, &out, &out, nil, &s)
-	if code != 7 || !session.ran || len(planner.overrides) != 1 || planner.overrides[0].Reason != "\u7dca\u6025\u4fee\u6b63" || !strings.Contains(out.String(), "Checking requested formulae and dependencies:") {
-		t.Fatal(code, out.String(), planner)
+	if code != 7 || !session.ran {
+		t.Fatalf("want child exit 7 after launch: exit=%d ran=%t output=%q", code, session.ran, &out)
+	}
+	if len(planner.overrides) != 1 || planner.overrides[0].Reason != "\u7dca\u6025\u4fee\u6b63" {
+		t.Fatalf("printable age reason was not preserved: overrides=%+v", planner.overrides)
+	}
+	if !strings.Contains(out.String(), "Checking requested formulae and dependencies:") {
+		t.Fatalf("candidate presentation missing: output=%q", &out)
 	}
 }
 func TestRuntimeReportsPreflightHoldWithoutInventingExecutionOutcome(t *testing.T) {

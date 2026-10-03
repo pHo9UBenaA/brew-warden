@@ -82,20 +82,8 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 	if err != nil {
 		return nil, "", err
 	}
-	for _, f := range metadata {
-		i := slices.Index(names, f.Name)
-		if f.artifact() != nodes[i].Artifact {
-			return nil, "", errors.New("execution metadata differs from verified candidate")
-		}
-		dependencies := make([]string, 0, len(nodes[i].Dependencies))
-		for _, dep := range nodes[i].Dependencies {
-			dependencies = append(dependencies, dep.Name)
-		}
-		slices.Sort(dependencies)
-		slices.Sort(f.Dependencies)
-		if !slices.Equal(dependencies, f.Dependencies) {
-			return nil, "", errors.New("execution dependency graph changed")
-		}
+	if err := matchExecutionMetadata(metadata, names, nodes); err != nil {
+		return nil, "", err
 	}
 	var document struct {
 		Formulae []installedFormula `json:"formulae" required:"true"`
@@ -137,6 +125,27 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		return nil, "", err
 	}
 	return document.Formulae, digest, nil
+}
+
+// parseInfo has already established that metadata contains exactly the requested
+// names. Compare each identity and dependency set with the verified plan.
+func matchExecutionMetadata(metadata []formulaMetadata, names []string, nodes []domain.Node) error {
+	for _, formula := range metadata {
+		node := nodes[slices.Index(names, formula.Name)]
+		if formula.artifact() != node.Artifact {
+			return errors.New("execution metadata differs from verified candidate")
+		}
+		dependencies := make([]string, 0, len(node.Dependencies))
+		for _, dependency := range node.Dependencies {
+			dependencies = append(dependencies, dependency.Name)
+		}
+		slices.Sort(dependencies)
+		slices.Sort(formula.Dependencies)
+		if !slices.Equal(dependencies, formula.Dependencies) {
+			return errors.New("execution dependency graph changed")
+		}
+	}
+	return nil
 }
 
 // installedReceiptDigest binds a recorded official-core installation to its
@@ -239,9 +248,9 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 		}
 		return "install", nil
 	}
-	wanted := candidate.Version
+	candidateKegVersion := candidate.Version
 	if candidate.Revision > 0 {
-		wanted += "_" + strconv.Itoa(candidate.Revision)
+		candidateKegVersion += "_" + strconv.Itoa(candidate.Revision)
 	}
 	if state.ActiveVersion == nil || *state.ActiveVersion == "" {
 		return "", errors.New("unlinked installed candidate requires manual Homebrew repair")
@@ -255,7 +264,7 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 			return "", errors.New("installed candidate is not a supported bottle")
 		}
 		// Public receipt flags describe installation state, not payload integrity.
-		if version.Version == wanted {
+		if version.Version == candidateKegVersion {
 			operation = "keep"
 		} else if state.Outdated {
 			operation = "upgrade"
@@ -400,7 +409,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 		return fail(err)
 	}
 	s.plan = executionPlan{
-		Schema: 3, MinimumAge: policy.MinimumAgeSeconds(),
+		Schema: 3, MinimumAgeSeconds: policy.MinimumAgeSeconds(),
 		Nodes: c.Evidence(), Actions: actions, BeforeState: before,
 		Environment: executionEnvironment{
 			Runtime: c.runtimeDigest, BrewRevision: c.runtimeRevision,

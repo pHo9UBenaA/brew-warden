@@ -33,19 +33,19 @@ func TestRejectUnverifiedOperations(t *testing.T) {
 
 func TestLocalDiagnostics(t *testing.T) {
 	var stdout, stderr bytes.Buffer
-	if Run([]string{"--help"}, &stdout, &stderr) != 0 || stdout.Len() == 0 || stderr.Len() != 0 {
-		t.Fatal("help must succeed locally")
+	if code := Run([]string{"--help"}, &stdout, &stderr); code != 0 || stdout.Len() == 0 || stderr.Len() != 0 {
+		t.Fatalf("help must succeed locally: exit=%d stdout=%q stderr=%q", code, &stdout, &stderr)
 	}
 	stdout.Reset()
-	if Run([]string{"doctor"}, &stdout, &stderr) == 0 || !strings.Contains(stderr.String(), "No live Homebrew checks were run") || stdout.Len() != 0 {
-		t.Fatal("doctor must report an unavailable execution capability")
+	if code := Run([]string{"doctor"}, &stdout, &stderr); code == 0 || !strings.Contains(stderr.String(), "No live Homebrew checks were run") || stdout.Len() != 0 {
+		t.Fatalf("doctor must report an unavailable execution capability: exit=%d stdout=%q stderr=%q", code, &stdout, &stderr)
 	}
 	if Run([]string{"--help"}, failedWriter{}, &stderr) == 0 {
 		t.Fatal("failed output must not succeed")
 	}
 	stdout.Reset()
-	if Run([]string{"--version"}, &stdout, &stderr) != 0 || !strings.HasPrefix(stdout.String(), "BrewWarden ") {
-		t.Fatal("missing local version")
+	if code := Run([]string{"--version"}, &stdout, &stderr); code != 0 || !strings.HasPrefix(stdout.String(), "BrewWarden ") {
+		t.Fatalf("missing local version: exit=%d stdout=%q stderr=%q", code, &stdout, &stderr)
 	}
 }
 
@@ -84,6 +84,6 @@ func TestWrapperOptions(t *testing.T) {
 	}
 	_, age, rest, err := options([]string{"brew", "install", "--minimum-release-age", "0h"})
 	if err != nil || age != nil || len(rest) != 4 {
-		t.Fatal("consumed child arguments")
+		t.Fatalf("want all four child arguments preserved without age override: age=%v rest=%q error=%v", age, rest, err)
 	}
 }

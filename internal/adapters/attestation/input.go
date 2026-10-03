@@ -42,9 +42,9 @@ func (b *boundedOutput) Write(p []byte) (int, error) {
 	return b.Buffer.Write(p)
 }
 
-func hashFile(path string, limit int64) (domain.Digest, error) {
+func hashFile(path string, maxBytes int64) (domain.Digest, error) {
 	info, err := os.Lstat(path)
-	if err != nil || !info.Mode().IsRegular() || info.Size() > limit {
+	if err != nil || !info.Mode().IsRegular() || info.Size() > maxBytes {
 		return "", errors.New("invalid verifier input file")
 	}
 	f, err := os.Open(path)
@@ -57,8 +57,8 @@ func hashFile(path string, limit int64) (domain.Digest, error) {
 		return "", errors.New("verifier input changed")
 	}
 	h := sha256.New()
-	n, err := io.Copy(h, io.LimitReader(f, limit+1))
-	if err != nil || n > limit {
+	bytesRead, err := io.Copy(h, io.LimitReader(f, maxBytes+1))
+	if err != nil || bytesRead > maxBytes {
 		return "", errors.New("cannot hash verifier input")
 	}
 	return domain.Digest(hex.EncodeToString(h.Sum(nil))), nil

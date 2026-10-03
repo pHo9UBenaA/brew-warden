@@ -30,7 +30,7 @@ func FuzzInFlightRecord(f *testing.F) {
 		}
 		var record inFlight
 		if err := decodeStrict(raw, &record); err == nil && record.valid() && filepath.Base(record.Collection) != record.Collection {
-			t.Fatal("record accepted a workspace outside the private collection root")
+			t.Fatalf("accepted collection path outside private root: record=%+v", record)
 		}
 	})
 }
@@ -135,7 +135,7 @@ func TestInFlightParentDeathAndFreshRetry(t *testing.T) {
 			}
 			record, err := readInFlight(filepath.Join(directory, name))
 			if err != nil || record == nil {
-				t.Fatal("missing durable in-flight record", err)
+				t.Fatalf("missing durable %s record: record=%+v error=%v", name, record, err)
 			}
 			defer func() { _ = syscall.Kill(-record.PID, syscall.SIGKILL) }()
 			if err := clearStoppedInFlight(directory); err == nil {
@@ -156,7 +156,7 @@ func TestInFlightParentDeathAndFreshRetry(t *testing.T) {
 				time.Sleep(50 * time.Millisecond)
 			}
 			if record, err := readInFlight(filepath.Join(directory, name)); err != nil || record != nil {
-				t.Fatal("stale record was not removed", err)
+				t.Fatalf("stale %s record was not removed: record=%+v error=%v", name, record, err)
 			}
 			if _, err := os.Lstat(filepath.Join(directory, "collection-12345")); !errors.Is(err, os.ErrNotExist) {
 				t.Fatal("stale workspace was not removed", err)

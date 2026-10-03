@@ -29,7 +29,7 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 			if jq.artifact().SHA256 != domain.Digest("ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036") ||
 				jq.Version != "1.8.2" || jq.BottleTag != "arm64_tahoe" || jq.Rebuild != 1 ||
 				len(jq.Dependencies) != 1 || jq.Dependencies[0] != "oniguruma" || !jq.artifact().Valid() {
-				t.Fatal("captured Homebrew bottle or closure changed")
+				t.Fatalf("captured jq 1.8.2 arm64_tahoe rebuild 1 with oniguruma dependency changed: %+v", jq)
 			}
 			scan, err := os.ReadFile(filepath.Join("testdata", "brew-"+version+"-jq-vulns.json"))
 			if err != nil {
@@ -63,7 +63,7 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 			}
 			var formulae []map[string]json.RawMessage
 			if err := json.Unmarshal(envelope["formulae"], &formulae); err != nil || len(formulae) != 1 {
-				t.Fatal("invalid captured formulae", err)
+				t.Fatalf("want one captured formula, got %d: error=%v", len(formulae), err)
 			}
 			delete(formulae[0], "dependencies")
 			envelope["formulae"] = marshalFixture(t, formulae)

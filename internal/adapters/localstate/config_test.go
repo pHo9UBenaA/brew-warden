@@ -10,7 +10,13 @@ import (
 func TestParseConfigDefaultsAndExplicitZeroAge(t *testing.T) {
 	for _, data := range []string{
 		`{"schemaVersion":1}`,
-		`{"schemaVersion":1,"age":{"minimumHours":168},"trust":{"allowedTaps":["homebrew/core"]},"verification":{"requireChecksum":true,"requireBottleAttestation":true},"emergency":{"mode":"suggest","waivableRules":["age"]}}`,
+		`{
+			"schemaVersion":1,
+			"age":{"minimumHours":168},
+			"trust":{"allowedTaps":["homebrew/core"]},
+			"verification":{"requireChecksum":true,"requireBottleAttestation":true},
+			"emergency":{"mode":"suggest","waivableRules":["age"]}
+		}`,
 	} {
 		p, err := ParseConfig(strings.NewReader(data))
 		if err != nil || p.MinimumAgeSeconds() != domain.DefaultMinimumAgeSeconds || !p.Valid() {
@@ -55,7 +61,7 @@ func FuzzConfig(f *testing.F) {
 	f.Fuzz(func(t *testing.T, text string) {
 		p, err := ParseConfig(strings.NewReader(text))
 		if err == nil && (!p.Valid() || p.MinimumAgeSeconds() < 0) {
-			t.Fatal("invalid policy returned without error")
+			t.Fatalf("config %q returned invalid policy without error: %+v", text, p)
 		}
 	})
 }

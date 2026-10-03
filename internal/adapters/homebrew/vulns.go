@@ -35,9 +35,9 @@ type publicVulnsReport struct {
 // Valid only with the pinned scanner, explicit authenticated candidates and an
 // empty inspection prefix. JSON has no clean-subject list; it is not portable
 // standalone proof that an arbitrary invocation checked the requested plan.
-func parsePublicVulns(raw []byte, status int, candidates []formulaMetadata) (publicVulnsReport, error) {
+func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (publicVulnsReport, error) {
 	var report publicVulnsReport
-	if len(candidates) == 0 || len(candidates) > 128 || (status != 0 && status != 1) {
+	if len(candidates) == 0 || len(candidates) > 128 || (exitCode != 0 && exitCode != 1) {
 		return report, errors.New("unsupported advisory invocation")
 	}
 	expected := map[string]string{}
@@ -84,7 +84,7 @@ func parsePublicVulns(raw []byte, status int, candidates []formulaMetadata) (pub
 		}
 		hasOpen = hasOpen || len(f.Open) > 0
 	}
-	if (status == 1) != hasOpen {
+	if (exitCode == 1) != hasOpen {
 		return publicVulnsReport{}, errors.New("homebrew advisory exit and findings disagree")
 	}
 	return report, nil
@@ -172,13 +172,13 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	out, stderr := &processOutput{}, &processOutput{}
 	cmd.Stdout, cmd.Stderr = out, stderr
 	err = cmd.Run()
-	status := 0
+	exitCode := 0
 	if err != nil {
-		var ex *exec.ExitError
-		if !errors.As(err, &ex) || ctx.Err() != nil {
+		var exitErr *exec.ExitError
+		if !errors.As(err, &exitErr) || ctx.Err() != nil {
 			return fail(errors.New("homebrew advisory command failed"))
 		}
-		status = ex.ExitCode()
+		exitCode = exitErr.ExitCode()
 	}
 	if out.overflow || stderr.overflow {
 		return fail(errors.New("homebrew advisory output exceeded limit"))
@@ -189,7 +189,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	if err := writeNew(filepath.Join(w.root, "advisory-scan.stdout"), out.Bytes(), 0600); err != nil {
 		return fail(err)
 	}
-	report, err := parsePublicVulns(out.Bytes(), status, candidates)
+	report, err := parsePublicVulns(out.Bytes(), exitCode, candidates)
 	if err != nil {
 		return fail(err)
 	}

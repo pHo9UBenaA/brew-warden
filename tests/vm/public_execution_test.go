@@ -61,7 +61,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		if pass == 0 {
 			profiles, err := filepath.Glob(filepath.Join(directory, "collection-*", "public-execution.sb"))
 			if err != nil || len(profiles) != 1 {
-				t.Fatal("execution profile missing", err)
+				t.Fatalf("want one execution profile, got %q: error=%v", profiles, err)
 			}
 			for _, protected := range []string{profiles[0], filepath.Join(filepath.Dir(profiles[0]), "plan.json")} {
 				command := exec.CommandContext(ctx, "/usr/bin/sandbox-exec", "-f", profiles[0], "/bin/sh", "-c", `printf changed >> "$1"`, "protection-test", protected)
@@ -80,7 +80,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		unrelatedBefore := publicUnrelatedKegs(t, prepared.Assessment.Nodes)
 		if fault == "interrupt" {
 			if result, err := session.Run(runContext, prepared.Assessment.Binding); err == nil || !interrupt.Triggered() || !result.ExitKnown || result.ExitCode == 0 {
-				t.Fatal("installer did not reach the interruption fixture", err)
+				t.Fatalf("want nonzero child exit after interruption: triggered=%t result=%+v error=%v", interrupt.Triggered(), result, err)
 			}
 			if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
 				t.Fatal("interrupted execution changed unrelated packages")
@@ -117,7 +117,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			case "changed-metadata":
 				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "metadata.json"))
 				if err != nil || len(files) != 1 {
-					t.Fatal("missing authenticated metadata fixture", err)
+					t.Fatalf("want one authenticated metadata fixture, got %q: error=%v", files, err)
 				}
 				file, err := os.OpenFile(files[0], os.O_WRONLY|os.O_APPEND, 0)
 				if err != nil {
@@ -150,7 +150,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			case "changed-input":
 				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "*.tar.gz"))
 				if err != nil || len(files) == 0 {
-					t.Fatal("missing bottle fixture", err)
+					t.Fatalf("want at least one bottle fixture, got %q: error=%v", files, err)
 				}
 				if err := os.WriteFile(files[0], []byte("changed after verification"), 0600); err != nil {
 					t.Fatal(err)
@@ -158,7 +158,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			case "missing-cache":
 				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "fetch.json"))
 				if err != nil || len(files) != 1 {
-					t.Fatal("missing fetch fixture", err)
+					t.Fatalf("want one fetch fixture, got %q: error=%v", files, err)
 				}
 				raw, err := os.ReadFile(files[0])
 				if err != nil {
@@ -166,7 +166,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 				}
 				var fetch struct{ Downloads []struct{ Path string } }
 				if err := json.Unmarshal(raw, &fetch); err != nil || len(fetch.Downloads) == 0 {
-					t.Fatal("invalid fetch fixture", err)
+					t.Fatalf("want fetch fixture with downloads, got %+v: error=%v", fetch, err)
 				}
 				path := fetch.Downloads[0].Path
 				if !strings.HasPrefix(path, filepath.Dir(files[0])+"/cache/downloads/") {
@@ -180,7 +180,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 				stop()
 				runContext = cancelled
 			default:
-				t.Fatal("unsupported public execution fault")
+				t.Fatalf("unsupported public execution fault: %q", fault)
 			}
 			if _, err := session.Run(runContext, prepared.Assessment.Binding); err == nil {
 				t.Fatal("fault did not stop execution")
@@ -190,7 +190,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			}
 			after, err := kegSnapshot("/opt/homebrew/Cellar")
 			if err != nil || after != before {
-				t.Fatal("failed preflight changed installed payload", err)
+				t.Fatalf("failed preflight changed installed payload: before=%s after=%s error=%v", before, after, err)
 			}
 			return
 		}
@@ -202,7 +202,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			t.Fatal("execution changed an unrelated installed package")
 		}
 		if pass == 1 && result.AfterState != prepared.BeforeState {
-			t.Fatal("unchanged rerun changed selected state")
+			t.Fatalf("unchanged rerun changed selected state: before=%s after=%s", prepared.BeforeState, result.AfterState)
 		}
 		if _, err := session.Run(ctx, prepared.Assessment.Binding); err == nil {
 			t.Fatal("attempt replay accepted")

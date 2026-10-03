@@ -60,10 +60,10 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 			t.Fatal(err)
 		}
 		if h.Name == "brewwarden/SHA256SUMS" && !strings.Contains(string(data), hash([]byte("executable"))+"  bwd\n") {
-			t.Fatal("missing executable digest")
+			t.Fatalf("want executable digest %q in SHA256SUMS, got %q", hash([]byte("executable"))+"  bwd\n", data)
 		}
 		if h.Name == "brewwarden/brewwarden" && (h.Typeflag != tar.TypeSymlink || h.Linkname != "bwd") {
-			t.Fatal("alias not relative")
+			t.Fatalf("want symlink alias to bwd, got type=%d link=%q", h.Typeflag, h.Linkname)
 		}
 	}
 	if len(seen) != 4 {

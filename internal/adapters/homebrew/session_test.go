@@ -13,7 +13,7 @@ func planFixture() executionPlan {
 	a := metadataFixture().Formulae[0].artifact()
 	digest := domain.Digest(strings.Repeat("a", 64))
 	return executionPlan{
-		Schema: 1, MinimumAge: 0, Targets: []domain.Artifact{a},
+		Schema: 1, MinimumAgeSeconds: 0, Targets: []domain.Artifact{a},
 		Nodes:   []domain.Node{{Artifact: a, Dependencies: []domain.Artifact{}, Evidence: []domain.Evidence{}}},
 		Actions: []plannedAction{{Name: "jq", Operation: "install"}}, BeforeState: digest,
 		Environment: executionEnvironment{Runtime: digest, OSVersion: "26.6.2", Prefix: "/opt/homebrew"},
@@ -37,7 +37,7 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 		t.Fatal("exception not bound", prepared)
 	}
 	for name, change := range map[string]func(*executionPlan){
-		"policy":          func(p *executionPlan) { p.MinimumAge = 42 },
+		"policy":          func(p *executionPlan) { p.MinimumAgeSeconds = 42 },
 		"OS version":      func(p *executionPlan) { p.Environment.OSVersion = "26.6.3" },
 		"bottle rebuild":  func(p *executionPlan) { p.Nodes[0].Artifact.Rebuild++ },
 		"waiver reason":   func(p *executionPlan) { p.Waivers[0].Reason = "Another reason" },
@@ -55,7 +55,7 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 				t.Fatal(err)
 			}
 			if next.Assessment.Binding == prepared.Assessment.Binding || next.ExceptionID == prepared.ExceptionID {
-				t.Fatal("changed plan reused binding")
+				t.Fatalf("changed plan reused binding or exception: before=%+v after=%+v", prepared, next)
 			}
 		})
 	}

@@ -15,7 +15,7 @@ func TestAdvisoryInventoryAndOmittedStatus(t *testing.T) {
 	feed := `{"meta":{"count":1,"schema_version":"1.7.3"},"advisories":{"jq":[{"id":"BREW-example"}]}}`
 	index, err := parseAdvisoryIndex([]byte(feed))
 	if err != nil || len(index.Records["jq"]) != 1 {
-		t.Fatal(err)
+		t.Fatalf("want one jq advisory, got %d: error=%v", len(index.Records["jq"]), err)
 	}
 	for _, raw := range []string{
 		strings.Replace(feed, `"count":1`, `"count":2`, 1),
@@ -101,13 +101,13 @@ func TestPublicAdvisoryTransport(t *testing.T) {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &http.Client{Transport: advisoryTransport(func(r *http.Request) (*http.Response, error) {
 				if r.URL.String() != advisoryFeedURL || r.Header.Get("Cache-Control") != "no-cache" {
-					t.Fatal("unexpected request")
+					t.Fatalf("want URL %q and Cache-Control no-cache, got URL=%q Cache-Control=%q", advisoryFeedURL, r.URL.String(), r.Header.Get("Cache-Control"))
 				}
 				return &http.Response{StatusCode: tc.status, Header: http.Header{"Age": []string{tc.age}}, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
 			})}
 			_, err := fetchAdvisoryJSON(context.Background(), client, advisoryFeedURL, tc.limit)
 			if (err == nil) != tc.ok {
-				t.Fatal(err)
+				t.Fatalf("want success=%t, got error=%v", tc.ok, err)
 			}
 		})
 	}

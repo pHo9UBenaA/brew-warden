@@ -38,7 +38,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	defer cancel()
 	authDir := os.Getenv("BREWWARDEN_VM_GH_CONFIG_DIR")
 	if authDir != "" && !filepath.IsAbs(authDir) {
-		t.Fatal("guest gh configuration directory must be absolute")
+		t.Fatalf("guest gh configuration directory must be absolute: %q", authDir)
 	}
 	newCommand := func(args ...string) *exec.Cmd {
 		c := exec.CommandContext(ctx, binary, args...)
@@ -83,7 +83,7 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	}}
 	command.Stdout, command.Stderr = trigger, trigger
 	if err := command.Run(); err == nil || !trigger.Triggered() {
-		t.Fatal("parent crash fixture not reached", err)
+		t.Fatalf("want parent failure after fetch trigger: triggered=%t error=%v", trigger.Triggered(), err)
 	}
 	raw, err := os.ReadFile(file)
 	if err != nil {
@@ -94,10 +94,10 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 		Plan, Attempt        string
 	}
 	if err := json.Unmarshal(raw, &owned); err != nil || owned.Schema != 1 || owned.PID <= 1 || owned.Session != owned.PID || len(owned.Plan) != 64 || len(owned.Attempt) != 64 {
-		t.Fatal("invalid owned process record", err)
+		t.Fatalf("invalid owned process record: record=%+v error=%v", owned, err)
 	}
 	if int64(owned.PID) != stoppedPID.Load() {
-		t.Fatal("the frozen child and durable record do not match")
+		t.Fatalf("frozen child PID %d differs from durable PID %d", stoppedPID.Load(), owned.PID)
 	}
 	// The child is still live, so a second BrewWarden mutation must hold.
 	output, err := newCommand("brew", "install", "xz").CombinedOutput()

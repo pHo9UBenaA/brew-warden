@@ -47,7 +47,7 @@ func TestInstalledRuntimeIsCopiedAndBoundToExactVersion(t *testing.T) {
 	}
 	copied, err := os.ReadFile(filepath.Join(destination, "brew/Library/Homebrew/fixture.rb"))
 	if err != nil || string(copied) != "ruby fixture\n" {
-		t.Fatal("installed library was not copied", err)
+		t.Fatalf("want copied library %q, got %q: error=%v", "ruby fixture\n", copied, err)
 	}
 	if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/fixture.rb"), []byte("changed"), 0644); err != nil {
 		t.Fatal(err)

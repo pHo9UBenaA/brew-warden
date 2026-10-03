@@ -45,15 +45,6 @@ func readInFlight(file string) (*inFlight, error) {
 	return &record, nil
 }
 
-func syncParent(file string) error {
-	dir, err := os.Open(filepath.Dir(file))
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
-}
-
 // Called only while holding the private BrewWarden operation lock. A record
 // from a lost wrapper is removed only after the whole owned session is absent.
 // The pending record is considered too: parent death between sync and rename

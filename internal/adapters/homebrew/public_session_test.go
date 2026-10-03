@@ -3,10 +3,38 @@ package homebrew
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
+
+func TestExecutionMetadataMatchesArtifactAndDependencySet(t *testing.T) {
+	candidates := metadataFixture().Formulae
+	candidate := candidates[0]
+	dependency := candidates[1].artifact()
+	node := domain.Node{Artifact: candidate.artifact(), Dependencies: []domain.Artifact{dependency}}
+	for _, tc := range []struct {
+		name   string
+		mutate func(*formulaMetadata)
+		want   string
+	}{
+		{"matching", func(*formulaMetadata) {}, ""},
+		{"changed bottle", func(f *formulaMetadata) { f.Rebuild++ }, "execution metadata differs"},
+		{"missing dependency", func(f *formulaMetadata) { f.Dependencies = nil }, "execution dependency graph changed"},
+		{"extra dependency", func(f *formulaMetadata) { f.Dependencies = append(f.Dependencies, "xz") }, "execution dependency graph changed"},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			formula := candidate
+			formula.Dependencies = append([]string{}, candidate.Dependencies...)
+			tc.mutate(&formula)
+			err := matchExecutionMetadata([]formulaMetadata{formula}, []string{candidate.Name}, []domain.Node{node})
+			if tc.want == "" && err != nil || tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)) {
+				t.Fatalf("want error containing %q, got %v", tc.want, err)
+			}
+		})
+	}
+}
 
 func TestPublicOperationLockExcludesConcurrentMutation(t *testing.T) {
 	directory := t.TempDir()

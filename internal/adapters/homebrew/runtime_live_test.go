@@ -68,7 +68,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 		} `json:"signatures"`
 	}
 	if err := json.Unmarshal(metadata, &signed); err != nil || len(signed.Signatures) == 0 {
-		t.Fatal("missing signed fixture")
+		t.Fatalf("want signed metadata with at least one signature, got %d: error=%v", len(signed.Signatures), err)
 	}
 	sig := signed.Signatures[0].Signature
 	if len(sig) == 0 {

@@ -41,17 +41,26 @@ func ParseConfig(r io.Reader) (domain.Policy, error) {
 	if doc.SchemaVersion != 1 {
 		return domain.Policy{}, errors.New("configuration schemaVersion must be 1")
 	}
-	if doc.Trust != nil && (len(doc.Trust.AllowedTaps) != 1 || doc.Trust.AllowedTaps[0] != "homebrew/core") {
-		return domain.Policy{}, errors.New("only homebrew/core is currently supported")
+	if doc.Trust != nil {
+		taps := doc.Trust.AllowedTaps
+		if len(taps) != 1 || taps[0] != "homebrew/core" {
+			return domain.Policy{}, errors.New("only homebrew/core is currently supported")
+		}
 	}
 	if doc.Verification != nil {
-		v := doc.Verification
-		if (v.RequireChecksum != nil && !*v.RequireChecksum) || (v.RequireBottleAttestation != nil && !*v.RequireBottleAttestation) {
+		verification := doc.Verification
+		checksumDisabled := verification.RequireChecksum != nil && !*verification.RequireChecksum
+		attestationDisabled := verification.RequireBottleAttestation != nil && !*verification.RequireBottleAttestation
+		if checksumDisabled || attestationDisabled {
 			return domain.Policy{}, errors.New("required verification cannot be disabled")
 		}
 	}
-	if doc.Emergency != nil && (doc.Emergency.Mode != "suggest" || len(doc.Emergency.WaivableRules) != 1 || doc.Emergency.WaivableRules[0] != "age") {
-		return domain.Policy{}, errors.New("emergency configuration permits only suggest mode and age waivers")
+	if doc.Emergency != nil {
+		emergency := doc.Emergency
+		ageOnly := len(emergency.WaivableRules) == 1 && emergency.WaivableRules[0] == "age"
+		if emergency.Mode != "suggest" || !ageOnly {
+			return domain.Policy{}, errors.New("emergency configuration permits only suggest mode and age waivers")
+		}
 	}
 	seconds := domain.DefaultMinimumAgeSeconds
 	if doc.Age != nil && doc.Age.MinimumHours != nil {

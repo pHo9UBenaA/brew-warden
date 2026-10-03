@@ -2,15 +2,32 @@
 # Development-only reproducer: a CLI handoff does not preserve preflight state.
 # Success means the limitation was reproduced, not that execution binding passed.
 set -eu
-[ "$#" -eq 2 ] || { echo 'usage: probe-homebrew-dependency-drift.sh VM_WORKSPACE VERIFIED_CACHE' >&2; exit 2; }
-case "$(/usr/sbin/sysctl -n hw.model)" in VirtualMac*) ;; *) echo 'requires disposable macOS VM' >&2; exit 2 ;; esac
+[ "$#" -eq 2 ] || {
+  echo 'usage: probe-homebrew-dependency-drift.sh VM_WORKSPACE VERIFIED_CACHE' >&2
+  exit 2
+}
+case "$(/usr/sbin/sysctl -n hw.model)" in
+  VirtualMac*) ;;
+  *) echo 'requires disposable macOS VM' >&2; exit 2 ;;
+esac
+
 root=$1
 cache=$2
-case "$root" in /private/tmp/bwd-cli-*) ;; *) exit 2 ;; esac
-case "${root#/private/tmp/bwd-cli-}" in ''|*[!a-zA-Z0-9_-]*) exit 2 ;; esac
+case "$root" in
+  /private/tmp/bwd-cli-*) ;;
+  *) exit 2 ;;
+esac
+case "${root#/private/tmp/bwd-cli-}" in
+  ''|*[!a-zA-Z0-9_-]*) exit 2 ;;
+esac
 [ "$(cd "$root" && pwd -P)" = "$root" ] || exit 2
-case "$cache" in "$root"/*/cache) ;; *) echo 'cache must be inside VM workspace' >&2; exit 2 ;; esac
-case "$cache" in *[!a-zA-Z0-9_./-]*) echo 'invalid cache path' >&2; exit 2 ;; esac
+case "$cache" in
+  "$root"/*/cache) ;;
+  *) echo 'cache must be inside VM workspace' >&2; exit 2 ;;
+esac
+case "$cache" in
+  *[!a-zA-Z0-9_./-]*) echo 'invalid cache path' >&2; exit 2 ;;
+esac
 [ "$(cd "$cache" && pwd -P)" = "$cache" ] || exit 2
 [ -f "$cache/api/internal/packages.arm64_tahoe.jws.json" ]
 [ -d /opt/homebrew/Cellar/pcre2/10.48 ]

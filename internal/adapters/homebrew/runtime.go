@@ -256,12 +256,12 @@ func digestBytes(data []byte) domain.Digest {
 	sum := sha256.Sum256(data)
 	return domain.Digest(hex.EncodeToString(sum[:]))
 }
-func readRegular(file string, limit int64) ([]byte, error) {
+func readRegular(file string, maxBytes int64) ([]byte, error) {
 	info, err := os.Lstat(file)
 	if err != nil {
 		return nil, err
 	}
-	if !info.Mode().IsRegular() || info.Size() > limit {
+	if !info.Mode().IsRegular() || info.Size() > maxBytes {
 		return nil, errors.New("input is not a bounded regular file")
 	}
 	f, err := os.Open(file)
@@ -273,8 +273,8 @@ func readRegular(file string, limit int64) ([]byte, error) {
 	if err != nil || !os.SameFile(info, opened) {
 		return nil, errors.New("input changed while opening")
 	}
-	data, err := io.ReadAll(io.LimitReader(f, limit+1))
-	if err != nil || int64(len(data)) > limit {
+	data, err := io.ReadAll(io.LimitReader(f, maxBytes+1))
+	if err != nil || int64(len(data)) > maxBytes {
 		return nil, errors.New("input exceeds limit")
 	}
 	return data, nil
@@ -295,12 +295,7 @@ func writeNew(file string, data []byte, mode os.FileMode) error {
 	if closeErr != nil {
 		return closeErr
 	}
-	dir, err := os.Open(filepath.Dir(file))
-	if err != nil {
-		return err
-	}
-	defer dir.Close()
-	return dir.Sync()
+	return syncParent(file)
 }
 
 func writeRecord(file string, data []byte) error {
@@ -314,6 +309,11 @@ func writeRecord(file string, data []byte) error {
 	if err := os.Rename(pending, file); err != nil {
 		return err
 	}
+	return syncParent(file)
+}
+
+// Persist directory entries after creating, renaming or removing owned files.
+func syncParent(file string) error {
 	directory, err := os.Open(filepath.Dir(file))
 	if err != nil {
 		return err

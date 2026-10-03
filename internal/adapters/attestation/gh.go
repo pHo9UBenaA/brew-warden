@@ -125,11 +125,11 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 		return 0, nil, fmt.Errorf("public attestation verification unavailable: %w", err)
 	}
 	for _, input := range []struct {
-		path   string
-		digest domain.Digest
-		limit  int64
+		path     string
+		digest   domain.Digest
+		maxBytes int64
 	}{{v.Path, tool, 128 * 1024 * 1024}, {bottle, actual, 2 * 1024 * 1024 * 1024}} {
-		digest, err := hashFile(input.path, input.limit)
+		digest, err := hashFile(input.path, input.maxBytes)
 		if err != nil || digest != input.digest {
 			return 0, nil, errors.New("attestation input changed during verification")
 		}

@@ -45,6 +45,16 @@ func decodeSchema(data []byte, out any, allowUnknownFields bool) error {
 	return d.Decode(out)
 }
 
+// Untagged exported fields retain their Go name; explicitly tagged fields use
+// the tag's exact spelling, without options such as omitempty.
+func schemaFieldName(field reflect.StructField) string {
+	name := strings.Split(field.Tag.Get("json"), ",")[0]
+	if name == "" && field.PkgPath == "" {
+		return field.Name
+	}
+	return name
+}
+
 func validateValue(d *json.Decoder, t reflect.Type, depth int, allowUnknownFields bool) error {
 	if depth > 16 {
 		return errors.New("JSON nesting exceeds limit")
@@ -67,10 +77,7 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int, allowUnknownField
 		fields := map[string]reflect.Type{}
 		for i := 0; i < t.NumField(); i++ {
 			f := t.Field(i)
-			name := strings.Split(f.Tag.Get("json"), ",")[0]
-			if name == "" && f.PkgPath == "" {
-				name = f.Name
-			}
+			name := schemaFieldName(f)
 			if name != "" && name != "-" {
 				fields[name] = f.Type
 			}
@@ -109,11 +116,10 @@ func validateValue(d *json.Decoder, t reflect.Type, depth int, allowUnknownField
 		}
 		for i := 0; i < t.NumField(); i++ {
 			field := t.Field(i)
-			name := strings.Split(field.Tag.Get("json"), ",")[0]
-			if name == "" && field.PkgPath == "" {
-				name = field.Name
-			}
-			if (field.Tag.Get("required") == "true" || field.Tag.Get("json") == "" && field.PkgPath == "") && !seen[name] {
+			name := schemaFieldName(field)
+			untaggedExported := field.Tag.Get("json") == "" && field.PkgPath == ""
+			required := field.Tag.Get("required") == "true" || untaggedExported
+			if required && !seen[name] {
 				return errors.New("missing required JSON field")
 			}
 		}

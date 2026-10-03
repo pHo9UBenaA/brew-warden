@@ -30,7 +30,7 @@ func TestLiveExplicitUpgradeChangesSelectedVersion(t *testing.T) {
 	}
 	prior, err := filepath.EvalSymlinks(filepath.Join("/opt/homebrew/opt", target))
 	if err != nil || filepath.Dir(prior) != filepath.Join("/opt/homebrew/Cellar", target) {
-		t.Fatal("requires a linked older bottle", err)
+		t.Fatalf("requires older %s keg linked inside its rack: resolved=%q error=%v", target, prior, err)
 	}
 	unrelated := map[string]string{}
 	racks, err := os.ReadDir("/opt/homebrew/Cellar")

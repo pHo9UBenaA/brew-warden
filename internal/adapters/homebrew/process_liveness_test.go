@@ -107,7 +107,7 @@ func TestSessionFindsChildInAnotherGroupAfterLeaderDies(t *testing.T) {
 	}
 	member, err := strconv.Atoi(strings.TrimSpace(line))
 	if err != nil || member <= 1 {
-		t.Fatal("invalid child fixture", err)
+		t.Fatalf("want child PID > 1, got %d from %q: error=%v", member, line, err)
 	}
 	defer func() {
 		if sid, err := processSessionID(member); err == nil && sid == command.Process.Pid {
@@ -116,12 +116,12 @@ func TestSessionFindsChildInAnotherGroupAfterLeaderDies(t *testing.T) {
 	}()
 	group, err := syscall.Getpgid(member)
 	if err != nil || group == command.Process.Pid {
-		t.Fatal("fixture did not create a separate group", err)
+		t.Fatalf("want member process group distinct from leader %d, got %d: error=%v", command.Process.Pid, group, err)
 	}
 	_ = command.Process.Kill()
 	_ = command.Wait()
 	active, _, err := sessionInProcesses(command.Process.Pid, 0, []string{strconv.Itoa(member)})
 	if err != nil || !active {
-		t.Fatal("lost live child after session leader exited", err)
+		t.Fatalf("want live child %d in session %d, got active=%t: error=%v", member, command.Process.Pid, active, err)
 	}
 }

@@ -44,7 +44,7 @@ func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	unrelatedSource = strings.Replace(unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`, 1)
 	other, err := parseInfo([]byte(unrelatedSource), []string{"jq"})
 	if err != nil || len(other) != 1 || other[0].artifact() != f[0].artifact() || other[0].Dependencies[0] != f[0].Dependencies[0] {
-		t.Fatal("source-specific metadata changed bottle selection", err)
+		t.Fatalf("source-specific metadata changed bottle selection: got=%+v want=%+v error=%v", other, f, err)
 	}
 	for name, raw := range map[string]string{
 		"missing revision":     strings.Replace(infoFixture, `"revision":0,`, "", 1),

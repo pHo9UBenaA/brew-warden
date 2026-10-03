@@ -184,7 +184,7 @@ func TestInstalledGHInputAndOutputBounds(t *testing.T) {
 	}
 	out := &boundedOutput{}
 	if _, err := out.Write(make([]byte, maxResponse+1)); err == nil || !out.overflow {
-		t.Fatal("unbounded verifier output accepted")
+		t.Fatalf("want output overflow and write error: overflow=%t error=%v", out.overflow, err)
 	}
 }
 
@@ -269,11 +269,14 @@ test "$8" = --format && test "${10}" = --limit && test "${11}" = 100 || exit 5
 				t.Fatal(err)
 			}
 			got, raw, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), a, bottle, now)
-			if (err == nil) != tc.ok || tc.ok && (got == 0 || string(raw) != verified) {
-				t.Fatal(got, err)
+			if (err == nil) != tc.ok {
+				t.Fatalf("want verification success=%t, got error=%v", tc.ok, err)
+			}
+			if tc.ok && (got == 0 || string(raw) != verified) {
+				t.Fatalf("want verified response %q with nonzero timestamp, got timestamp=%d response=%q", verified, got, raw)
 			}
 			if tc.reason != "" && (err == nil || !strings.Contains(err.Error(), tc.reason) || strings.Contains(err.Error(), "secret-marker")) {
-				t.Fatal("gh failure lost its actionable redacted reason", err)
+				t.Fatalf("want redacted gh error containing %q, got %v", tc.reason, err)
 			}
 			if tc.ok {
 				provenance, age, evidenceRaw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
@@ -299,6 +302,6 @@ test "$8" = --format && test "${10}" = --limit && test "${11}" = 100 || exit 5
 	defer cancel()
 	start := time.Now()
 	if _, _, err := (PublicGH{Path: tool}).VerifyBottle(ctx, a, bottle, now); err == nil || time.Since(start) > 3*time.Second {
-		t.Fatal("cancellation failed", err)
+		t.Fatalf("want cancellation error within three seconds: elapsed=%s error=%v", time.Since(start), err)
 	}
 }

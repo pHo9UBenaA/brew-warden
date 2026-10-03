@@ -11,7 +11,7 @@ func TestConfigurationFileBoundary(t *testing.T) {
 	path := filepath.Join(dir, "config.json")
 	f := Files{ConfigPath: path}
 	if p, err := f.LoadConfig(""); err != nil || !p.Valid() {
-		t.Fatal("missing optional config must use defaults", err)
+		t.Fatalf("missing optional config must use defaults: policy=%+v error=%v", p, err)
 	}
 	if _, err := f.LoadConfig(path); err == nil {
 		t.Fatal("explicit missing config ignored")
@@ -20,7 +20,7 @@ func TestConfigurationFileBoundary(t *testing.T) {
 		t.Fatal(err)
 	}
 	if p, err := f.LoadConfig(""); err != nil || p.MinimumAgeSeconds() != 86400 {
-		t.Fatal("config not loaded", err)
+		t.Fatalf("want configured minimum age 86400 seconds, got %d: error=%v", p.MinimumAgeSeconds(), err)
 	}
 	if err := os.Chmod(path, 0o666); err != nil {
 		t.Fatal(err)

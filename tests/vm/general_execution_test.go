@@ -98,7 +98,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	}
 	after, err := kegSnapshot("/opt/homebrew/Cellar")
 	if err != nil || installed != after {
-		t.Fatal("unchanged rerun modified installed payload", err)
+		t.Fatalf("unchanged rerun modified installed payload: before=%s after=%s error=%v", installed, after, err)
 	}
 	t.Log("verified complete closure, unchanged unrelated packages and idempotent rerun", targets)
 }

@@ -17,24 +17,25 @@ func TestBottleMetadataBindsDigestAndCompleteClosure(t *testing.T) {
 	root := candidates[0]
 	root.Revision, root.Rebuild = 0, 0
 	candidates[0] = root
+	const historicalDependency = `{"full_name":"oniguruma","version":"6.9.9","revision":0}`
 	for _, tc := range []struct {
 		name         string
 		digest       string
 		dependencies string
 		want         bool
 	}{
-		{"matching", string(root.BottleSHA256), `[{"full_name":"oniguruma","version":"6.9.9","revision":0}]`, true},
+		{"matching", string(root.BottleSHA256), "[" + historicalDependency + "]", true},
 		{"different bottle", "wrong", `[]`, false},
 		{"missing dependency", string(root.BottleSHA256), `[]`, false},
 		{"additional dependency", string(root.BottleSHA256), `[{"full_name":"unplanned","version":"1","revision":0}]`, false},
-		{"duplicate dependency", string(root.BottleSHA256), `[{"full_name":"oniguruma","version":"6.9.9","revision":0},{"full_name":"oniguruma","version":"6.9.9","revision":0}]`, false},
+		{"duplicate dependency", string(root.BottleSHA256), "[" + historicalDependency + "," + historicalDependency + "]", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			raw := bottleIndexFixture(t, tc.digest, root.Version+".arm64_tahoe",
 				`{"arch":"arm64","runtime_dependencies":`+tc.dependencies+`}`)
 			err := validateBottleMetadata(raw, root, candidates)
 			if (err == nil) != tc.want {
-				t.Fatal("unexpected metadata decision", err)
+				t.Fatalf("want metadata success=%t for dependencies %s, got error=%v", tc.want, tc.dependencies, err)
 			}
 		})
 	}

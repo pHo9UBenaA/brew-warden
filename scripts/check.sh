@@ -7,7 +7,8 @@ if [ "$#" -ne 1 ]; then
   printf 'Usage: scripts/check.sh all|build|race|cover|fuzz|lint|vuln\n' >&2
   exit 1
 fi
-require_tool() {
+# Return the validated executable path, rather than mutate caller state.
+checked_tool_path() (
   binary="$PWD/.cache/tools/$1"
   if [ ! -x "$binary" ]; then
     printf 'Missing %s; run ./scripts/setup-tools.sh explicitly.\n' "$1" >&2
@@ -19,7 +20,8 @@ require_tool() {
     printf 'Wrong %s version; run ./scripts/setup-tools.sh.\n' "$1" >&2
     exit 1
   fi
-}
+  printf '%s\n' "$binary"
+)
 run_fuzz() {
   package=$1
   target=$2
@@ -40,8 +42,8 @@ case "$1" in
       printf 'Full verification requires Go %s from .go-version.\n' "$(cat .go-version)" >&2
       exit 1
     fi
-    require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"
-    require_tool govulncheck golang.org/x/vuln "$GOVULNCHECK_VERSION"
+    checked_tool_path staticcheck honnef.co/go/tools "$STATICCHECK_VERSION" >/dev/null
+    checked_tool_path govulncheck golang.org/x/vuln "$GOVULNCHECK_VERSION" >/dev/null
     ./scripts/verify.sh
     for step in race cover fuzz lint vuln; do
       ./scripts/check.sh "$step"
@@ -71,11 +73,11 @@ case "$1" in
     run_fuzz ./tests FuzzPolicyRequiresCompleteEvidence
     ;;
   lint)
-    require_tool staticcheck honnef.co/go/tools "$STATICCHECK_VERSION"
+    binary=$(checked_tool_path staticcheck honnef.co/go/tools "$STATICCHECK_VERSION")
     "$binary" ./...
     ;;
   vuln)
-    require_tool govulncheck golang.org/x/vuln "$GOVULNCHECK_VERSION"
+    binary=$(checked_tool_path govulncheck golang.org/x/vuln "$GOVULNCHECK_VERSION")
     # Module downloads stay disabled; only advisory DB access is needed here.
     "$binary" -test ./...
     ./scripts/check.sh build

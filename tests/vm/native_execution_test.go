@@ -76,7 +76,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		operation = "install"
 	}
 	if operation != "install" && operation != "upgrade" {
-		t.Fatal("unsupported VM operation")
+		t.Fatalf("unsupported VM operation: %q", operation)
 	}
 	directory, err := os.MkdirTemp(filepath.Dir(source), "live-execution-")
 	if err != nil {
@@ -97,7 +97,7 @@ func TestLiveNativeExecution(t *testing.T) {
 	switch fault {
 	case "", "age", "age-exception", "changed-input", "exception-changed-input", "link-conflict":
 	default:
-		t.Fatal("unsupported VM fault")
+		t.Fatalf("unsupported VM fault: %q", fault)
 	}
 	policy := domain.DefaultPolicy()
 	waivers := []domain.AgeWaiver{}
@@ -163,7 +163,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 		raw, readErr := os.ReadFile("/opt/homebrew/bin/jq")
 		if readErr != nil || string(raw) != "owned acceptance conflict\n" {
-			t.Fatal("existing shared file replaced", readErr)
+			t.Fatalf("want existing shared conflict file unchanged, got %q: error=%v", raw, readErr)
 		}
 		if _, err := os.Stat("/opt/homebrew/Cellar/oniguruma/6.9.10"); err != nil {
 			t.Fatal("did not exercise partial dependency installation", err)
@@ -185,7 +185,7 @@ func TestLiveNativeExecution(t *testing.T) {
 			t.Fatal("partial link held for the wrong reason", err)
 		}
 		if after, err := kegSnapshot("/opt/homebrew/Cellar"); err != nil || after != partial {
-			t.Fatal("held fresh retry mutated the partial prefix", err)
+			t.Fatalf("held fresh retry mutated partial prefix: before=%s after=%s error=%v", partial, after, err)
 		}
 		t.Log("partial installation retained; incomplete link prevents false success on fresh retry")
 		return
@@ -196,7 +196,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 		after, stateErr := kegSnapshot("/opt/homebrew/Cellar")
 		if stateErr != nil || after != completeBefore {
-			t.Fatal("held request changed prefix", stateErr)
+			t.Fatalf("held request changed prefix: before=%s after=%s error=%v", completeBefore, after, stateErr)
 		}
 		t.Log("verified mutation refusal", fault)
 		return

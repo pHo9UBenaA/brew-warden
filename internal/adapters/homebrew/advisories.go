@@ -38,7 +38,7 @@ type brewAdvisoryEntry struct {
 	FixedIn  string   `json:"fixed_in"`
 }
 
-func fetchAdvisoryJSON(ctx context.Context, client *http.Client, address string, limit int64) ([]byte, error) {
+func fetchAdvisoryJSON(ctx context.Context, client *http.Client, address string, maxBytes int64) ([]byte, error) {
 	if address != advisoryFeedURL {
 		if !strings.HasPrefix(address, "https://formulae.brew.sh/api/formula/") {
 			return nil, errors.New("invalid public advisory URL")
@@ -60,7 +60,7 @@ func fetchAdvisoryJSON(ctx context.Context, client *http.Client, address string,
 		return nil, errors.New("public advisory source unavailable")
 	}
 	defer response.Body.Close()
-	if response.StatusCode != http.StatusOK || response.ContentLength > limit {
+	if response.StatusCode != http.StatusOK || response.ContentLength > maxBytes {
 		return nil, errors.New("public advisory source unavailable or oversized")
 	}
 	if value := response.Header.Get("Age"); value != "" {
@@ -69,8 +69,8 @@ func fetchAdvisoryJSON(ctx context.Context, client *http.Client, address string,
 			return nil, errors.New("public advisory response is stale")
 		}
 	}
-	raw, err := io.ReadAll(io.LimitReader(response.Body, limit+1))
-	if err != nil || int64(len(raw)) > limit {
+	raw, err := io.ReadAll(io.LimitReader(response.Body, maxBytes+1))
+	if err != nil || int64(len(raw)) > maxBytes {
 		return nil, errors.New("public advisory response incomplete or oversized")
 	}
 	return raw, nil

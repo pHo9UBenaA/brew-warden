@@ -77,7 +77,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 			status = ex.ExitCode()
 		}
 		if out.overflow || stderr.overflow {
-			t.Fatal("output limit exceeded")
+			t.Fatalf("output limit exceeded: stdout_overflow=%t stderr_overflow=%t", out.overflow, stderr.overflow)
 		}
 		t.Logf("%s: exit=%d stdout-sha256=%s stderr=%s", label, status, digestBytes(out.Bytes()), stderr.String())
 		if status != 0 && out.Len() == 0 {
@@ -88,18 +88,18 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 			t.Fatalf("%s: %v", label, err)
 		}
 		if r.Findings == nil || r.Skipped == nil {
-			t.Fatal("missing result fields")
+			t.Fatalf("missing result fields: findings=%+v skipped=%+v", r.Findings, r.Skipped)
 		}
 		return r, status
 	}
 	expanded, status := run("implicit-dependency-expansion", "vulns", "--json", "--deps", "homebrew/core/jq")
 	slices.Sort(expanded.Skipped)
 	if status != 0 || !slices.Equal(expanded.Skipped, []string{"autoconf", "automake", "libtool", "m4"}) {
-		t.Fatal("expected skipped build dependencies despite successful command exit")
+		t.Fatalf("want exit 0 with skipped autoconf, automake, libtool and m4: exit=%d report=%+v", status, expanded)
 	}
 	clean, status := run("empty-prefix-candidate", "vulns", "--json", "homebrew/core/jq", "homebrew/core/oniguruma")
 	if status != 0 || len(clean.Findings) != 0 || len(clean.Skipped) != 0 {
-		t.Fatal("expected clean candidate and dependency fixture; inspect changed upstream data")
+		t.Fatalf("want exit 0 without findings or skipped subjects; inspect changed upstream data: exit=%d report=%+v", status, clean)
 	}
 	info, err := w.invoke(context.Background(), "probe-info", profile, "info", "--json=v2", "--formula", "homebrew/core/jq", "homebrew/core/oniguruma")
 	if err != nil {
@@ -127,7 +127,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	}
 	old, status := run("old-installed-sbom", "vulns", "--json", "homebrew/core/jq")
 	if status != 1 || len(old.Findings) != 1 || old.Findings[0].Formula != "jq" || old.Findings[0].Version != "1.6" || len(old.Findings[0].Vulnerabilities) == 0 {
-		t.Fatal("old SBOM selection not demonstrated")
+		t.Fatalf("want exit 1 with affected jq 1.6 SBOM: exit=%d report=%+v", status, old)
 	}
 	t.Logf("old selected version=%s findings=%d", old.Findings[0].Version, len(old.Findings[0].Vulnerabilities))
 	// Removing only the fixture proves candidate selection is recovered without
@@ -137,7 +137,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	}
 	restored, status := run("candidate-restored", "vulns", "--json", "homebrew/core/jq", "homebrew/core/oniguruma")
 	if status != 0 || len(restored.Findings) != 0 || len(restored.Skipped) != 0 {
-		t.Fatal("candidate result did not recover")
+		t.Fatalf("want exit 0 without findings or skipped subjects after fixture removal: exit=%d report=%+v", status, restored)
 	}
 	profile, err = w.sandbox("advisory-network-denied", sandboxPermissions{}, []string{filepath.Join(root, "runtime/brew/Library"), cache})
 	if err != nil {
@@ -145,7 +145,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	}
 	failed, status := run("network-failure", "vulns", "--json", "homebrew/core/jq")
 	if status == 0 || failed.Findings != nil {
-		t.Fatal("network failure became a clean result")
+		t.Fatalf("network failure became a clean result: exit=%d report=%+v", status, failed)
 	}
 
 }
@@ -189,11 +189,11 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 		t.Fatal(err)
 	}
 	if len(evidence) != len(candidates) {
-		t.Fatal("incomplete combined evidence")
+		t.Fatalf("want %d combined claims, got %d", len(candidates), len(evidence))
 	}
 	for i, e := range evidence {
 		if e.Subject != candidates[i].artifact() {
-			t.Fatal("wrong evidence subject")
+			t.Fatalf("claim %d: want subject %+v, got %+v", i, candidates[i].artifact(), e.Subject)
 		}
 		t.Logf("combined advisory %s %s: %v", e.Subject.Name, e.Subject.Version, e.Applicability)
 	}
