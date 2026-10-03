@@ -29,7 +29,13 @@ func TestExecutionMetadataMatchesArtifactAndDependencySet(t *testing.T) {
 			formula.Dependencies = append([]string{}, candidate.Dependencies...)
 			tc.mutate(&formula)
 			err := matchExecutionMetadata([]formulaMetadata{formula}, []string{candidate.Name}, []domain.Node{node})
-			if tc.want == "" && err != nil || tc.want != "" && (err == nil || !strings.Contains(err.Error(), tc.want)) {
+			if tc.want == "" {
+				if err != nil {
+					t.Fatalf("matching execution metadata rejected: %v", err)
+				}
+				return
+			}
+			if err == nil || !strings.Contains(err.Error(), tc.want) {
 				t.Fatalf("want error containing %q, got %v", tc.want, err)
 			}
 		})
@@ -75,7 +81,7 @@ func TestPublicSessionCloseRemovesCurrentWorkspace(t *testing.T) {
 	}
 }
 
-func TestInstalledLinkRejectsPartialPourAndMismatchedRecords(t *testing.T) {
+func TestInstalledLinkObservesPartialPourAndRejectsMismatchedRecords(t *testing.T) {
 	prefix, err := filepath.EvalSymlinks(t.TempDir())
 	if err != nil {
 		t.Fatal(err)

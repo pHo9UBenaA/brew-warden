@@ -306,12 +306,23 @@ test "$9" = json && test "${10}" = --limit && test "${11}" = 100 || exit 5
 				t.Fatalf("want redacted gh error containing %q, got %v", tc.reason, err)
 			}
 			if tc.ok {
-				wantTime := time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC).Unix()
-				if provenance.Claim != domain.Provenance || age.Claim != domain.Publication ||
-					age.Publication != domain.VerifiedAttestation || age.PublishedAt != wantTime || string(raw) != verified ||
-					provenance.RawSHA256 != EvidenceDigest(raw) || age.RawSHA256 != provenance.RawSHA256 ||
-					provenance.Subject != a || age.Subject != a || provenance.ProviderVersion != "gh/2.66.0" || age.ProviderVersion != provenance.ProviderVersion {
-					t.Fatalf("want attributed provenance and age for %+v at %d: provenance=%+v age=%+v", a, wantTime, provenance, age)
+				wantProvenance := domain.Evidence{
+					Claim: domain.Provenance, Subject: a, Status: domain.Verified,
+					Provider: domain.Supplement, Source: repository, ProviderVersion: "gh/2.66.0",
+					RawSHA256: EvidenceDigest([]byte(verified)), ObservedAt: now, ExpiresAt: now + 3600,
+				}
+				if provenance != wantProvenance {
+					t.Fatalf("provenance=%+v, want %+v", provenance, wantProvenance)
+				}
+				wantAge := wantProvenance
+				wantAge.Claim = domain.Publication
+				wantAge.Publication = domain.VerifiedAttestation
+				wantAge.PublishedAt = time.Date(2026, 9, 10, 0, 0, 0, 0, time.UTC).Unix()
+				if age != wantAge {
+					t.Fatalf("age=%+v, want %+v", age, wantAge)
+				}
+				if string(raw) != verified {
+					t.Fatalf("raw verification response=%q, want %q", raw, verified)
 				}
 			}
 		})

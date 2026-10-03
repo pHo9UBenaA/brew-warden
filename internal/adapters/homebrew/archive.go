@@ -14,14 +14,14 @@ import (
 // install payloads and relative links only inside their own versioned keg.
 // Verified regular files under .bottle/etc and .bottle/var may be restored by
 // the public installer inside its prefix. Shared-prefix links remain unsupported.
-func validateBottleArchive(data []byte, f formulaMetadata) error {
+func validateBottleArchive(data []byte, candidate formulaMetadata) error {
 	compressed, err := gzip.NewReader(bytes.NewReader(data))
 	if err != nil {
 		return errors.New("invalid bottle archive")
 	}
 	defer compressed.Close()
 	archive := tar.NewReader(compressed)
-	prefix := f.Name + "/" + kegVersion(f.Version, f.Revision)
+	prefix := candidate.Name + "/" + kegVersion(candidate.Version, candidate.Revision)
 	entries := map[string]byte{}
 	var totalPayloadBytes int64
 	for {
@@ -82,7 +82,7 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 		return errors.New("empty bottle payload")
 	}
 	for name := range entries {
-		for parent := path.Dir(name); parent != f.Name && parent != "."; parent = path.Dir(parent) {
+		for parent := path.Dir(name); parent != candidate.Name && parent != "."; parent = path.Dir(parent) {
 			if kind, ok := entries[parent]; ok && kind != tar.TypeDir {
 				return errors.New("bottle path traverses non-directory")
 			}

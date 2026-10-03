@@ -40,7 +40,7 @@ cat > "$root/drift/offline.sb" <<PROFILE
 (allow file-write* (subpath "$root") (subpath "/opt/homebrew") (literal "/dev/null"))
 (deny file-write* (subpath "/opt/homebrew/Library") (subpath "/opt/homebrew/.git") (literal "/opt/homebrew/bin/brew") (subpath "$cache/downloads") (subpath "$cache/api"))
 PROFILE
-run() {
+run_brew() {
   label=$1
   mode=$2
   shift 2
@@ -61,23 +61,23 @@ run() {
   printf '%s\n' "$status" > "$root/drift/$label.status"
   [ "$status" -eq 0 ]
 }
-run restore-bottle offline reinstall --formula --force-bottle homebrew/core/pcre2
+run_brew restore-bottle offline reinstall --formula --force-bottle homebrew/core/pcre2
 if [ -e /opt/homebrew/Cellar/ripgrep ]; then
-  run remove-target offline uninstall --formula homebrew/core/ripgrep
+  run_brew remove-target offline uninstall --formula homebrew/core/ripgrep
 fi
 [ ! -e /opt/homebrew/Cellar/ripgrep ]
 lib=/opt/homebrew/Cellar/pcre2/10.48/lib/libpcre2-8.0.dylib
 /usr/bin/shasum -a 256 "$lib" > "$root/drift/verified-dependency.sha256"
 cp /opt/homebrew/Cellar/pcre2/10.48/INSTALL_RECEIPT.json "$root/drift/verified-receipt.json"
 # This is an ordinary user operation, not a modified Homebrew or injected script.
-run external-rebuild ordinary reinstall --formula --build-from-source --debug-symbols pcre2
+run_brew external-rebuild ordinary reinstall --formula --build-from-source --debug-symbols pcre2
 /usr/bin/shasum -a 256 "$lib" > "$root/drift/rebuilt-dependency.sha256"
 if /usr/bin/cmp -s "$root/drift/verified-dependency.sha256" "$root/drift/rebuilt-dependency.sha256"; then
   echo 'fixture did not produce different dependency bytes' >&2
   exit 1
 fi
 cp /opt/homebrew/Cellar/pcre2/10.48/INSTALL_RECEIPT.json "$root/drift/rebuilt-receipt.json"
-run candidate-install offline install --formula --force-bottle homebrew/core/ripgrep
+run_brew candidate-install offline install --formula --force-bottle homebrew/core/ripgrep
 /usr/bin/shasum -a 256 "$lib" > "$root/drift/consumed-dependency.sha256"
 /usr/bin/cmp "$root/drift/rebuilt-dependency.sha256" "$root/drift/consumed-dependency.sha256"
 [ -x /opt/homebrew/Cellar/ripgrep/15.2.0/bin/rg ]

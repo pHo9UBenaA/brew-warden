@@ -139,27 +139,27 @@ func architecture(root string) error {
 		if layer == "tests" && !strings.HasSuffix(rel, "_test.go") {
 			return fmt.Errorf("integration directory contains non-test source: %s", rel)
 		}
-		f, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, rel), nil, parser.ParseComments)
+		parsed, err := parser.ParseFile(token.NewFileSet(), filepath.Join(root, rel), nil, parser.ParseComments)
 		if err != nil {
 			return err
 		}
-		for _, cg := range f.Comments {
-			for _, c := range cg.List {
-				if strings.HasPrefix(c.Text, "//go:linkname") || strings.HasPrefix(c.Text, "//go:generate") {
+		for _, group := range parsed.Comments {
+			for _, comment := range group.List {
+				if strings.HasPrefix(comment.Text, "//go:linkname") || strings.HasPrefix(comment.Text, "//go:generate") {
 					return fmt.Errorf("prohibited directive in %s", rel)
 				}
 			}
 		}
-		s := source{path: rel, dir: dir, layer: layer, externalTest: strings.HasSuffix(f.Name.Name, "_test")}
-		for _, i := range f.Imports {
-			value, err := strconv.Unquote(i.Path.Value)
+		file := source{path: rel, dir: dir, layer: layer, externalTest: strings.HasSuffix(parsed.Name.Name, "_test")}
+		for _, declaration := range parsed.Imports {
+			importPath, err := strconv.Unquote(declaration.Path.Value)
 			if err != nil {
 				return err
 			}
-			s.imports = append(s.imports, value)
+			file.imports = append(file.imports, importPath)
 		}
-		files = append(files, s)
-		if !s.externalTest {
+		files = append(files, file)
+		if !file.externalTest {
 			dirs[dir] = true
 		}
 		return nil
@@ -168,34 +168,34 @@ func architecture(root string) error {
 		return err
 	}
 	graph := map[string][]string{}
-	for _, s := range files {
-		for _, imp := range s.imports {
-			if imp == "C" || imp == "unsafe" || imp == "plugin" {
-				return fmt.Errorf("prohibited import %s in %s", imp, s.path)
+	for _, file := range files {
+		for _, importPath := range file.imports {
+			if importPath == "C" || importPath == "unsafe" || importPath == "plugin" {
+				return fmt.Errorf("prohibited import %s in %s", importPath, file.path)
 			}
-			if strings.HasPrefix(imp, module+"/") || imp == module {
-				target := strings.TrimPrefix(imp, module+"/")
-				if imp == module {
+			if strings.HasPrefix(importPath, module+"/") || importPath == module {
+				target := strings.TrimPrefix(importPath, module+"/")
+				if importPath == module {
 					target = "."
 				}
 				if !dirs[target] {
-					return fmt.Errorf("unresolved local import %s in %s", imp, s.path)
+					return fmt.Errorf("unresolved local import %s in %s", importPath, file.path)
 				}
-				if !permits(s.layer, layerOf(target)) {
-					return fmt.Errorf("forbidden %s dependency on %s in %s", s.layer, layerOf(target), s.path)
+				if !permits(file.layer, layerOf(target)) {
+					return fmt.Errorf("forbidden %s dependency on %s in %s", file.layer, layerOf(target), file.path)
 				}
-				if !s.externalTest {
-					graph[s.dir] = append(graph[s.dir], target)
+				if !file.externalTest {
+					graph[file.dir] = append(graph[file.dir], target)
 				}
 				continue
 			}
-			p, err := build.Default.Import(imp, "", build.FindOnly)
-			if err != nil || !p.Goroot {
-				return fmt.Errorf("nonstandard or unresolved import %s in %s", imp, s.path)
+			importedPackage, err := build.Default.Import(importPath, "", build.FindOnly)
+			if err != nil || !importedPackage.Goroot {
+				return fmt.Errorf("nonstandard or unresolved import %s in %s", importPath, file.path)
 			}
-			core := s.layer == "domain" || s.layer == "ports" || s.layer == "application"
-			if core && !coreStandard(s.layer, imp) && !(strings.HasSuffix(s.path, "_test.go") && imp == "testing") {
-				return fmt.Errorf("forbidden core builtin %s in %s", imp, s.path)
+			core := file.layer == "domain" || file.layer == "ports" || file.layer == "application"
+			if core && !coreStandard(file.layer, importPath) && !(strings.HasSuffix(file.path, "_test.go") && importPath == "testing") {
+				return fmt.Errorf("forbidden core builtin %s in %s", importPath, file.path)
 			}
 		}
 	}
@@ -205,20 +205,20 @@ func architecture(root string) error {
 	)
 	state := map[string]int{}
 	var visit func(string) error
-	visit = func(n string) error {
-		if state[n] == visiting {
-			return fmt.Errorf("package import cycle at %s", n)
+	visit = func(directory string) error {
+		if state[directory] == visiting {
+			return fmt.Errorf("package import cycle at %s", directory)
 		}
-		if state[n] == visited {
+		if state[directory] == visited {
 			return nil
 		}
-		state[n] = visiting
-		for _, next := range graph[n] {
-			if err := visit(next); err != nil {
+		state[directory] = visiting
+		for _, dependency := range graph[directory] {
+			if err := visit(dependency); err != nil {
 				return err
 			}
 		}
-		state[n] = visited
+		state[directory] = visited
 		return nil
 	}
 	keys := make([]string, 0, len(graph))

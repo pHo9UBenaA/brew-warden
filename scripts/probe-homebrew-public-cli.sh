@@ -52,7 +52,7 @@ cat > "$root/public-cli.sb" <<PROFILE
 (allow file-write* (subpath "$root") (subpath "/opt/homebrew") (literal "/dev/null"))
 (deny file-write* (subpath "/opt/homebrew/Library") (subpath "/opt/homebrew/.git") (literal "/opt/homebrew/bin/brew") (subpath "$root/inputs") (subpath "$root/cache/downloads") (literal "$root/cache/api/internal/packages.arm64_tahoe.jws.json"))
 PROFILE
-run() {
+run_brew() {
   label=$1
   shift
   status=0
@@ -74,18 +74,18 @@ no_installed_payload() {
   entries=$(/usr/bin/find /opt/homebrew/Cellar -mindepth 2 -print) || return 1
   [ -z "$entries" ]
 }
-run version --version
-run candidate-info info --json=v2 --formula homebrew/core/jq homebrew/core/oniguruma
+run_brew version --version
+run_brew candidate-info info --json=v2 --formula homebrew/core/jq homebrew/core/oniguruma
 if [ "$mode" = upgrade ]; then
   /usr/bin/find /opt/homebrew/Cellar/oniguruma -type f -exec /usr/bin/shasum -a 256 '{}' + > "$root/results/dependency-before-upgrade.sha256"
-  run upgrade upgrade --formula --force-bottle homebrew/core/jq
+  run_brew upgrade upgrade --formula --force-bottle homebrew/core/jq
   [ "$(/opt/homebrew/bin/jq --version)" = jq-1.8.2 ]
   /usr/bin/find /opt/homebrew/Cellar/oniguruma -type f -exec /usr/bin/shasum -a 256 '{}' + > "$root/results/dependency-after-upgrade.sha256"
   /usr/bin/cmp "$root/results/dependency-before-upgrade.sha256" "$root/results/dependency-after-upgrade.sha256"
   echo 'Public CLI upgrade preserved dependency files; broader binding remains unverified.'
   exit 0
 fi
-run cache-paths --cache --formula --bottle-tag=arm64_tahoe homebrew/core/jq homebrew/core/oniguruma
+run_brew cache-paths --cache --formula --bottle-tag=arm64_tahoe homebrew/core/jq homebrew/core/oniguruma
 jq_cache=$(sed -n '1p' "$root/results/cache-paths.stdout")
 dep_cache=$(sed -n '2p' "$root/results/cache-paths.stdout")
 for file in "$jq_cache" "$dep_cache"; do
@@ -97,25 +97,25 @@ for file in "$jq_cache" "$dep_cache"; do
 done
 cp "$jq_cache" "$root/jq-original.tar.gz"
 printf 'corrupt bottle\n' > "$jq_cache"
-if run corrupt-bottle install --formula --force-bottle homebrew/core/jq; then
+if run_brew corrupt-bottle install --formula --force-bottle homebrew/core/jq; then
   echo 'corrupt bottle accepted' >&2
   exit 1
 fi
 no_installed_payload corrupt-bottle
 cp "$root/jq-original.tar.gz" "$jq_cache"
 mv "$dep_cache" "$root/dependency-original.tar.gz"
-if run missing-dependency install --formula --force-bottle homebrew/core/jq; then
+if run_brew missing-dependency install --formula --force-bottle homebrew/core/jq; then
   echo 'missing dependency accepted' >&2
   exit 1
 fi
 no_installed_payload missing-dependency
 mv "$root/dependency-original.tar.gz" "$dep_cache"
-run install install --formula --force-bottle homebrew/core/jq
-run installed list --formula --versions
+run_brew install install --formula --force-bottle homebrew/core/jq
+run_brew installed list --formula --versions
 /opt/homebrew/bin/jq --version > "$root/results/jq-version.txt"
 [ -d /opt/homebrew/Cellar/jq/1.8.2 ] && [ -d /opt/homebrew/Cellar/oniguruma/6.9.10 ]
 /usr/bin/find /opt/homebrew/Cellar -type f -exec /usr/bin/shasum -a 256 '{}' + > "$root/results/before-rerun.sha256"
-run unchanged install --formula --force-bottle homebrew/core/jq
+run_brew unchanged install --formula --force-bottle homebrew/core/jq
 /usr/bin/find /opt/homebrew/Cellar -type f -exec /usr/bin/shasum -a 256 '{}' + > "$root/results/after-rerun.sha256"
 /usr/bin/cmp "$root/results/before-rerun.sha256" "$root/results/after-rerun.sha256"
 echo 'Public CLI fresh install and unchanged rerun passed; broader binding remains unverified.'

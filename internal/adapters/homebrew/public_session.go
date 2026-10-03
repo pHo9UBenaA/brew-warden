@@ -314,11 +314,14 @@ func (w workspace) checkPublicRuntime(ctx context.Context, revision string) erro
 	if reviewedBrewRevisions[revision] == "" {
 		return errors.New("unrecognized Homebrew execution source")
 	}
-	if actual, err := reviewedBrewSource(ctx, "/opt/homebrew"); errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
+	actual, err := reviewedBrewSource(ctx, "/opt/homebrew")
+	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return err
-	} else if err == nil && actual != revision {
+	}
+	if err == nil && actual != revision {
 		return errors.New("installed Homebrew release changed before execution")
-	} else if err != nil && revision != brewRevision {
+	}
+	if err != nil && revision != brewRevision {
 		return errors.New("installed Homebrew release is no longer reviewed")
 	}
 	source := filepath.Join(w.root, "runtime/brew")

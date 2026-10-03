@@ -164,21 +164,31 @@ func TestPolicyDurationRange(t *testing.T) {
 	}
 }
 
-func TestAgeBoundaryAndWaiverAccounting(t *testing.T) {
-	a := eligibleAssessment()
-	publication := evidenceFor(&a.Nodes[0], domain.Publication)
-	publication.PublishedAt = a.Now - a.Policy.MinimumAgeSeconds()
-	if got := domain.Evaluate(a); got.Outcome != domain.Allow {
+func TestAgeAllowsExactMinimum(t *testing.T) {
+	assessment := eligibleAssessment()
+	evidenceFor(&assessment.Nodes[0], domain.Publication).PublishedAt = assessment.Now - assessment.Policy.MinimumAgeSeconds()
+	if got := domain.Evaluate(assessment); got.Outcome != domain.Allow {
 		t.Fatalf("exact minimum age must allow: got %+v", got)
 	}
-	publication.PublishedAt++
-	if got := domain.Evaluate(a); got.Outcome != domain.Hold {
+}
+
+func TestAgeHoldsOneSecondBelowMinimum(t *testing.T) {
+	assessment := eligibleAssessment()
+	evidenceFor(&assessment.Nodes[0], domain.Publication).PublishedAt = assessment.Now - assessment.Policy.MinimumAgeSeconds() + 1
+	if got := domain.Evaluate(assessment); got.Outcome != domain.Hold {
 		t.Fatalf("one second young must hold: got %+v", got)
 	}
-	waiveYoung(&a)
-	if got := domain.Evaluate(a); got.Outcome != domain.Allow || len(got.Waived) != 2 {
+}
+
+func TestAgeExceptionReportsAllWaivedArtifacts(t *testing.T) {
+	assessment := eligibleAssessment()
+	waiveYoung(&assessment)
+	if got := domain.Evaluate(assessment); got.Outcome != domain.Allow || len(got.Waived) != 2 {
 		t.Fatalf("missing waiver accounting: %+v", got)
 	}
+}
+
+func TestZeroAssessmentHolds(t *testing.T) {
 	if got := domain.Evaluate(domain.Assessment{}); got.Outcome != domain.Hold {
 		t.Fatalf("zero assessment must hold: got %+v", got)
 	}

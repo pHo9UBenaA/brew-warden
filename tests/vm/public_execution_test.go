@@ -90,108 +90,11 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			}
 			// There is no saved-plan replay. An active descendant can outlive
 			// the cancelled parent. Wait for exclusion to end, then re-collect.
-			engine := homebrew.Engine{Collector: &collector}
-			deadline := time.Now().Add(2 * time.Minute)
-			for {
-				newPlan, next, err := engine.Prepare(ctx, ports.Request{Operation: operation, Targets: names}, domain.DefaultPolicy(), nil, time.Now().Unix())
-				if err == nil {
-					defer next.Close()
-					if newPlan.Assessment.Binding.Attempt == prepared.Assessment.Binding.Attempt {
-						t.Fatal("interrupted plan was replayed")
-					}
-					break
-				}
-				if time.Now().After(deadline) || (!strings.Contains(err.Error(), "owned Homebrew process") && !strings.Contains(err.Error(), "another BrewWarden execution")) {
-					t.Fatal("fresh collection after interruption failed", err)
-				}
-				time.Sleep(200 * time.Millisecond)
-			}
+			assertFreshPublicPlanAfterInterruption(t, ctx, &collector, ports.Request{Operation: operation, Targets: names}, prepared.Assessment.Binding.Attempt)
 			return
 		}
 		if fault != "" {
-			before, err := kegSnapshot("/opt/homebrew/Cellar")
-			if err != nil {
-				t.Fatal(err)
-			}
-			switch fault {
-			case "changed-metadata":
-				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "metadata.json"))
-				if err != nil || len(files) != 1 {
-					t.Fatalf("want one authenticated metadata fixture, got %q: error=%v", files, err)
-				}
-				file, err := os.OpenFile(files[0], os.O_WRONLY|os.O_APPEND, 0)
-				if err != nil {
-					t.Fatal(err)
-				}
-				_, writeErr := file.WriteString("changed after verification")
-				if err := file.Close(); writeErr != nil || err != nil {
-					t.Fatal("cannot change metadata fixture", writeErr, err)
-				}
-			case "installed-state":
-				link := "/opt/homebrew/opt/" + names[0]
-				original, err := os.Readlink(link)
-				if err != nil {
-					t.Fatal("requires an installed linked target", err)
-				}
-				if err := os.Remove(link); err != nil {
-					t.Fatal(err)
-				}
-				defer func() {
-					if err := os.Remove(link); err != nil && !os.IsNotExist(err) {
-						t.Error("cannot clear changed installed link", err)
-					}
-					if err := os.Symlink(original, link); err != nil {
-						t.Error("cannot restore installed link", err)
-					}
-				}()
-				if err := os.Symlink("../Cellar/"+names[0]+"/unplanned", link); err != nil {
-					t.Fatal("cannot change installed link", err)
-				}
-			case "changed-input":
-				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "*.tar.gz"))
-				if err != nil || len(files) == 0 {
-					t.Fatalf("want at least one bottle fixture, got %q: error=%v", files, err)
-				}
-				if err := os.WriteFile(files[0], []byte("changed after verification"), 0600); err != nil {
-					t.Fatal(err)
-				}
-			case "missing-cache":
-				files, err := filepath.Glob(filepath.Join(directory, "collection-*", "fetch.json"))
-				if err != nil || len(files) != 1 {
-					t.Fatalf("want one fetch fixture, got %q: error=%v", files, err)
-				}
-				raw, err := os.ReadFile(files[0])
-				if err != nil {
-					t.Fatal(err)
-				}
-				var fetch struct{ Downloads []struct{ Path string } }
-				if err := json.Unmarshal(raw, &fetch); err != nil || len(fetch.Downloads) == 0 {
-					t.Fatalf("want fetch fixture with downloads, got %+v: error=%v", fetch, err)
-				}
-				path := fetch.Downloads[0].Path
-				if !strings.HasPrefix(path, filepath.Dir(files[0])+"/cache/downloads/") {
-					t.Fatalf("want cached fixture under %s/cache/downloads/, got %q", filepath.Dir(files[0]), path)
-				}
-				if err := os.Remove(path); err != nil {
-					t.Fatal(err)
-				}
-			case "cancel":
-				cancelled, stop := context.WithCancel(ctx)
-				stop()
-				runContext = cancelled
-			default:
-				t.Fatalf("unsupported public execution fault: %q", fault)
-			}
-			if _, err := session.Run(runContext, prepared.Assessment.Binding); err == nil {
-				t.Fatal("fault did not stop execution")
-			}
-			if _, err := session.Run(ctx, prepared.Assessment.Binding); err == nil {
-				t.Fatal("failed attempt was reusable")
-			}
-			after, err := kegSnapshot("/opt/homebrew/Cellar")
-			if err != nil || after != before {
-				t.Fatalf("failed preflight changed installed payload: before=%s after=%s error=%v", before, after, err)
-			}
+			assertPublicFaultPreventsMutation(t, ctx, directory, names[0], fault, prepared, session)
 			return
 		}
 		result, err := session.Run(ctx, prepared.Assessment.Binding)
@@ -210,6 +113,119 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		if err := session.Close(); err != nil {
 			t.Fatal(err)
 		}
+	}
+}
+
+// Inject one pre-execution fault, then check refusal, one-use consumption and
+// unchanged payloads. The installed-state fixture is restored before returning.
+func assertPublicFaultPreventsMutation(t *testing.T, ctx context.Context, directory, target, fault string, prepared ports.Prepared, session ports.ExecutionSession) {
+	t.Helper()
+	before, err := kegSnapshot("/opt/homebrew/Cellar")
+	if err != nil {
+		t.Fatal(err)
+	}
+	runContext := ctx
+	switch fault {
+	case "changed-metadata":
+		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "metadata.json"))
+		if err != nil || len(files) != 1 {
+			t.Fatalf("want one authenticated metadata fixture, got %q: error=%v", files, err)
+		}
+		file, err := os.OpenFile(files[0], os.O_WRONLY|os.O_APPEND, 0)
+		if err != nil {
+			t.Fatal(err)
+		}
+		_, writeErr := file.WriteString("changed after verification")
+		if err := file.Close(); writeErr != nil || err != nil {
+			t.Fatal("cannot change metadata fixture", writeErr, err)
+		}
+	case "installed-state":
+		link := "/opt/homebrew/opt/" + target
+		original, err := os.Readlink(link)
+		if err != nil {
+			t.Fatal("requires an installed linked target", err)
+		}
+		if err := os.Remove(link); err != nil {
+			t.Fatal(err)
+		}
+		defer func() {
+			if err := os.Remove(link); err != nil && !os.IsNotExist(err) {
+				t.Error("cannot clear changed installed link", err)
+			}
+			if err := os.Symlink(original, link); err != nil {
+				t.Error("cannot restore installed link", err)
+			}
+		}()
+		if err := os.Symlink("../Cellar/"+target+"/unplanned", link); err != nil {
+			t.Fatal("cannot change installed link", err)
+		}
+	case "changed-input":
+		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "*.tar.gz"))
+		if err != nil || len(files) == 0 {
+			t.Fatalf("want at least one bottle fixture, got %q: error=%v", files, err)
+		}
+		if err := os.WriteFile(files[0], []byte("changed after verification"), 0600); err != nil {
+			t.Fatal(err)
+		}
+	case "missing-cache":
+		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "fetch.json"))
+		if err != nil || len(files) != 1 {
+			t.Fatalf("want one fetch fixture, got %q: error=%v", files, err)
+		}
+		raw, err := os.ReadFile(files[0])
+		if err != nil {
+			t.Fatal(err)
+		}
+		var fetch struct{ Downloads []struct{ Path string } }
+		if err := json.Unmarshal(raw, &fetch); err != nil || len(fetch.Downloads) == 0 {
+			t.Fatalf("want fetch fixture with downloads, got %+v: error=%v", fetch, err)
+		}
+		path := fetch.Downloads[0].Path
+		if !strings.HasPrefix(path, filepath.Dir(files[0])+"/cache/downloads/") {
+			t.Fatalf("want cached fixture under %s/cache/downloads/, got %q", filepath.Dir(files[0]), path)
+		}
+		if err := os.Remove(path); err != nil {
+			t.Fatal(err)
+		}
+	case "cancel":
+		cancelled, stop := context.WithCancel(ctx)
+		stop()
+		runContext = cancelled
+	default:
+		t.Fatalf("unsupported public execution fault: %q", fault)
+	}
+	if _, err := session.Run(runContext, prepared.Assessment.Binding); err == nil {
+		t.Fatal("fault did not stop execution")
+	}
+	if _, err := session.Run(ctx, prepared.Assessment.Binding); err == nil {
+		t.Fatal("failed attempt was reusable")
+	}
+	after, err := kegSnapshot("/opt/homebrew/Cellar")
+	if err != nil || after != before {
+		t.Fatalf("failed preflight changed installed payload: before=%s after=%s error=%v", before, after, err)
+	}
+}
+
+// Retry only while the previous owned process prevents a new collection. The
+// first successful preparation must have a new attempt, never the saved plan.
+func assertFreshPublicPlanAfterInterruption(t *testing.T, ctx context.Context, collector *homebrew.Collector, request ports.Request, interruptedAttempt domain.Digest) {
+	t.Helper()
+	engine := homebrew.Engine{Collector: collector}
+	deadline := time.Now().Add(2 * time.Minute)
+	for {
+		prepared, session, err := engine.Prepare(ctx, request, domain.DefaultPolicy(), nil, time.Now().Unix())
+		if err == nil {
+			defer session.Close()
+			if prepared.Assessment.Binding.Attempt == interruptedAttempt {
+				t.Fatal("interrupted plan was replayed")
+			}
+			return
+		}
+		processActive := strings.Contains(err.Error(), "owned Homebrew process") || strings.Contains(err.Error(), "another BrewWarden execution")
+		if time.Now().After(deadline) || !processActive {
+			t.Fatal("fresh collection after interruption failed", err)
+		}
+		time.Sleep(200 * time.Millisecond)
 	}
 }
 

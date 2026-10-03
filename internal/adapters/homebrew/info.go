@@ -52,25 +52,26 @@ func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
 	}
 	selected := map[string]bool{}
 	result := make([]formulaMetadata, 0, len(names))
-	for _, f := range doc.Formulae {
-		if !slices.Contains(names, f.Name) || selected[f.Name] || f.FullName != f.Name || f.Tap != "homebrew/core" {
+	for _, formula := range doc.Formulae {
+		if !slices.Contains(names, formula.Name) || selected[formula.Name] || formula.FullName != formula.Name || formula.Tap != "homebrew/core" {
 			return nil, errors.New("homebrew info identity mismatch")
 		}
-		selected[f.Name] = true
-		m := formulaMetadata{
-			Name: f.Name, Version: f.Versions.Stable, Revision: f.Revision,
-			Rebuild: f.Bottle.Stable.Rebuild, Dependencies: f.Dependencies,
+		selected[formula.Name] = true
+		candidate := formulaMetadata{
+			Name: formula.Name, Version: formula.Versions.Stable, Revision: formula.Revision,
+			Rebuild: formula.Bottle.Stable.Rebuild, Dependencies: formula.Dependencies,
 		}
-		b := f.Bottle.Stable.Files.Tahoe
-		m.BottleTag = "arm64_tahoe"
-		if b == nil {
-			b = f.Bottle.Stable.Files.All
-			m.BottleTag = "all"
+
+		bottle := formula.Bottle.Stable.Files.Tahoe
+		candidate.BottleTag = "arm64_tahoe"
+		if bottle == nil {
+			bottle = formula.Bottle.Stable.Files.All
+			candidate.BottleTag = "all"
 		}
-		if b != nil {
-			m.BottleURL, m.BottleSHA256, m.Cellar = b.URL, b.SHA256, b.Cellar
+		if bottle != nil {
+			candidate.BottleURL, candidate.BottleSHA256, candidate.Cellar = bottle.URL, bottle.SHA256, bottle.Cellar
 		}
-		result = append(result, m)
+		result = append(result, candidate)
 	}
 	return result, nil
 }

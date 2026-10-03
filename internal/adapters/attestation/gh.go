@@ -74,7 +74,8 @@ func supportedGHVersion(raw []byte) (string, error) {
 			return "", errUnsupportedGHVersion
 		}
 	}
-	if values[0] != 2 || values[1] < 66 || values[1] > 101 || values[1] == 101 && values[2] != 0 {
+	major, minor, patch := values[0], values[1], values[2]
+	if major != 2 || minor < 66 || minor > 101 || (minor == 101 && patch != 0) {
 		return "", errUnsupportedGHVersion
 	}
 	return fields[2], nil

@@ -1,5 +1,5 @@
 #!/bin/sh
-# Test committed source without exposing host paths, credentials or Docker socket.
+# Test a revision or the current worktree without exposing host paths, credentials or Docker socket.
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 test "$#" -le 1

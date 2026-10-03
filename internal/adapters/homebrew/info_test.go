@@ -1,6 +1,7 @@
 package homebrew
 
 import (
+	"slices"
 	"strings"
 	"testing"
 )
@@ -33,19 +34,39 @@ const infoFixture = `{"formulae":[{
 	"desc":null
 }],"casks":[]}`
 
-func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
-	f, err := parseInfo([]byte(infoFixture), []string{"jq"})
-	if err != nil || len(f) != 1 || len(f[0].Dependencies) != 1 || f[0].Dependencies[0] != "oniguruma" || f[0].Rebuild != 1 || !f[0].BottleSHA256.Valid() {
-		t.Fatalf("want one rebuilt jq bottle with oniguruma dependency and valid digest: candidates=%+v error=%v", f, err)
+func TestInfoSelectsRebuiltBottleAndDependencies(t *testing.T) {
+	candidates, err := parseInfo([]byte(infoFixture), []string{"jq"})
+	if err != nil || len(candidates) != 1 {
+		t.Fatalf("want one jq candidate: candidates=%+v error=%v", candidates, err)
+	}
+	candidate := candidates[0]
+	if !slices.Equal(candidate.Dependencies, []string{"oniguruma"}) {
+		t.Fatalf("dependencies=%v, want [oniguruma]", candidate.Dependencies)
+	}
+	if candidate.Rebuild != 1 || !candidate.BottleSHA256.Valid() {
+		t.Fatalf("want rebuild 1 with a valid bottle digest: candidate=%+v", candidate)
+	}
+}
+
+func TestInfoBottleSelectionIgnoresSourceLayout(t *testing.T) {
+	baseline, err := parseInfo([]byte(infoFixture), []string{"jq"})
+	if err != nil || len(baseline) != 1 {
+		t.Fatalf("cannot parse baseline: candidates=%+v error=%v", baseline, err)
 	}
 	// Source hosts and recipe paths are not bottle eligibility inputs. A
 	// different project layout must follow the same selected bottle path.
 	unrelatedSource := strings.Replace(infoFixture, "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", "https://downloads.example.org/archive", 1)
 	unrelatedSource = strings.Replace(unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`, 1)
 	other, err := parseInfo([]byte(unrelatedSource), []string{"jq"})
-	if err != nil || len(other) != 1 || other[0].artifact() != f[0].artifact() || len(other[0].Dependencies) != 1 || other[0].Dependencies[0] != f[0].Dependencies[0] {
-		t.Fatalf("source-specific metadata changed bottle selection: got=%+v want=%+v error=%v", other, f, err)
+	if err != nil || len(other) != 1 {
+		t.Fatalf("cannot parse changed source layout: candidates=%+v error=%v", other, err)
 	}
+	if other[0].artifact() != baseline[0].artifact() || !slices.Equal(other[0].Dependencies, baseline[0].Dependencies) {
+		t.Fatalf("source-specific metadata changed bottle selection: got=%+v want=%+v", other, baseline)
+	}
+}
+
+func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	for name, raw := range map[string]string{
 		"missing revision":     strings.Replace(infoFixture, `"revision":0,`, "", 1),
 		"missing dependencies": strings.Replace(infoFixture, `"dependencies":["oniguruma"],`, "", 1),

@@ -7,6 +7,7 @@ import (
 	"os/exec"
 	"path/filepath"
 	"runtime"
+	"slices"
 	"strings"
 	"time"
 
@@ -74,17 +75,15 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	}
 	waivers := []domain.AgeWaiver{}
 	for _, override := range overrides {
-		found := false
-		for _, node := range collection.nodes {
-			if node.Artifact.Name == override.Name {
-				waivers = append(waivers, domain.AgeWaiver{Artifact: node.Artifact, Reason: override.Reason})
-				found = true
-			}
-		}
-		if !found {
+		candidateIndex := slices.IndexFunc(collection.nodes, func(node domain.Node) bool {
+			return node.Artifact.Name == override.Name
+		})
+		if candidateIndex == -1 {
 			_ = removeCollection(e.Collector.Directory, filepath.Base(collection.root))
 			return ports.Prepared{}, nil, errors.New("age exception is outside the complete candidate plan")
 		}
+		artifact := collection.nodes[candidateIndex].Artifact
+		waivers = append(waivers, domain.AgeWaiver{Artifact: artifact, Reason: override.Reason})
 	}
 	return collection.Prepare(ctx, policy, waivers, now, e.Streams)
 }
