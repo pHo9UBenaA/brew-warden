@@ -33,14 +33,14 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 	}
 	selected := ""
 	for _, manifest := range index.Manifests {
-		a := manifest.Annotations
-		if a.Digest != string(candidate.BottleSHA256) || a.Ref != ref {
+		annotations := manifest.Annotations
+		if annotations.Digest != string(candidate.BottleSHA256) || annotations.Ref != ref {
 			continue
 		}
-		if selected != "" || a.Tab == "" {
+		if selected != "" || annotations.Tab == "" {
 			return errors.New("ambiguous bottle OCI selection")
 		}
-		selected = a.Tab
+		selected = annotations.Tab
 	}
 	if selected == "" {
 		return errors.New("OCI index does not identify selected bottle")
@@ -49,12 +49,16 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 		Dependencies []installedDependency `json:"runtime_dependencies" required:"true"`
 		Arch         string                `json:"arch"`
 	}
-	if err := decodeSchema([]byte(selected), &tab, true); err != nil || (candidate.BottleTag != "all" && tab.Arch != "arm64") || len(tab.Dependencies) > 128 {
+	if err := decodeSchema([]byte(selected), &tab, true); err != nil {
+		return errors.New("invalid bottle dependency metadata")
+	}
+	supportedArchitecture := candidate.BottleTag == "all" || tab.Arch == "arm64"
+	if !supportedArchitecture || len(tab.Dependencies) > 128 {
 		return errors.New("invalid bottle dependency metadata")
 	}
 	known := map[string]formulaMetadata{}
-	for _, c := range candidates {
-		known[c.Name] = c
+	for _, formula := range candidates {
+		known[formula.Name] = formula
 	}
 	wanted := map[string]bool{}
 	queue := append([]string{}, candidate.Dependencies...)

@@ -11,8 +11,11 @@ import (
 func TestPublicVulnsOutput(t *testing.T) {
 	candidates := metadataFixture().Formulae
 	clean := `{"findings":[],"skipped_formulae":[]}`
-	affected := `{"findings":[{"formula":"jq","version":"1.8.2","vulnerabilities":[{"id":"CVE-2024-23337","aliases":["GHSA-2q6r-344g-cx46"],"summary":null}],"patched":[]}],"skipped_formulae":[]}`
-	patched := strings.Replace(strings.Replace(affected, `"vulnerabilities":[`, `"patched":[`, 1), `"patched":[]`, `"vulnerabilities":[]`, 1)
+	affected := `{"findings":[{"formula":"jq","version":"1.8.2",` +
+		`"vulnerabilities":[{"id":"CVE-2024-23337","aliases":["GHSA-2q6r-344g-cx46"],"summary":null}],` +
+		`"patched":[]}],"skipped_formulae":[]}`
+	patched := replaceFixtureText(t, affected, `"vulnerabilities":[`, `"patched":[`)
+	patched = replaceFixtureText(t, patched, `"patched":[]`, `"vulnerabilities":[]`)
 	for _, tc := range []struct {
 		name     string
 		raw      string
@@ -38,13 +41,13 @@ func TestPublicVulnsOutput(t *testing.T) {
 		"skipped exit zero":     {`{"findings":[],"skipped_formulae":["oniguruma"]}`, 0},
 		"missing skipped":       {`{"findings":[]}`, 0},
 		"null findings":         {`{"findings":null,"skipped_formulae":[]}`, 0},
-		"old installed version": {strings.Replace(affected, `1.8.2`, `1.6`, 1), 1},
-		"unrequested formula":   {strings.Replace(affected, `"jq"`, `"curl"`, 1), 1},
-		"missing patched":       {strings.Replace(affected, `,"patched":[]`, "", 1), 1},
-		"duplicate field":       {strings.Replace(clean, `"findings":[]`, `"findings":[],"findings":[]`, 1), 0},
-		"mis-cased field":       {strings.Replace(clean, `findings`, `Findings`, 1), 0},
+		"old installed version": {replaceFixtureText(t, affected, `1.8.2`, `1.6`), 1},
+		"unrequested formula":   {replaceFixtureText(t, affected, `"jq"`, `"curl"`), 1},
+		"missing patched":       {replaceFixtureText(t, affected, `,"patched":[]`, ""), 1},
+		"duplicate field":       {replaceFixtureText(t, clean, `"findings":[]`, `"findings":[],"findings":[]`), 0},
+		"mis-cased field":       {replaceFixtureText(t, clean, `findings`, `Findings`), 0},
 		"truncated":             {affected[:len(affected)-1], 1},
-		"unsafe id":             {strings.Replace(affected, `CVE-2024-23337`, `bad\u001b`, 1), 1},
+		"unsafe id":             {replaceFixtureText(t, affected, `CVE-2024-23337`, `bad\u001b`), 1},
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := parsePublicVulns([]byte(tc.raw), tc.exitCode, candidates); err == nil {

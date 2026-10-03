@@ -97,7 +97,7 @@ func TestInstalledRuntimeIsCopiedAndBoundToExactVersion(t *testing.T) {
 	r, prefix, destination := runtimeFixture(t)
 	actual, err := r.materializeFrom(context.Background(), destination, prefix)
 	if err != nil || actual != r.ExpectedSHA256 {
-		t.Fatal("runtime fingerprint mismatch", actual, err)
+		t.Fatalf("runtime fingerprint: want %s, got %s: error=%v", r.ExpectedSHA256, actual, err)
 	}
 	copied, err := os.ReadFile(filepath.Join(destination, "brew/Library/Homebrew/fixture.rb"))
 	if err != nil || string(copied) != "ruby fixture\n" {

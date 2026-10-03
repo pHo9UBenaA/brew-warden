@@ -35,7 +35,7 @@ func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
 	planner := &servicePlanner{prepared: p, session: session}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}, Present: func(ports.Prepared) error { return io.ErrClosedPipe }}
 	if _, err := s.Run(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, domain.DefaultPolicy(), nil); err == nil || session.ran || !session.closed {
-		t.Fatal(err, session)
+		t.Fatalf("failed presentation must refuse launch and release session: ran=%t closed=%t error=%v", session.ran, session.closed, err)
 	}
 }
 

@@ -126,7 +126,7 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 		}
 	}
 	if len(seen) != 4 {
-		t.Fatal(seen)
+		t.Fatalf("want four packaged entries including SHA256SUMS: entries=%v", seen)
 	}
 	if err := archive(first, files); err == nil {
 		t.Fatal("overwrote an existing distribution")

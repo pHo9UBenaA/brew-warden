@@ -2,7 +2,6 @@ package homebrew
 
 import (
 	"slices"
-	"strings"
 	"testing"
 )
 
@@ -55,8 +54,8 @@ func TestInfoBottleSelectionIgnoresSourceLayout(t *testing.T) {
 	}
 	// Source hosts and recipe paths are not bottle eligibility inputs. A
 	// different project layout must follow the same selected bottle path.
-	unrelatedSource := strings.Replace(infoFixture, "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", "https://downloads.example.org/archive", 1)
-	unrelatedSource = strings.Replace(unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`, 1)
+	unrelatedSource := replaceFixtureText(t, infoFixture, "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", "https://downloads.example.org/archive")
+	unrelatedSource = replaceFixtureText(t, unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`)
 	other, err := parseInfo([]byte(unrelatedSource), []string{"jq"})
 	if err != nil || len(other) != 1 {
 		t.Fatalf("cannot parse changed source layout: candidates=%+v error=%v", other, err)
@@ -68,15 +67,15 @@ func TestInfoBottleSelectionIgnoresSourceLayout(t *testing.T) {
 
 func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	for name, raw := range map[string]string{
-		"missing revision":     strings.Replace(infoFixture, `"revision":0,`, "", 1),
-		"missing dependencies": strings.Replace(infoFixture, `"dependencies":["oniguruma"],`, "", 1),
-		"null dependencies":    strings.Replace(infoFixture, `"dependencies":["oniguruma"]`, `"dependencies":null`, 1),
-		"duplicate name":       strings.Replace(infoFixture, `"name":"jq"`, `"name":"evil","name":"jq"`, 1),
-		"ambiguous case":       strings.Replace(infoFixture, `"revision":0`, `"Revision":0`, 1),
-		"nested case":          strings.Replace(infoFixture, `"sha256":"ca67c64`, `"SHA256":"ca67c64`, 1),
-		"wrong tap":            strings.Replace(infoFixture, `"tap":"homebrew/core"`, `"tap":"other/core"`, 1),
-		"wrong identity":       strings.Replace(infoFixture, `"full_name":"jq"`, `"full_name":"other/jq"`, 1),
-		"cask result":          strings.Replace(infoFixture, `"casks":[]`, `"casks":["jq"]`, 1),
+		"missing revision":     replaceFixtureText(t, infoFixture, `"revision":0,`, ""),
+		"missing dependencies": replaceFixtureText(t, infoFixture, `"dependencies":["oniguruma"],`, ""),
+		"null dependencies":    replaceFixtureText(t, infoFixture, `"dependencies":["oniguruma"]`, `"dependencies":null`),
+		"duplicate name":       replaceFixtureText(t, infoFixture, `"name":"jq"`, `"name":"evil","name":"jq"`),
+		"ambiguous case":       replaceFixtureText(t, infoFixture, `"revision":0`, `"Revision":0`),
+		"nested case":          replaceFixtureText(t, infoFixture, `"sha256":"ca67c64`, `"SHA256":"ca67c64`),
+		"wrong tap":            replaceFixtureText(t, infoFixture, `"tap":"homebrew/core"`, `"tap":"other/core"`),
+		"wrong identity":       replaceFixtureText(t, infoFixture, `"full_name":"jq"`, `"full_name":"other/jq"`),
+		"cask result":          replaceFixtureText(t, infoFixture, `"casks":[]`, `"casks":["jq"]`),
 		"trailing JSON":        infoFixture + `{}`,
 	} {
 		t.Run(name, func(t *testing.T) {

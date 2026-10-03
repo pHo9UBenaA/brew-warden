@@ -48,12 +48,12 @@ func TestLiveNativeMetadata(t *testing.T) {
 		log, readErr := os.ReadFile(filepath.Join(root, "info-0.stderr"))
 		t.Fatalf("metadata: %v; diagnostic read: %v: %s", err, readErr, log)
 	}
-	recipes, candidates, err := parseMetadata(result, []string{"jq"})
+	candidates, err := parseMetadata(result, []string{"jq"})
 	if err != nil {
 		t.Fatal(err)
 	}
-	if len(recipes) != 2 || len(candidates) != 2 || candidates[0].Name != "jq" || candidates[1].Name != "oniguruma" {
-		t.Fatal("unexpected closure", recipes, candidates)
+	if len(candidates) != 2 || candidates[0].Name != "jq" || candidates[1].Name != "oniguruma" {
+		t.Fatalf("want complete jq/oniguruma closure in name order: candidates=%+v", candidates)
 	}
 	t.Log("authenticated complete metadata closure", digestBytes(result))
 

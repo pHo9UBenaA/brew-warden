@@ -200,11 +200,11 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 			if len(manifest.Files) >= 10000 {
 				return errors.New("installed Homebrew runtime inventory exceeds limit")
 			}
-			dst := filepath.Join(brew, relative)
+			destinationFile := filepath.Join(brew, relative)
 			if item.IsDir() {
-				return os.MkdirAll(dst, 0700)
+				return os.MkdirAll(destinationFile, 0700)
 			}
-			if err := os.MkdirAll(filepath.Dir(dst), 0700); err != nil {
+			if err := os.MkdirAll(filepath.Dir(destinationFile), 0700); err != nil {
 				return err
 			}
 			info, err := item.Info()
@@ -217,7 +217,7 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 				if err != nil || path.IsAbs(entry.Link) || !safeRelative(path.Clean(path.Join(path.Dir(entry.Path), entry.Link))) {
 					return errors.New("unsafe Homebrew runtime link")
 				}
-				if err := os.Symlink(entry.Link, dst); err != nil {
+				if err := os.Symlink(entry.Link, destinationFile); err != nil {
 					return err
 				}
 			} else {
@@ -239,7 +239,7 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 					return err
 				}
 				entry.SHA256 = digestBytes(data)
-				if err := writeNew(dst, data, os.FileMode(entry.Mode)); err != nil {
+				if err := writeNew(destinationFile, data, os.FileMode(entry.Mode)); err != nil {
 					return err
 				}
 			}

@@ -27,7 +27,9 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	if e.Collector.LegacyState != "" {
 		_, err := os.Lstat(e.Collector.LegacyState)
 		if err == nil || !errors.Is(err, os.ErrNotExist) {
-			return ports.Prepared{}, nil, errors.New("legacy attempt journal requires the matching older build for recovery before this version can run; archive it only after confirming no owned process remains")
+			return ports.Prepared{}, nil, errors.New(
+				"legacy attempt journal requires the matching older build for recovery before this version can run; " +
+					"archive it only after confirming no owned process remains")
 		}
 	}
 	seen := map[string]bool{}

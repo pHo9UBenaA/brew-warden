@@ -5,10 +5,10 @@ package vm
 import (
 	"context"
 	"encoding/json"
+	"maps"
 	"os"
 	"os/exec"
 	"path/filepath"
-	"reflect"
 	"testing"
 	"time"
 )
@@ -66,7 +66,7 @@ func TestLiveDistributionPromotesExplicitInstallOwnership(t *testing.T) {
 	}
 	run("jq")
 	if after, err := kegSnapshot(rack); err != nil || before != after {
-		t.Fatalf("non-root dependency changed: %v", err)
+		t.Fatalf("non-root dependency changed: before=%s after=%s error=%v", before, after, err)
 	}
 	if requested, _ := observe(); requested {
 		t.Fatal("non-root dependency was promoted")
@@ -100,7 +100,7 @@ func TestLiveDistributionPromotesExplicitInstallOwnership(t *testing.T) {
 	if !requested || afterTime != installedAt {
 		t.Fatalf("want promotion without reinstall: requested=%t installed_at=%d -> %d", requested, installedAt, afterTime)
 	}
-	if after := payload(); !reflect.DeepEqual(originalPayload, after) {
+	if after := payload(); !maps.Equal(originalPayload, after) {
 		t.Fatal("ownership promotion changed payload", originalPayload, after)
 	}
 }

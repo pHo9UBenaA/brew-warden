@@ -72,7 +72,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		}
 		prepared.Assessment.Now = time.Now().Unix()
 		if decision := domain.Evaluate(prepared.Assessment); decision.Outcome != domain.Allow {
-			t.Fatal(decision)
+			t.Fatalf("verified public plan must be eligible before execution: decision=%+v", decision)
 		}
 		if _, err := session.Revalidate(ctx); err != nil {
 			t.Fatal(err)
@@ -99,7 +99,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		}
 		result, err := session.Run(ctx, prepared.Assessment.Binding)
 		if err != nil || !result.ExitKnown || result.ExitCode != 0 || !result.MatchesPlan || !result.AfterState.Valid() {
-			t.Fatal(result, err)
+			t.Fatalf("want successful public execution with matching observed state: result=%+v error=%v", result, err)
 		}
 		if after := publicUnrelatedKegs(t, prepared.Assessment.Nodes); !maps.Equal(unrelatedBefore, after) {
 			t.Fatalf("execution changed unrelated packages: before=%v after=%v", unrelatedBefore, after)

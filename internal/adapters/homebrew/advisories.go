@@ -126,8 +126,7 @@ func parseBrewAdvisoryStatus(raw []byte, candidate formulaMetadata, records []js
 	if err != nil {
 		return brewAdvisoryStatus{}, err
 	}
-	f := info[0]
-	if f.artifact() != candidate.artifact() {
+	if info[0].artifact() != candidate.artifact() {
 		return brewAdvisoryStatus{}, errors.New("public advisory metadata does not match candidate")
 	}
 	var doc struct {
@@ -176,9 +175,9 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 		return domain.Affected
 	}
 	var native publicFinding
-	for _, f := range osv.Findings {
-		if f.Formula == candidate.Name {
-			native = f
+	for _, finding := range osv.Findings {
+		if finding.Formula == candidate.Name {
+			native = finding
 		}
 	}
 	for _, open := range native.Open {

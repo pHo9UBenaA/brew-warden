@@ -18,7 +18,9 @@ var formulaName = regexp.MustCompile(`^[a-z0-9][a-z0-9+_.@-]{0,127}$`)
 var versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
 
 func ValidRequest(operation string, targets []string) bool {
-	if (operation != "install" && operation != "upgrade") || len(targets) > 128 || (operation == "install" && len(targets) == 0) {
+	supportedOperation := operation == "install" || operation == "upgrade"
+	missingInstallTarget := operation == "install" && len(targets) == 0
+	if !supportedOperation || len(targets) > 128 || missingInstallTarget {
 		return false
 	}
 	for _, target := range targets {

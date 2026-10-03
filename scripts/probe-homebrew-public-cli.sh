@@ -50,7 +50,10 @@ cat > "$root/public-cli.sb" <<PROFILE
 (deny network*)
 (deny file-write*)
 (allow file-write* (subpath "$root") (subpath "/opt/homebrew") (literal "/dev/null"))
-(deny file-write* (subpath "/opt/homebrew/Library") (subpath "/opt/homebrew/.git") (literal "/opt/homebrew/bin/brew") (subpath "$root/inputs") (subpath "$root/cache/downloads") (literal "$root/cache/api/internal/packages.arm64_tahoe.jws.json"))
+(deny file-write*
+  (subpath "/opt/homebrew/Library") (subpath "/opt/homebrew/.git") (literal "/opt/homebrew/bin/brew")
+  (subpath "$root/inputs") (subpath "$root/cache/downloads")
+  (literal "$root/cache/api/internal/packages.arm64_tahoe.jws.json"))
 PROFILE
 run_brew() {
   label=$1

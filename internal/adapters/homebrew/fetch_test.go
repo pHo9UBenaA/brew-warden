@@ -27,8 +27,8 @@ func TestCLICacheResultsRequireEverySelectedBottle(t *testing.T) {
 		"missing path":            "",
 		"warning instead of path": "Warning: bottle unavailable\n",
 		"duplicate path":          file + "\n" + file + "\n",
-		"wrong platform":          strings.Replace(file, "arm64_tahoe", "arm64_sonoma", 1) + "\n",
-		"wrong formula":           strings.Replace(file, "jq--", "other--", 1) + "\n",
+		"wrong platform":          replaceFixtureText(t, file, "arm64_tahoe", "arm64_sonoma") + "\n",
+		"wrong formula":           replaceFixtureText(t, file, "jq--", "other--") + "\n",
 		"carriage return":         file + "\r\n",
 	} {
 		t.Run(name, func(t *testing.T) {

@@ -205,7 +205,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Fatalf("execution failed: %+v %v", result, err)
 	}
 	if result.Outcome != domain.AttemptSucceeded || !result.ExitKnown || result.ExitCode != 0 {
-		t.Fatal(result)
+		t.Fatalf("want successful native execution with known zero exit: result=%+v", result)
 	}
 	if before != "" {
 		after, err := kegSnapshot(dep)

@@ -18,10 +18,10 @@ func TestAdvisoryInventoryAndOmittedStatus(t *testing.T) {
 		t.Fatalf("want one jq advisory, got %d: error=%v", len(index.Records["jq"]), err)
 	}
 	for _, raw := range []string{
-		strings.Replace(feed, `"count":1`, `"count":2`, 1),
-		strings.Replace(feed, `"advisories":{`, `"advisories":null,"ignored":{`, 1),
-		strings.Replace(feed, `"count":1`, `"count":1,"count":1`, 1),
-		strings.Replace(feed, `"jq":[{"id":"BREW-example"}]`, `"jq":null`, 1),
+		replaceFixtureText(t, feed, `"count":1`, `"count":2`),
+		replaceFixtureText(t, feed, `"advisories":{`, `"advisories":null,"ignored":{`),
+		replaceFixtureText(t, feed, `"count":1`, `"count":1,"count":1`),
+		replaceFixtureText(t, feed, `"jq":[{"id":"BREW-example"}]`, `"jq":null`),
 		feed + `{}`, feed[:len(feed)-1],
 	} {
 		if _, err := parseAdvisoryIndex([]byte(raw)); err == nil {
@@ -73,7 +73,10 @@ func TestAdvisoryCombination(t *testing.T) {
 		{"absent record", brewAdvisoryStatus{}, domain.Affected},
 		{"unrelated fix", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2020-0000"}}}}, domain.Affected},
 		{"matched patch", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}}}, domain.NoKnownApplicableFindings},
-		{"homebrew open despite patched OSV", brewAdvisoryStatus{Open: []brewAdvisoryEntry{{ID: "BREW-example"}}, Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}}}, domain.Affected},
+		{"homebrew open despite patched OSV", brewAdvisoryStatus{
+			Open:    []brewAdvisoryEntry{{ID: "BREW-example"}},
+			Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}},
+		}, domain.Affected},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			got := combineAdvisories(c, report, tc.status)

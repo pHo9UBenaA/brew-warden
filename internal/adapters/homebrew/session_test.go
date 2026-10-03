@@ -76,9 +76,9 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 		}
 	})
 	for name, bad := range map[string]string{
-		"missing revision":      strings.Replace(string(raw), `"Revision":0,`, "", 1),
-		"mis-cased revision":    strings.Replace(string(raw), `"Revision":0`, `"revision":0`, 1),
-		"duplicate minimum age": strings.Replace(string(raw), `"minimumAge":0`, `"minimumAge":0,"minimumAge":1`, 1),
+		"missing revision":      replaceFixtureText(t, string(raw), `"Revision":0,`, ""),
+		"mis-cased revision":    replaceFixtureText(t, string(raw), `"Revision":0`, `"revision":0`),
+		"duplicate minimum age": replaceFixtureText(t, string(raw), `"minimumAge":0`, `"minimumAge":0,"minimumAge":1`),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if err := decodeStrict([]byte(bad), &executionPlan{}); err == nil {

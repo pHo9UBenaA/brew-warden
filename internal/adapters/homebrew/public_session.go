@@ -103,12 +103,8 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 			return nil, "", err
 		}
 		candidate := nodes[slices.Index(names, formula.Name)].Artifact
-		for j := range formula.Installed {
-			version := &formula.Installed[j]
-			version.ReceiptSHA256, err = installedReceiptDigest(candidate, version.Version)
-			if err != nil {
-				return nil, "", err
-			}
+		if err := formula.bindInstalledReceipts(candidate); err != nil {
+			return nil, "", err
 		}
 	}
 	digest, err := w.saveInstalledState(document.Formulae)
@@ -158,6 +154,20 @@ func matchExecutionMetadata(metadata []formulaMetadata, names []string, nodes []
 	return nil
 }
 
+// Bind every observed version, not just the active keg: a plan also depends on
+// inactive receipts remaining unchanged until execution.
+func (formula *installedFormula) bindInstalledReceipts(candidate domain.Artifact) error {
+	for i := range formula.Installed {
+		version := &formula.Installed[i]
+		digest, err := installedReceiptDigest(candidate, version.Version)
+		if err != nil {
+			return err
+		}
+		version.ReceiptSHA256 = digest
+	}
+	return nil
+}
+
 // installedReceiptDigest binds a recorded official-core installation to its
 // receipt bytes. It does not authenticate the installed payload itself.
 func installedReceiptDigest(candidate domain.Artifact, version string) (domain.Digest, error) {
@@ -181,7 +191,11 @@ func installedReceiptDigest(candidate domain.Artifact, version string) (domain.D
 			Spec string `json:"spec" required:"true"`
 		} `json:"source" required:"true"`
 	}
-	if err := decodeSchema(raw, &receipt, true); err != nil || receipt.Arch != "arm64" || receipt.Source.Tap != "homebrew/core" || receipt.Source.Spec != "stable" {
+	if err := decodeSchema(raw, &receipt, true); err != nil {
+		return "", errors.New("installed receipt is not official core stable")
+	}
+	officialCoreStable := receipt.Arch == "arm64" && receipt.Source.Tap == "homebrew/core" && receipt.Source.Spec == "stable"
+	if !officialCoreStable {
 		return "", errors.New("installed receipt is not official core stable")
 	}
 	return digestBytes(raw), nil

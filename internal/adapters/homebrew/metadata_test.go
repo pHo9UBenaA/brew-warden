@@ -23,8 +23,8 @@ func metadataFixture() metadataDocument {
 func TestMetadataClosureAndIdentity(t *testing.T) {
 	doc := metadataFixture()
 	raw := marshalFixture(t, doc)
-	if recipes, candidates, err := parseMetadata(raw, []string{"jq"}); err != nil || len(recipes) != 2 || len(candidates) != 2 {
-		t.Fatal(recipes, candidates, err)
+	if candidates, err := parseMetadata(raw, []string{"jq"}); err != nil || len(candidates) != 2 {
+		t.Fatalf("want two candidates in complete jq closure: candidates=%+v error=%v", candidates, err)
 	}
 	for name, mutate := range map[string]func(*metadataDocument){
 		"missing dependency":    func(d *metadataDocument) { d.Formulae = d.Formulae[:1] },
@@ -41,18 +41,18 @@ func TestMetadataClosureAndIdentity(t *testing.T) {
 			doc := metadataFixture()
 			mutate(&doc)
 			raw := marshalFixture(t, doc)
-			if _, _, err := parseMetadata(raw, []string{"jq"}); err == nil {
+			if _, err := parseMetadata(raw, []string{"jq"}); err == nil {
 				t.Fatal("invalid candidate metadata accepted", string(raw))
 			}
 		})
 	}
 	for name, invalid := range map[string]string{
-		"missing revision": strings.Replace(string(raw), `"revision":0,`, "", 1),
-		"mis-cased schema": strings.Replace(string(raw), `"schema":1`, `"Schema":1`, 1),
-		"duplicate schema": strings.Replace(string(raw), `"schema":1`, `"schema":1,"schema":1`, 1),
+		"missing revision": replaceFixtureText(t, string(raw), `"revision":0,`, ""),
+		"mis-cased schema": replaceFixtureText(t, string(raw), `"schema":1`, `"Schema":1`),
+		"duplicate schema": replaceFixtureText(t, string(raw), `"schema":1`, `"schema":1,"schema":1`),
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, _, err := parseMetadata([]byte(invalid), []string{"jq"}); err == nil {
+			if _, err := parseMetadata([]byte(invalid), []string{"jq"}); err == nil {
 				t.Fatal("ambiguous or incomplete metadata accepted")
 			}
 		})
@@ -66,7 +66,7 @@ func FuzzNativeMetadata(f *testing.F) {
 		if len(s) > maxManifest {
 			return
 		}
-		_, _, _ = parseMetadata([]byte(s), []string{"jq"})
+		_, _ = parseMetadata([]byte(s), []string{"jq"})
 	})
 }
 
@@ -75,7 +75,7 @@ func TestBottleCellarMustMatchExecutionPrefix(t *testing.T) {
 		doc := metadataFixture()
 		doc.Formulae[0].Cellar = cellar
 		raw := marshalFixture(t, doc)
-		_, _, err := parseMetadata(raw, []string{"jq"})
+		_, err := parseMetadata(raw, []string{"jq"})
 		want := cellar == ":any" || cellar == ":any_skip_relocation" || cellar == "/opt/homebrew/Cellar"
 		if (err == nil) != want {
 			t.Fatalf("cellar %q: %v", cellar, err)

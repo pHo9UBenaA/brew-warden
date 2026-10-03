@@ -2,6 +2,7 @@ package tests
 
 import (
 	"fmt"
+	"slices"
 	"testing"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
@@ -39,19 +40,20 @@ func FuzzPolicyRequiresCompleteEvidence(f *testing.F) {
 			t.Fatalf("complete chain of %d formulae was not eligible: %+v", count, got)
 		}
 		victim := int(data[2]) % len(a.Nodes)
-		claim := int(data[3]) % int(domain.Vulnerabilities-domain.Metadata+1)
-		evidence := &a.Nodes[victim].Evidence
+		claim := domain.Metadata + domain.Claim(data[3]%byte(domain.Vulnerabilities-domain.Metadata+1))
+		node := &a.Nodes[victim]
+		evidence := evidenceFor(node, claim)
 		switch data[4] % 5 {
 		case 0:
-			*evidence = append((*evidence)[:claim], (*evidence)[claim+1:]...)
+			node.Evidence = slices.DeleteFunc(node.Evidence, func(item domain.Evidence) bool { return item.Claim == claim })
 		case 1:
-			(*evidence)[claim].Status = domain.Unavailable
+			evidence.Status = domain.Unavailable
 		case 2:
-			(*evidence)[claim].ExpiresAt = a.Now
+			evidence.ExpiresAt = a.Now
 		case 3:
-			(*evidence)[claim].Subject.Rebuild++
+			evidence.Subject.Rebuild++
 		case 4:
-			*evidence = append(*evidence, (*evidence)[claim])
+			node.Evidence = append(node.Evidence, *evidence)
 		}
 		if got := domain.Evaluate(a); got.Outcome != domain.Hold || len(got.Reasons) == 0 {
 			t.Fatalf("missing, stale or ambiguous evidence on node %d claim %d was accepted: %+v", victim, claim, got)

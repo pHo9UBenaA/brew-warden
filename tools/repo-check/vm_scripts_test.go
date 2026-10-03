@@ -38,7 +38,9 @@ func vmScriptFixture(t *testing.T) (string, string) {
 		".cache/tart/guest/home/.local/state/gh/state.yml": "disposable-state\n",
 		".cache/tart/guest/home/device.log":                "old private login log\n",
 		".cache/tart/guest/home/device.pid":                "99999999\n",
-		".cache/tart/guest/login-output":                   "! First copy your one-time code: ABCD-1234\nOpen this URL to continue in your web browser: https://github.com/login/device\nsecret-marker must not be displayed\n",
+		".cache/tart/guest/login-output": "! First copy your one-time code: ABCD-1234\n" +
+			"Open this URL to continue in your web browser: https://github.com/login/device\n" +
+			"secret-marker must not be displayed\n",
 		".cache/tart/guest/gh/gh": `#!/bin/sh
 root=$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)
 case "$1:$2" in

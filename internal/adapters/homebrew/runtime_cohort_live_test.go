@@ -43,7 +43,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	if _, err := readRegular(filepath.Join(root, metadataCachePath), 80*1024*1024); err != nil {
 		t.Fatalf("authenticated Homebrew snapshot absent: %v", err)
 	}
-	_, candidates, err := parseMetadata(metadata, []string{"jq"})
+	candidates, err := parseMetadata(metadata, []string{"jq"})
 	if err != nil || len(candidates) < 2 {
 		t.Fatalf("want jq and its complete dependency closure: candidates=%+v error=%v", candidates, err)
 	}

@@ -41,7 +41,9 @@ func TestLegacyJournalCannotBeSilentlyMigrated(t *testing.T) {
 		t.Fatal(err)
 	}
 	engine := Engine{Collector: &Collector{LegacyState: journal}}
-	if _, _, err := engine.Prepare(context.Background(), ports.Request{Operation: "install", Targets: []string{"jq"}}, domain.DefaultPolicy(), nil, time.Now().Unix()); err == nil || !strings.Contains(err.Error(), "matching older build") {
+	request := ports.Request{Operation: "install", Targets: []string{"jq"}}
+	_, _, err := engine.Prepare(context.Background(), request, domain.DefaultPolicy(), nil, time.Now().Unix())
+	if err == nil || !strings.Contains(err.Error(), "matching older build") {
 		t.Fatal("legacy execution state was bypassed", err)
 	}
 }
@@ -56,11 +58,11 @@ func TestInFlightRejectsCorruptAndUnsafeRecords(t *testing.T) {
 		name, data string
 	}{
 		{"malformed", "{"},
-		{"missing identity", strings.Replace(valid, `"plan":"`+strings.Repeat("a", 64)+`"`, `"plan":""`, 1)},
-		{"unbound session", strings.Replace(valid, `"session":500`, `"session":501`, 1)},
-		{"unknown schema", strings.Replace(valid, `"schema":1`, `"schema":99`, 1)},
-		{"workspace traversal", strings.Replace(valid, `"collection":"collection-12345"`, `"collection":"../outside"`, 1)},
-		{"workspace substitution", strings.Replace(valid, `"collection":"collection-12345"`, `"collection":"collection-trap"`, 1)},
+		{"missing identity", replaceFixtureText(t, valid, `"plan":"`+strings.Repeat("a", 64)+`"`, `"plan":""`)},
+		{"unbound session", replaceFixtureText(t, valid, `"session":500`, `"session":501`)},
+		{"unknown schema", replaceFixtureText(t, valid, `"schema":1`, `"schema":99`)},
+		{"workspace traversal", replaceFixtureText(t, valid, `"collection":"collection-12345"`, `"collection":"../outside"`)},
+		{"workspace substitution", replaceFixtureText(t, valid, `"collection":"collection-12345"`, `"collection":"collection-trap"`)},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			directory := t.TempDir()

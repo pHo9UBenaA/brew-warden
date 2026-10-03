@@ -187,7 +187,8 @@ auth() {
   fail 'Device authorization code unavailable; inspect guest device.log without copying credentials'
 }
 run_test() {
-  expected=$1; shift
+  expected=$1
+  shift
   result_log=$(mktemp "$PWD/.cache/vm-result.XXXXXXXX")
   if guest "$@" > "$result_log" 2>&1; then
     /bin/cat "$result_log"
@@ -250,11 +251,14 @@ run_case() {
         BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_SURVEY_TARGETS="$1" "$guest_test" -test.run '^TestLivePublicCoverageSurvey$' -test.v -test.timeout=40m ;;
     upgrade)
       [ "$#" -eq 1 ] || usage
-      run_test TestLiveExplicitUpgradeChangesSelectedVersion "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
-        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_UPGRADE_TARGET="$1" "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m ;;
+      run_test TestLiveExplicitUpgradeChangesSelectedVersion "$vm" /usr/bin/env -i \
+        HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_UPGRADE_TARGET="$1" \
+        "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m ;;
     ownership)
       [ "$#" -eq 0 ] || usage
-      run_test TestLiveDistributionPromotesExplicitInstallOwnership "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
+      run_test TestLiveDistributionPromotesExplicitInstallOwnership "$vm" /usr/bin/env -i \
+        HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_DISTRIBUTION_BINARY="$guest_bwd" \
         "$guest_test" -test.run '^TestLiveDistributionPromotesExplicitInstallOwnership$' -test.v -test.timeout=20m ;;
     crash)
@@ -291,7 +295,10 @@ fixture() {
       remove_if_installed "$vm" xz ;;
     repair-jq) guest_brew "$vm" link --formula jq ;;
     older-xz)
-      guest "$vm" /bin/sh -c 'test ! -e /opt/homebrew/Cellar/xz && test -f /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3/INSTALL_RECEIPT.json' || fail 'Older xz fixture unavailable; first make xz absent'
+      guest "$vm" /bin/sh -c '
+        test ! -e /opt/homebrew/Cellar/xz &&
+          test -f /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3/INSTALL_RECEIPT.json
+      ' || fail 'Older xz fixture unavailable; first make xz absent'
       guest "$vm" /bin/sh -c '/bin/mkdir -p /opt/homebrew/Cellar/xz && /bin/cp -pR /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3 /opt/homebrew/Cellar/xz/5.8.3'
       guest_brew "$vm" link --formula xz ;;
     *) usage ;;

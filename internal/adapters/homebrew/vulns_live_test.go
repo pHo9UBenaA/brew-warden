@@ -16,8 +16,7 @@ import (
 // This probe uses public commands in a copied prefix. The old keg is a metadata
 // fixture, not an installation. No host prefix is written or used as a target.
 func TestLivePublicVulnsCandidateSelection(t *testing.T) {
-	source := os.Getenv("BREWWARDEN_LIVE_RUNTIME")
-	if source == "" {
+	if os.Getenv("BREWWARDEN_LIVE_RUNTIME") == "" {
 		t.Skip("requires explicitly built native runtime and live OSV access")
 	}
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
@@ -63,7 +62,6 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 		ctx, cancel := context.WithTimeout(context.Background(), 90*time.Second)
 		defer cancel()
 		cmd := w.command(ctx, profile, args...)
-		cmd.Env = slices.DeleteFunc(cmd.Env, func(s string) bool { return s == "HOMEBREW_NO_INSTALL_FROM_API=1" || s == "HOMEBREW_DEVELOPER=1" })
 		cmd.Env = append(cmd.Env, "HOMEBREW_CURL_RETRIES=0")
 		out, stderr := &processOutput{}, &processOutput{}
 		cmd.Stdout, cmd.Stderr = out, stderr
@@ -153,8 +151,7 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 // Exercises the agreed two-source composition with fresh signed metadata rather
 // than a historical cache; all commands run in the private inspection prefix.
 func TestLivePublicAdvisorySources(t *testing.T) {
-	source := os.Getenv("BREWWARDEN_LIVE_RUNTIME")
-	if source == "" {
+	if os.Getenv("BREWWARDEN_LIVE_RUNTIME") == "" {
 		t.Skip("requires explicitly built native runtime and public advisory access")
 	}
 	if runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
@@ -180,7 +177,7 @@ func TestLivePublicAdvisorySources(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	_, candidates, err := parseMetadata(raw, targets)
+	candidates, err := parseMetadata(raw, targets)
 	if err != nil {
 		t.Fatal(err)
 	}

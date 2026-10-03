@@ -33,28 +33,31 @@ func (f formulaMetadata) artifact() domain.Artifact {
 		OS: "macos", Arch: "arm64", BottleTag: f.BottleTag, SHA256: f.BottleSHA256,
 	}
 }
-func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaMetadata, error) {
-	var doc metadataDocument
-	if err := decodeStrict(data, &doc); err != nil || doc.Schema != 1 || doc.Platform != "arm64_tahoe" || len(doc.Formulae) == 0 || len(doc.Formulae) > 128 {
-		return nil, nil, errors.New("invalid authenticated metadata result")
+
+// Return the complete validated closure in deterministic formula-name order.
+func parseMetadata(data []byte, targets []string) ([]formulaMetadata, error) {
+	var document metadataDocument
+	if err := decodeStrict(data, &document); err != nil || document.Schema != 1 || document.Platform != "arm64_tahoe" || len(document.Formulae) == 0 || len(document.Formulae) > 128 {
+		return nil, errors.New("invalid authenticated metadata result")
 	}
 	index := map[string]formulaMetadata{}
-	for _, f := range doc.Formulae {
-		if !domain.ValidRequest("install", []string{f.Name}) || index[f.Name].Name != "" || f.Revision < 0 || f.Rebuild < 0 {
-			return nil, nil, errors.New("invalid formula metadata identity")
+	for _, formula := range document.Formulae {
+		if !domain.ValidRequest("install", []string{formula.Name}) || index[formula.Name].Name != "" || formula.Revision < 0 || formula.Rebuild < 0 {
+			return nil, errors.New("invalid formula metadata identity")
 		}
-		if f.Dependencies == nil || len(f.Dependencies) > 128 {
-			return nil, nil, errors.New("incomplete dependency metadata")
+		if formula.Dependencies == nil || len(formula.Dependencies) > 128 {
+			return nil, errors.New("incomplete dependency metadata")
 		}
 		seen := map[string]bool{}
-		for _, dep := range f.Dependencies {
-			if !domain.ValidRequest("install", []string{dep}) || seen[dep] {
-				return nil, nil, errors.New("invalid dependency metadata")
+		for _, dependency := range formula.Dependencies {
+			if !domain.ValidRequest("install", []string{dependency}) || seen[dependency] {
+				return nil, errors.New("invalid dependency metadata")
 			}
-			seen[dep] = true
+			seen[dependency] = true
 		}
-		index[f.Name] = f
+		index[formula.Name] = formula
 	}
+
 	const (
 		visiting = iota + 1
 		visited
@@ -62,16 +65,16 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 	state := map[string]int{}
 	var visit func(string) error
 	visit = func(name string) error {
-		f, ok := index[name]
-		if !ok || state[name] == visiting {
+		formula, exists := index[name]
+		if !exists || state[name] == visiting {
 			return errors.New("incomplete or cyclic metadata closure")
 		}
 		if state[name] == visited {
 			return nil
 		}
 		state[name] = visiting
-		for _, dep := range f.Dependencies {
-			if err := visit(dep); err != nil {
+		for _, dependency := range formula.Dependencies {
+			if err := visit(dependency); err != nil {
 				return err
 			}
 		}
@@ -80,31 +83,32 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, []formulaM
 	}
 	seenTargets := map[string]bool{}
 	if len(targets) == 0 {
-		return nil, nil, errors.New("empty candidate selection")
+		return nil, errors.New("empty candidate selection")
 	}
 	for _, target := range targets {
 		if seenTargets[target] {
-			return nil, nil, errors.New("duplicate target")
+			return nil, errors.New("duplicate target")
 		}
 		seenTargets[target] = true
 		if err := visit(target); err != nil {
-			return nil, nil, err
+			return nil, err
 		}
 	}
 	if len(state) != len(index) {
-		return nil, nil, errors.New("unrequested formula metadata")
+		return nil, errors.New("unrequested formula metadata")
 	}
+
 	candidates := []formulaMetadata{}
 	for name := range state {
-		f := index[name]
-		expectedURL := "https://ghcr.io/v2/homebrew/core/" + strings.ReplaceAll(f.Name, "@", "/") + "/blobs/sha256:" + string(f.BottleSHA256)
-		supportedTag := slices.Contains([]string{"arm64_tahoe", "all"}, f.BottleTag)
-		supportedCellar := slices.Contains([]string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar"}, f.Cellar)
-		if !f.artifact().Valid() || !supportedTag || !supportedCellar || f.BottleURL != expectedURL {
-			return nil, nil, fmt.Errorf("unsupported bottle for %s: tag %q, cellar %q", f.Name, f.BottleTag, f.Cellar)
+		formula := index[name]
+		expectedURL := "https://ghcr.io/v2/homebrew/core/" + strings.ReplaceAll(formula.Name, "@", "/") + "/blobs/sha256:" + string(formula.BottleSHA256)
+		supportedTag := slices.Contains([]string{"arm64_tahoe", "all"}, formula.BottleTag)
+		supportedCellar := slices.Contains([]string{":any", ":any_skip_relocation", "/opt/homebrew/Cellar"}, formula.Cellar)
+		if !formula.artifact().Valid() || !supportedTag || !supportedCellar || formula.BottleURL != expectedURL {
+			return nil, fmt.Errorf("unsupported bottle for %s: tag %q, cellar %q", formula.Name, formula.BottleTag, formula.Cellar)
 		}
-		candidates = append(candidates, f)
+		candidates = append(candidates, formula)
 	}
 	slices.SortFunc(candidates, func(a, b formulaMetadata) int { return strings.Compare(a.Name, b.Name) })
-	return doc.Formulae, candidates, nil
+	return candidates, nil
 }

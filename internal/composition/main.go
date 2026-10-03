@@ -36,6 +36,7 @@ func Main() {
 	stop()
 	os.Exit(code)
 }
+
 func service(configPath string) *application.Service {
 	if !domain.Digest(DistributionSource).Valid() || configPath == "" {
 		return nil

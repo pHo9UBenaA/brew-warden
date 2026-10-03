@@ -72,44 +72,30 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	}
 	if service == nil {
 		if len(rest) == 1 && rest[0] == "doctor" {
-			_, _ = fmt.Fprintf(errOut, "minimum_release_age_seconds: %d\n%s\nNo live Homebrew checks were run. This build cannot enable execution.\n", policy.MinimumAgeSeconds(), executionUnavailable)
+			_, _ = fmt.Fprintf(errOut,
+				"minimum_release_age_seconds: %d\n%s\n"+
+					"No live Homebrew checks were run. This build cannot enable execution.\n",
+				policy.MinimumAgeSeconds(), executionUnavailable)
 			return 1
 		}
 		_, _ = fmt.Fprintln(errOut, executionUnavailable)
 		return 1
 	}
 	if len(rest) == 1 && rest[0] == "doctor" && len(overrides) == 0 {
-		if service.Diagnostics == nil {
-			_, _ = fmt.Fprintln(errOut, "runtime_unavailable")
-			return 1
-		}
-		if err := service.Diagnostics.Check(ctx); err != nil {
-			_, _ = fmt.Fprintln(errOut, "runtime_unavailable: "+err.Error())
-			return 1
-		}
-		_, err := fmt.Fprintf(out,
-			"Runtime integrity and supported platform verified.\n"+
-				"Candidate eligibility: verified official bottles for arm64_tahoe with complete required evidence.\n"+
-				"Minimum release age: %d seconds.\n"+
-				"Metadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n",
-			policy.MinimumAgeSeconds())
-		if err != nil {
-			return 1
-		}
-		return 0
+		return runDoctor(ctx, out, errOut, service.Diagnostics, policy)
 	}
 	if len(rest) < 2 || rest[0] != "brew" || !domain.ValidRequest(rest[1], rest[2:]) {
 		_, _ = fmt.Fprintln(errOut, "invocation_invalid: unsupported operation or Homebrew options.")
 		return 1
 	}
-	run := *service
-	run.Present = func(p ports.Prepared) error {
-		return presentPlan(errOut, p)
+	invocationService := *service
+	invocationService.Present = func(prepared ports.Prepared) error {
+		return presentPlan(errOut, prepared)
 	}
-	result, err := run.Run(ctx, ports.Request{Operation: rest[1], Targets: rest[2:]}, policy, overrides)
+	result, err := invocationService.Run(ctx, ports.Request{Operation: rest[1], Targets: rest[2:]}, policy, overrides)
 	if err != nil {
-		for _, r := range result.Decision.Reasons {
-			_, _ = fmt.Fprintf(errOut, "%s: %s (%s)\n", r.Artifact.Name, claimName(r.Claim), r.Code)
+		for _, reason := range result.Decision.Reasons {
+			_, _ = fmt.Fprintf(errOut, "%s: %s (%s)\n", reason.Artifact.Name, claimName(reason.Claim), reason.Code)
 		}
 		outcome := string(result.Outcome)
 		if outcome == "" {
@@ -126,6 +112,27 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	} else {
 		_, err = fmt.Fprintln(out, "Installation verified.")
 	}
+	if err != nil {
+		return 1
+	}
+	return 0
+}
+
+func runDoctor(ctx context.Context, out, errOut io.Writer, diagnostics ports.Diagnostics, policy domain.Policy) int {
+	if diagnostics == nil {
+		_, _ = fmt.Fprintln(errOut, "runtime_unavailable")
+		return 1
+	}
+	if err := diagnostics.Check(ctx); err != nil {
+		_, _ = fmt.Fprintln(errOut, "runtime_unavailable: "+err.Error())
+		return 1
+	}
+	_, err := fmt.Fprintf(out,
+		"Runtime integrity and supported platform verified.\n"+
+			"Candidate eligibility: verified official bottles for arm64_tahoe with complete required evidence.\n"+
+			"Minimum release age: %d seconds.\n"+
+			"Metadata, provenance, publication, advisory coverage and installed state are freshly checked for each command.\n",
+		policy.MinimumAgeSeconds())
 	if err != nil {
 		return 1
 	}

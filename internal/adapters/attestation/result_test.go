@@ -18,8 +18,8 @@ func TestAttestationAgeChecksEachResultAfterMatchingCandidate(t *testing.T) {
 	}{
 		{"matching later subject", matching, false},
 		{"unrelated trusted subject", unrelated, true},
-		{"untrusted later signer", strings.Replace(matching, `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`, 1), true},
-		{"contradictory later digest", strings.Replace(matching, string(artifact.SHA256), strings.Repeat("b", 64), 1), true},
+		{"untrusted later signer", replaceFixtureText(t, matching, `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`), true},
+		{"contradictory later digest", replaceFixtureText(t, matching, string(artifact.SHA256), strings.Repeat("b", 64)), true},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			_, err := oldestVerifiedTimestamp([]byte("["+matching+","+tc.later+"]"), artifact, now)

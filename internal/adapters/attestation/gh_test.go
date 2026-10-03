@@ -84,9 +84,9 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 		"missing timestamps":     "[" + ghResult(a) + "]",
 		"malformed timestamp":    "[" + ghResult(a, "invalid") + "]",
 		"future timestamp":       "[" + ghResult(a, "2026-09-24T00:00:00Z") + "]",
-		"untrusted log":          "[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`, 1) + "]",
-		"unknown log":            "[" + strings.Replace(one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`, 1) + "]",
-		"untrusted repository":   "[" + strings.Replace(one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`, 1) + "]",
+		"untrusted log":          "[" + replaceFixtureText(t, one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`) + "]",
+		"unknown log":            "[" + replaceFixtureText(t, one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`) + "]",
+		"untrusted repository":   "[" + replaceFixtureText(t, one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`) + "]",
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := oldestVerifiedTimestamp([]byte(bad), a, now); err == nil {
@@ -130,7 +130,7 @@ func FuzzVerifiedSubject(f *testing.F) {
 		if _, err := oldestVerifiedTimestamp(valid, other, now); err == nil {
 			t.Fatal("different bottle digest borrowed the attestation")
 		}
-		wrongSigner := strings.Replace(string(valid), `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`, 1)
+		wrongSigner := replaceFixtureText(t, string(valid), `"runnerEnvironment":"github-hosted"`, `"runnerEnvironment":"untrusted"`)
 		if _, err := oldestVerifiedTimestamp([]byte(wrongSigner), a, now); err == nil {
 			t.Fatal("untrusted signer borrowed the attestation")
 		}
@@ -158,9 +158,9 @@ func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {
 		t.Fatal(err)
 	}
 	for name, bad := range map[string]string{
-		"different digest":   strings.Replace(raw, string(platform.SHA256), strings.Repeat("b", 64), 1),
-		"different platform": strings.Replace(raw, "arm64_tahoe", "arm64_linux", 1),
-		"different rebuild":  strings.Replace(raw, ".bottle.1.", ".bottle.2.", 1),
+		"different digest":   replaceFixtureText(t, raw, string(platform.SHA256), strings.Repeat("b", 64)),
+		"different platform": replaceFixtureText(t, raw, "arm64_tahoe", "arm64_linux"),
+		"different rebuild":  replaceFixtureText(t, raw, ".bottle.1.", ".bottle.2."),
 	} {
 		t.Run(name, func(t *testing.T) {
 			if _, err := oldestVerifiedTimestamp([]byte("["+bad+"]"), all, now); err == nil {
@@ -345,7 +345,8 @@ exit 42
 		t.Fatal(err)
 	}
 	const now = int64(1800000000)
-	if _, _, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, now); err == nil || !strings.Contains(err.Error(), "unsupported installed gh version") {
+	_, _, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, now)
+	if err == nil || !strings.Contains(err.Error(), "unsupported installed gh version") {
 		t.Fatalf("want unsupported gh version refusal, got %v", err)
 	}
 	if _, err := os.Stat(started); !os.IsNotExist(err) {

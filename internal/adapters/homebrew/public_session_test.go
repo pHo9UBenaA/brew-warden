@@ -91,23 +91,29 @@ func TestInstalledLinkObservesPartialPourAndRejectsMismatchedRecords(t *testing.
 			t.Fatal(err)
 		}
 	}
+	assertLink := func(kegOnly, wantIncomplete bool) {
+		t.Helper()
+		version, incomplete, err := installedLink(prefix, "jq", kegOnly)
+		if err != nil || version == nil {
+			t.Fatalf("want active 1.8.2 for kegOnly=%t: version_missing=%t error=%v", kegOnly, version == nil, err)
+		}
+		if *version != "1.8.2" || incomplete != wantIncomplete {
+			t.Fatalf("kegOnly=%t: want version=1.8.2 incomplete=%t, got version=%q incomplete=%t", kegOnly, wantIncomplete, *version, incomplete)
+		}
+	}
 	opt := filepath.Join(prefix, "opt/jq")
 	if err := os.Symlink("../Cellar/jq/1.8.2", opt); err != nil {
 		t.Fatal(err)
 	}
-	if version, incomplete, err := installedLink(prefix, "jq", false); err != nil || !incomplete || version == nil || *version != "1.8.2" {
-		t.Fatal("partially poured keg was not marked incomplete for the after-state", version, incomplete, err)
-	}
-	if version, incomplete, err := installedLink(prefix, "jq", true); err != nil || incomplete || version == nil || *version != "1.8.2" {
-		t.Fatal("keg-only formula without shared-prefix link was rejected", version, incomplete, err)
-	}
+	// An opt-only normal formula is incomplete; an opt-only keg-only formula is complete.
+	assertLink(false, true)
+	assertLink(true, false)
 	record := filepath.Join(prefix, "var/homebrew/linked/jq")
 	if err := os.Symlink("../../../Cellar/jq/1.8.2", record); err != nil {
 		t.Fatal(err)
 	}
-	if version, incomplete, err := installedLink(prefix, "jq", false); err != nil || incomplete || version == nil || *version != "1.8.2" {
-		t.Fatal("fully linked keg was not recognized", version, incomplete, err)
-	}
+	// The matching linked-keg record completes a normal formula's link step.
+	assertLink(false, false)
 	if err := os.Remove(record); err != nil {
 		t.Fatal(err)
 	}

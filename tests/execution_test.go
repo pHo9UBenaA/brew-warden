@@ -65,7 +65,7 @@ func TestFreshExecutionReportsActualExitAndState(t *testing.T) {
 			s := &executionSession{prepared: p, result: tc.actual}
 			result, err := application.Execute(context.Background(), p, s, &executionClock{p.Assessment.Now})
 			if result.Outcome != tc.want || !s.ran || !s.closed || (err == nil) != (tc.want == domain.AttemptSucceeded) {
-				t.Fatal(result, err, s)
+				t.Fatalf("want outcome=%s, launch, session release and error iff not succeeded: result=%+v ran=%t closed=%t error=%v", tc.want, result, s.ran, s.closed, err)
 			}
 		})
 	}
@@ -78,7 +78,7 @@ func TestExecutionRejectsChangedAttemptWithoutLaunch(t *testing.T) {
 	session := &executionSession{prepared: fresh}
 	_, err := application.Execute(context.Background(), original, session, &executionClock{original.Assessment.Now})
 	if err == nil || session.ran || !session.closed {
-		t.Fatal("changed attempt reused an old plan or leaked its session", err, session)
+		t.Fatalf("changed attempt must refuse launch and release session: ran=%t closed=%t error=%v", session.ran, session.closed, err)
 	}
 }
 
@@ -91,7 +91,7 @@ func TestExecutionCannotReportSuccessWhenOwnedProcessStateIsUnresolved(t *testin
 	}
 	result, err := application.Execute(context.Background(), p, s, &executionClock{p.Assessment.Now})
 	if err == nil || result.Outcome != domain.AttemptUnknown || !s.ran || !s.closed {
-		t.Fatal("success inferred despite unresolved process", result, err)
+		t.Fatalf("unresolved process must report unknown with launch and release: result=%+v ran=%t closed=%t error=%v", result, s.ran, s.closed, err)
 	}
 }
 
@@ -123,7 +123,7 @@ func TestFreshExecutionFailureGatesNeverLaunch(t *testing.T) {
 				s.afterValidate = func() { clock.now += 121 }
 			}
 			if _, err := application.Execute(ctx, p, s, clock); err == nil || s.ran || !s.closed {
-				t.Fatal("failure gate launched Homebrew", err, s)
+				t.Fatalf("failure gate must refuse launch and release session: ran=%t closed=%t error=%v", s.ran, s.closed, err)
 			}
 		})
 	}

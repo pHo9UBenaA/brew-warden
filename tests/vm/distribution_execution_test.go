@@ -101,7 +101,8 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 	}
 	// The child is still live, so a second BrewWarden mutation must hold.
 	output, err := newCommand("brew", "install", "xz").CombinedOutput()
-	if err == nil || !strings.Contains(string(output), "another BrewWarden execution") && !strings.Contains(string(output), "may still be running") {
+	processExcluded := strings.Contains(string(output), "another BrewWarden execution") || strings.Contains(string(output), "may still be running")
+	if err == nil || !processExcluded {
 		t.Fatal("continued child was not excluded", string(output), err)
 	}
 	if err := syscall.Kill(int(stoppedPID.Load()), syscall.SIGCONT); err != nil {
@@ -122,7 +123,8 @@ func TestLiveDistributionParentCrash(t *testing.T) {
 		if err == nil && strings.Contains(string(output), "Installation verified.") {
 			break
 		}
-		if time.Now().After(deadline) || err == nil || (!strings.Contains(string(output), "owned Homebrew process") && !strings.Contains(string(output), "another BrewWarden execution")) {
+		processActive := strings.Contains(string(output), "owned Homebrew process") || strings.Contains(string(output), "another BrewWarden execution")
+		if time.Now().After(deadline) || err == nil || !processActive {
 			t.Fatal("fresh retry failed", string(output), err)
 		}
 		time.Sleep(200 * time.Millisecond)

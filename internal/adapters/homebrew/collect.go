@@ -110,7 +110,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
-	_, candidates, err := parseMetadata(parsed, request.Targets)
+	candidates, err := parseMetadata(parsed, request.Targets)
 	if err != nil {
 		return err
 	}
@@ -151,8 +151,8 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
-	for i, f := range candidates {
-		if err := checkClaim(advisoryEvidence[i], f.artifact(), domain.Vulnerabilities, result.observedAt); err != nil {
+	for i, candidate := range candidates {
+		if err := checkClaim(advisoryEvidence[i], candidate.artifact(), domain.Vulnerabilities, result.observedAt); err != nil {
 			return err
 		}
 		result.nodes[i].Evidence = append(result.nodes[i].Evidence, advisoryEvidence[i])
@@ -215,11 +215,11 @@ func (c *Collector) collectCandidateEvidence(ctx context.Context, collection *Co
 	return node, nil
 }
 
-func checkClaim(e domain.Evidence, a domain.Artifact, claim domain.Claim, now int64) error {
-	if _, err := domain.NewEvidence(e); err != nil {
+func checkClaim(evidence domain.Evidence, artifact domain.Artifact, claim domain.Claim, now int64) error {
+	if _, err := domain.NewEvidence(evidence); err != nil {
 		return err
 	}
-	if e.Subject != a || e.Claim != claim || e.ObservedAt != now || e.ExpiresAt > now+3600 {
+	if evidence.Subject != artifact || evidence.Claim != claim || evidence.ObservedAt != now || evidence.ExpiresAt > now+3600 {
 		return errors.New("collector evidence binding mismatch")
 	}
 	return nil
@@ -253,8 +253,8 @@ func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error
 	}
 	return nil
 }
-func (w workspace) observation(e domain.Evidence, raw []byte) error {
-	if digestBytes(raw) != e.RawSHA256 {
+func (w workspace) observation(evidence domain.Evidence, raw []byte) error {
+	if digestBytes(raw) != evidence.RawSHA256 {
 		return errors.New("evidence observation digest mismatch")
 	}
 	return w.rawObservation(raw)
