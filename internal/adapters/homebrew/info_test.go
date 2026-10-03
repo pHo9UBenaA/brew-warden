@@ -35,15 +35,15 @@ const infoFixture = `{"formulae":[{
 
 func TestInfoRejectsMissingOrAmbiguousEvidence(t *testing.T) {
 	f, err := parseInfo([]byte(infoFixture), []string{"jq"})
-	if err != nil || len(f) != 1 || f[0].Dependencies[0] != "oniguruma" || f[0].Rebuild != 1 || !f[0].BottleSHA256.Valid() {
-		t.Fatal(f, err)
+	if err != nil || len(f) != 1 || len(f[0].Dependencies) != 1 || f[0].Dependencies[0] != "oniguruma" || f[0].Rebuild != 1 || !f[0].BottleSHA256.Valid() {
+		t.Fatalf("want one rebuilt jq bottle with oniguruma dependency and valid digest: candidates=%+v error=%v", f, err)
 	}
 	// Source hosts and recipe paths are not bottle eligibility inputs. A
 	// different project layout must follow the same selected bottle path.
 	unrelatedSource := strings.Replace(infoFixture, "https://github.com/jqlang/jq/releases/download/jq-1.8.2/jq-1.8.2.tar.gz", "https://downloads.example.org/archive", 1)
 	unrelatedSource = strings.Replace(unrelatedSource, `"ruby_source_path":"Formula/j/jq.rb"`, `"ruby_source_path":"Formula/other/layout.rb"`, 1)
 	other, err := parseInfo([]byte(unrelatedSource), []string{"jq"})
-	if err != nil || len(other) != 1 || other[0].artifact() != f[0].artifact() || other[0].Dependencies[0] != f[0].Dependencies[0] {
+	if err != nil || len(other) != 1 || other[0].artifact() != f[0].artifact() || len(other[0].Dependencies) != 1 || other[0].Dependencies[0] != f[0].Dependencies[0] {
 		t.Fatalf("source-specific metadata changed bottle selection: got=%+v want=%+v error=%v", other, f, err)
 	}
 	for name, raw := range map[string]string{

@@ -27,11 +27,7 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 	if err := decodeSchema(raw, &index, true); err != nil || index.Schema != 2 || len(index.Manifests) == 0 || len(index.Manifests) > 128 {
 		return errors.New("invalid bottle OCI index")
 	}
-	version := candidate.Version
-	if candidate.Revision > 0 {
-		version += "_" + strconv.Itoa(candidate.Revision)
-	}
-	ref := version + "." + candidate.BottleTag
+	ref := kegVersion(candidate.Version, candidate.Revision) + "." + candidate.BottleTag
 	if candidate.Rebuild > 0 {
 		ref += "." + strconv.Itoa(candidate.Rebuild)
 	}
@@ -99,10 +95,7 @@ func (w workspace) checkBottleMetadata(candidates []formulaMetadata) error {
 		return errors.New("bottle cache inventory unavailable")
 	}
 	for _, candidate := range candidates {
-		version := candidate.Version
-		if candidate.Revision > 0 {
-			version += "_" + strconv.Itoa(candidate.Revision)
-		}
+		version := kegVersion(candidate.Version, candidate.Revision)
 		if candidate.Rebuild > 0 {
 			version += "-" + strconv.Itoa(candidate.Rebuild)
 		}

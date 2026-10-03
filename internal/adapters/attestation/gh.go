@@ -27,7 +27,7 @@ type PublicGH struct {
 }
 
 // InstalledGH resolves the user's installed command without installing or
-// upgrading it. VerifyBottle subsequently checks the supported version cohort.
+// upgrading it. Check and VerifyBottle validate the supported version cohort.
 func InstalledGH() (PublicGH, error) {
 	path, err := exec.LookPath("gh")
 	if err != nil {
@@ -106,12 +106,12 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	tool, err := hashFile(v.Path, 128*1024*1024)
+	verifierDigest, err := hashFile(v.Path, 128*1024*1024)
 	if err != nil {
 		return 0, nil, errors.New("installed gh unavailable")
 	}
-	actual, err := hashFile(bottle, 2*1024*1024*1024)
-	if err != nil || actual != a.SHA256 {
+	bottleDigest, err := hashFile(bottle, 2*1024*1024*1024)
+	if err != nil || bottleDigest != a.SHA256 {
 		return 0, nil, errors.New("bottle integrity mismatch")
 	}
 	if err := v.Check(ctx); err != nil {
@@ -128,7 +128,7 @@ func (v PublicGH) VerifyBottle(ctx context.Context, a domain.Artifact, bottle st
 		path     string
 		digest   domain.Digest
 		maxBytes int64
-	}{{v.Path, tool, 128 * 1024 * 1024}, {bottle, actual, 2 * 1024 * 1024 * 1024}} {
+	}{{v.Path, verifierDigest, 128 * 1024 * 1024}, {bottle, bottleDigest, 2 * 1024 * 1024 * 1024}} {
 		digest, err := hashFile(input.path, input.maxBytes)
 		if err != nil || digest != input.digest {
 			return 0, nil, errors.New("attestation input changed during verification")
@@ -193,15 +193,11 @@ func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, 
 		if err := decodeObject(raw, &result, "verificationResult"); err != nil {
 			return 0, err
 		}
-		var verification struct {
-			Signature  json.RawMessage   `json:"signature"`
-			Statement  json.RawMessage   `json:"statement"`
-			Timestamps []json.RawMessage `json:"verifiedTimestamps"`
-		}
+		var verification ghVerificationResult
 		if err := decodeObject(result.Verification, &verification, "signature", "statement", "verifiedTimestamps"); err != nil || len(verification.Timestamps) == 0 {
 			return 0, errors.New("missing verified attestation timestamps")
 		}
-		matched, err := verifiedResultSubject(raw, a)
+		matched, err := verifiedResultSubject(verification, a)
 		if err != nil || !matched {
 			return 0, errors.New("public attestation subject or signer mismatch")
 		}

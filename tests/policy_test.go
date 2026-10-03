@@ -168,18 +168,18 @@ func TestAgeBoundaryAndWaiverAccounting(t *testing.T) {
 	a := eligibleAssessment()
 	publication := evidenceFor(&a.Nodes[0], domain.Publication)
 	publication.PublishedAt = a.Now - a.Policy.MinimumAgeSeconds()
-	if domain.Evaluate(a).Outcome != domain.Allow {
-		t.Fatal("exact minimum age must pass")
+	if got := domain.Evaluate(a); got.Outcome != domain.Allow {
+		t.Fatalf("exact minimum age must allow: got %+v", got)
 	}
 	publication.PublishedAt++
-	if domain.Evaluate(a).Outcome != domain.Hold {
-		t.Fatal("one second young must hold")
+	if got := domain.Evaluate(a); got.Outcome != domain.Hold {
+		t.Fatalf("one second young must hold: got %+v", got)
 	}
 	waiveYoung(&a)
 	if got := domain.Evaluate(a); got.Outcome != domain.Allow || len(got.Waived) != 2 {
 		t.Fatalf("missing waiver accounting: %+v", got)
 	}
-	if domain.Evaluate(domain.Assessment{}).Outcome != domain.Hold {
-		t.Fatal("zero assessment allowed")
+	if got := domain.Evaluate(domain.Assessment{}); got.Outcome != domain.Hold {
+		t.Fatalf("zero assessment must hold: got %+v", got)
 	}
 }

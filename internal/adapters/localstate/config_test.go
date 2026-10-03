@@ -20,7 +20,7 @@ func TestParseConfigDefaultsAndExplicitZeroAge(t *testing.T) {
 	} {
 		p, err := ParseConfig(strings.NewReader(data))
 		if err != nil || p.MinimumAgeSeconds() != domain.DefaultMinimumAgeSeconds || !p.Valid() {
-			t.Fatalf("%v: %+v", err, p)
+			t.Fatalf("config %q: want default age %d seconds and valid policy, got %+v: error=%v", data, domain.DefaultMinimumAgeSeconds, p, err)
 		}
 	}
 	p, err := ParseConfig(strings.NewReader(`{"schemaVersion":1,"age":{"minimumHours":0}}`))

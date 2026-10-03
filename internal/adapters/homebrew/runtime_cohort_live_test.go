@@ -28,7 +28,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	}
 	digest, err := (Runtime{}).materialize(filepath.Join(root, "runtime"))
 	if err != nil || !digest.Valid() {
-		t.Fatalf("reviewed Homebrew runtime unavailable: %v", err)
+		t.Fatalf("want bound reviewed runtime: digest=%s error=%v", digest, err)
 	}
 	profile, err := w.sandbox("cohort-collect", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library")})
 	if err != nil {
@@ -45,7 +45,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	}
 	_, candidates, err := parseMetadata(metadata, []string{"jq"})
 	if err != nil || len(candidates) < 2 {
-		t.Fatalf("public signed dependency closure unavailable: %v", err)
+		t.Fatalf("want jq and its complete dependency closure: candidates=%+v error=%v", candidates, err)
 	}
 	downloads, err := w.fetchBottles(ctx, profile, candidates)
 	if err != nil {
@@ -59,7 +59,7 @@ func TestLiveReviewedHomebrewPublicEvidenceContract(t *testing.T) {
 	}
 	report, _, err := w.scanCandidateVulnerabilities(ctx, candidates)
 	if err != nil || len(report.Skipped) != 0 {
-		t.Fatalf("public scanner did not cover the complete candidate closure: %v", err)
+		t.Fatalf("want complete candidate scan without skipped subjects: report=%+v error=%v", report, err)
 	}
 	t.Logf("reviewed native runtime %s supplied signed metadata, exact bottles and advisory subjects for %d candidates", digest, len(candidates))
 }

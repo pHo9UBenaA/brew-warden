@@ -9,10 +9,19 @@ import (
 
 func bottleFixture(t *testing.T, extra ...*tar.Header) []byte {
 	t.Helper()
+	return bottleFixtureAtVersion(t, "1.8.2", extra...)
+}
+
+func bottleFixtureAtVersion(t *testing.T, version string, extra ...*tar.Header) []byte {
+	t.Helper()
 	var data bytes.Buffer
 	compressed := gzip.NewWriter(&data)
 	archive := tar.NewWriter(compressed)
-	headers := append([]*tar.Header{{Name: "jq/1.8.2/", Typeflag: tar.TypeDir, Mode: 0755}, {Name: "jq/1.8.2/bin/jq", Typeflag: tar.TypeReg, Mode: 0555, Size: 3}}, extra...)
+	prefix := "jq/" + version
+	headers := append([]*tar.Header{
+		{Name: prefix + "/", Typeflag: tar.TypeDir, Mode: 0755},
+		{Name: prefix + "/bin/jq", Typeflag: tar.TypeReg, Mode: 0555, Size: 3},
+	}, extra...)
 	for _, header := range headers {
 		if err := archive.WriteHeader(header); err != nil {
 			t.Fatal(err)

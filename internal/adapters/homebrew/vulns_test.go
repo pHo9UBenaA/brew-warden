@@ -14,20 +14,30 @@ func TestPublicVulnsOutput(t *testing.T) {
 	affected := `{"findings":[{"formula":"jq","version":"1.8.2","vulnerabilities":[{"id":"CVE-2024-23337","aliases":["GHSA-2q6r-344g-cx46"],"summary":null}],"patched":[]}],"skipped_formulae":[]}`
 	patched := strings.Replace(strings.Replace(affected, `"vulnerabilities":[`, `"patched":[`, 1), `"patched":[]`, `"vulnerabilities":[]`, 1)
 	for _, tc := range []struct {
-		raw    string
-		status int
-	}{{clean, 0}, {affected, 1}, {patched, 0}} {
-		if _, err := parsePublicVulns([]byte(tc.raw), tc.status, candidates); err != nil {
-			t.Fatal(err)
-		}
+		name     string
+		raw      string
+		exitCode int
+	}{
+		{"clean", clean, 0},
+		{"affected", affected, 1},
+		{"patched", patched, 0},
+	} {
+		t.Run(tc.name, func(t *testing.T) {
+			if _, err := parsePublicVulns([]byte(tc.raw), tc.exitCode, candidates); err != nil {
+				t.Fatalf("report with exit %d rejected: %v", tc.exitCode, err)
+			}
+		})
 	}
 	for name, tc := range map[string]struct {
-		raw    string
-		status int
+		raw      string
+		exitCode int
 	}{
-		"failed clean": {clean, 1}, "crashed clean": {clean, 2}, "affected exit zero": {affected, 0},
-		"skipped exit zero": {`{"findings":[],"skipped_formulae":["oniguruma"]}`, 0},
-		"missing skipped":   {`{"findings":[]}`, 0}, "null findings": {`{"findings":null,"skipped_formulae":[]}`, 0},
+		"failed clean":          {clean, 1},
+		"crashed clean":         {clean, 2},
+		"affected exit zero":    {affected, 0},
+		"skipped exit zero":     {`{"findings":[],"skipped_formulae":["oniguruma"]}`, 0},
+		"missing skipped":       {`{"findings":[]}`, 0},
+		"null findings":         {`{"findings":null,"skipped_formulae":[]}`, 0},
 		"old installed version": {strings.Replace(affected, `1.8.2`, `1.6`, 1), 1},
 		"unrequested formula":   {strings.Replace(affected, `"jq"`, `"curl"`, 1), 1},
 		"missing patched":       {strings.Replace(affected, `,"patched":[]`, "", 1), 1},
@@ -37,7 +47,7 @@ func TestPublicVulnsOutput(t *testing.T) {
 		"unsafe id":             {strings.Replace(affected, `CVE-2024-23337`, `bad\u001b`, 1), 1},
 	} {
 		t.Run(name, func(t *testing.T) {
-			if _, err := parsePublicVulns([]byte(tc.raw), tc.status, candidates); err == nil {
+			if _, err := parsePublicVulns([]byte(tc.raw), tc.exitCode, candidates); err == nil {
 				t.Fatal("unverified report accepted")
 			}
 		})

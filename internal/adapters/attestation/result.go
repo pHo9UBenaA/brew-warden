@@ -7,21 +7,15 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-// Validate one result independently so age cannot borrow another result's subject.
-func verifiedResultSubject(raw []byte, a domain.Artifact) (bool, error) {
-	var result struct {
-		Verification json.RawMessage `json:"verificationResult"`
-	}
-	if err := decodeObject(raw, &result, "verificationResult"); err != nil {
-		return false, err
-	}
-	var verification struct {
-		Signature json.RawMessage `json:"signature"`
-		Statement json.RawMessage `json:"statement"`
-	}
-	if err := decodeObject(result.Verification, &verification, "signature", "statement"); err != nil {
-		return false, err
-	}
+// Keep signer, subject and timestamps from one gh result together. A timestamp
+// cannot borrow a matching subject or a trusted signer from another result.
+type ghVerificationResult struct {
+	Signature  json.RawMessage   `json:"signature"`
+	Statement  json.RawMessage   `json:"statement"`
+	Timestamps []json.RawMessage `json:"verifiedTimestamps"`
+}
+
+func verifiedResultSubject(verification ghVerificationResult, a domain.Artifact) (bool, error) {
 	var signature struct {
 		Certificate json.RawMessage `json:"certificate"`
 	}

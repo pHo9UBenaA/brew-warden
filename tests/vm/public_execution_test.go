@@ -82,8 +82,8 @@ func TestLivePublicCommandExecution(t *testing.T) {
 			if result, err := session.Run(runContext, prepared.Assessment.Binding); err == nil || !interrupt.Triggered() || !result.ExitKnown || result.ExitCode == 0 {
 				t.Fatalf("want nonzero child exit after interruption: triggered=%t result=%+v error=%v", interrupt.Triggered(), result, err)
 			}
-			if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
-				t.Fatal("interrupted execution changed unrelated packages")
+			if after := publicUnrelatedKegs(t, prepared.Assessment.Nodes); !maps.Equal(unrelatedBefore, after) {
+				t.Fatalf("interrupted execution changed unrelated packages: before=%v after=%v", unrelatedBefore, after)
 			}
 			if err := session.Close(); err != nil && !strings.Contains(err.Error(), "owned Homebrew process") {
 				t.Fatal(err)
@@ -170,7 +170,7 @@ func TestLivePublicCommandExecution(t *testing.T) {
 				}
 				path := fetch.Downloads[0].Path
 				if !strings.HasPrefix(path, filepath.Dir(files[0])+"/cache/downloads/") {
-					t.Fatal("fixture path outside workspace")
+					t.Fatalf("want cached fixture under %s/cache/downloads/, got %q", filepath.Dir(files[0]), path)
 				}
 				if err := os.Remove(path); err != nil {
 					t.Fatal(err)
@@ -198,8 +198,8 @@ func TestLivePublicCommandExecution(t *testing.T) {
 		if err != nil || !result.ExitKnown || result.ExitCode != 0 || !result.MatchesPlan || !result.AfterState.Valid() {
 			t.Fatal(result, err)
 		}
-		if !maps.Equal(unrelatedBefore, publicUnrelatedKegs(t, prepared.Assessment.Nodes)) {
-			t.Fatal("execution changed an unrelated installed package")
+		if after := publicUnrelatedKegs(t, prepared.Assessment.Nodes); !maps.Equal(unrelatedBefore, after) {
+			t.Fatalf("execution changed unrelated packages: before=%v after=%v", unrelatedBefore, after)
 		}
 		if pass == 1 && result.AfterState != prepared.BeforeState {
 			t.Fatalf("unchanged rerun changed selected state: before=%s after=%s", prepared.BeforeState, result.AfterState)

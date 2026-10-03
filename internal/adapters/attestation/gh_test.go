@@ -69,8 +69,9 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 	two := ghResult(a, "2026-09-22T12:00:00Z")
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
 	got, err := oldestVerifiedTimestamp([]byte("["+two+","+one+"]"), a, now)
-	if err != nil || got != time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC).Unix() {
-		t.Fatal(got, err)
+	want := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC).Unix()
+	if err != nil || got != want {
+		t.Fatalf("want oldest verified timestamp %d, got %d: error=%v", want, got, err)
 	}
 	b := a
 	b.SHA256 = domain.Digest(strings.Repeat("b", 64))
@@ -156,14 +157,16 @@ func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {
 	if _, err := oldestVerifiedTimestamp([]byte("["+raw+"]"), all, now); err != nil {
 		t.Fatal(err)
 	}
-	for _, bad := range []string{
-		strings.Replace(raw, string(platform.SHA256), strings.Repeat("b", 64), 1),
-		strings.Replace(raw, "arm64_tahoe", "arm64_linux", 1),
-		strings.Replace(raw, ".bottle.1.", ".bottle.2.", 1),
+	for name, bad := range map[string]string{
+		"different digest":   strings.Replace(raw, string(platform.SHA256), strings.Repeat("b", 64), 1),
+		"different platform": strings.Replace(raw, "arm64_tahoe", "arm64_linux", 1),
+		"different rebuild":  strings.Replace(raw, ".bottle.1.", ".bottle.2.", 1),
 	} {
-		if _, err := oldestVerifiedTimestamp([]byte("["+bad+"]"), all, now); err == nil {
-			t.Fatal("unbound all bottle accepted")
-		}
+		t.Run(name, func(t *testing.T) {
+			if _, err := oldestVerifiedTimestamp([]byte("["+bad+"]"), all, now); err == nil {
+				t.Fatal("unbound all bottle accepted")
+			}
+		})
 	}
 }
 
@@ -225,19 +228,24 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 	}
 }
 
-func TestPublicGHCommandBoundary(t *testing.T) {
+func ghCommandFixture(t *testing.T) (domain.Artifact, string, string) {
+	t.Helper()
 	root := t.TempDir()
-	a := artifactFixture()
-	bottle := filepath.Join(root, bottleName(a))
+	artifact := artifactFixture()
+	bottle := filepath.Join(root, bottleName(artifact))
 	if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
 		t.Fatal(err)
 	}
-	var err error
-	a.SHA256, err = hashFile(bottle, 1000)
+	digest, err := hashFile(bottle, 1000)
 	if err != nil {
 		t.Fatal("cannot hash command-boundary bottle fixture", err)
 	}
-	tool := filepath.Join(root, "gh")
+	artifact.SHA256 = digest
+	return artifact, bottle, filepath.Join(root, "gh")
+}
+
+func TestPublicGHCommandBoundary(t *testing.T) {
+	a, bottle, tool := ghCommandFixture(t)
 	verified := "[" + ghResult(a, "2026-09-10T00:00:00Z") + "]"
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
 	for _, tc := range []struct {
@@ -284,24 +292,82 @@ test "$8" = --format && test "${10}" = --limit && test "${11}" = 100 || exit 5
 					age.Publication != domain.VerifiedAttestation || age.PublishedAt != got ||
 					provenance.RawSHA256 != EvidenceDigest(evidenceRaw) || age.RawSHA256 != provenance.RawSHA256 ||
 					provenance.Subject != a || age.Subject != a {
-					t.Fatal("provenance and age not bound to the same bytes", err)
+					t.Fatalf("want provenance and age for %+v at %d with response digest %s: provenance=%+v age=%+v error=%v", a, got, EvidenceDigest(evidenceRaw), provenance, age, err)
 				}
 			}
 		})
 	}
-	if err := os.WriteFile(tool, []byte("#!/bin/sh\nif [ \"$1\" = version ]; then echo 'gh version 2.62.0 (unsupported)'; else exit 42; fi\n"), 0700); err != nil {
+}
+
+func TestPublicGHRejectsUnsupportedVersionBeforeAttestation(t *testing.T) {
+	artifact, bottle, tool := ghCommandFixture(t)
+	started := filepath.Join(filepath.Dir(tool), "attestation-started")
+	t.Setenv("GH_TEST_VERIFY_STARTED", started)
+	script := `#!/bin/sh
+if [ "$1" = version ]; then
+  echo 'gh version 2.62.0 (unsupported)'
+  exit 0
+fi
+printf started > "$GH_TEST_VERIFY_STARTED"
+exit 42
+`
+	if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	if _, _, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), a, bottle, now); err == nil {
-		t.Fatal("unsupported gh accepted")
+	const now = int64(1800000000)
+	if _, _, err := (PublicGH{Path: tool}).VerifyBottle(context.Background(), artifact, bottle, now); err == nil || !strings.Contains(err.Error(), "unsupported installed gh version") {
+		t.Fatalf("want unsupported gh version refusal, got %v", err)
 	}
-	if err := os.WriteFile(tool, []byte("#!/bin/sh\nif [ \"$1\" = version ]; then echo 'gh version 2.101.0 (fixture)'; else exec /bin/sleep 30; fi\n"), 0700); err != nil {
+	if _, err := os.Stat(started); !os.IsNotExist(err) {
+		t.Fatal("unsupported gh reached attestation command", err)
+	}
+}
+
+func TestPublicGHCancellationStopsRunningAttestation(t *testing.T) {
+	artifact, bottle, tool := ghCommandFixture(t)
+	started := filepath.Join(filepath.Dir(tool), "attestation-started")
+	t.Setenv("GH_TEST_VERIFY_STARTED", started)
+	script := `#!/bin/sh
+if [ "$1" = version ]; then
+  echo 'gh version 2.101.0 (fixture)'
+  exit 0
+fi
+printf started > "$GH_TEST_VERIFY_STARTED"
+exec /bin/sleep 30
+`
+	if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
 		t.Fatal(err)
 	}
-	ctx, cancel := context.WithTimeout(context.Background(), 50*time.Millisecond)
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)
 	defer cancel()
-	start := time.Now()
-	if _, _, err := (PublicGH{Path: tool}).VerifyBottle(ctx, a, bottle, now); err == nil || time.Since(start) > 3*time.Second {
-		t.Fatalf("want cancellation error within three seconds: elapsed=%s error=%v", time.Since(start), err)
+	completed := make(chan error, 1)
+	go func() {
+		_, _, err := (PublicGH{Path: tool}).VerifyBottle(ctx, artifact, bottle, 1800000000)
+		completed <- err
+	}()
+	// Wait for the actual attestation invocation, not an arbitrary sleep that
+	// could expire during file hashing or the separate version probe.
+	for {
+		if _, err := os.Stat(started); err == nil {
+			break
+		} else if !os.IsNotExist(err) {
+			t.Fatal("cannot observe attestation start", err)
+		}
+		select {
+		case err := <-completed:
+			t.Fatalf("verification ended before attestation started: %v", err)
+		case <-ctx.Done():
+			t.Fatal("attestation did not start before test deadline")
+		case <-time.After(10 * time.Millisecond):
+		}
+	}
+	cancel()
+	select {
+	case err := <-completed:
+		if err == nil || !strings.Contains(err.Error(), "gh command timed out or was cancelled") {
+			t.Fatalf("want attestation cancellation refusal, got %v", err)
+		}
+	case <-time.After(3 * time.Second):
+		t.Fatal("running attestation did not stop within three seconds of cancellation")
 	}
 }

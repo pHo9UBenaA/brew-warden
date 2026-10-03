@@ -30,10 +30,10 @@ func TestCapturedGHVerifiedResultCohorts(t *testing.T) {
 			}
 			result, err := os.ReadFile(filepath.Join("testdata", "gh-"+version+"-jq-verified.json"))
 			if err != nil || len(result) == 0 || len(result) > maxResponse {
-				t.Fatalf("captured result unavailable or unbounded: %v", err)
+				t.Fatalf("want captured result of 1..%d bytes: bytes=%d error=%v", maxResponse, len(result), err)
 			}
 			if got, err := oldestVerifiedTimestamp(result, artifact, now); err != nil || got != oldest {
-				t.Fatalf("verified signer/subject/earliest time not parsed: %d %v", got, err)
+				t.Fatalf("want verified timestamp %d for %+v, got %d: error=%v", oldest, artifact, got, err)
 			}
 			// The authenticated gh 2.66.0 --repo result matched the earlier
 			// offline-bundle capture byte-for-byte in the native guest. Keep the

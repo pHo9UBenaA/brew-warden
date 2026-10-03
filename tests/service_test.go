@@ -52,7 +52,7 @@ func TestFreshRetryRequiresNewBoundPlan(t *testing.T) {
 	second := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, AfterState: domain.Digest(strings.Repeat("c", 64)), MatchesPlan: true}}
 	planner.prepared, planner.session = p, second
 	if result, err := s.Run(context.Background(), request, domain.DefaultPolicy(), nil); err != nil || result.Outcome != domain.AttemptSucceeded || planner.calls != 2 || !second.ran {
-		t.Fatal("fresh retry did not use new plan", result, err)
+		t.Fatalf("want successful fresh retry with two preparations and second launch: result=%+v calls=%d ran=%t error=%v", result, planner.calls, second.ran, err)
 	}
 }
 

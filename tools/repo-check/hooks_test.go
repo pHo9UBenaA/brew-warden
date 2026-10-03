@@ -82,7 +82,7 @@ func TestGitHooks(t *testing.T) {
 		t.Fatalf("wrong rejection: %s", out)
 	}
 	if _, err := os.Stat(filepath.Join(root, "hook-verified")); err != nil {
-		t.Fatal("pre-commit did not run verification")
+		t.Fatal("pre-commit did not run verification", err)
 	}
 	run(true, "commit", "-qm", "chore: initialize hook fixture")
 	first := strings.TrimSpace(run(true, "rev-parse", "HEAD"))

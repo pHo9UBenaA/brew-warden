@@ -6,6 +6,7 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
+// Now returns Unix time in whole seconds, as required by domain assessments.
 type Clock interface{ Now() int64 }
 
 type Request struct {
@@ -32,7 +33,7 @@ type ExecutionResult struct {
 // A session owns the lock/snapshot lifetime through final state inspection.
 // Revalidate must recompute identity from actual inputs, not return cached flags.
 type ExecutionSession interface {
-	Revalidate(context.Context) (Prepared, error)
-	Run(context.Context, domain.Binding) (ExecutionResult, error)
+	Revalidate(ctx context.Context) (Prepared, error)
+	Run(ctx context.Context, binding domain.Binding) (ExecutionResult, error)
 	Close() error
 }

@@ -67,8 +67,8 @@ func TestWrapperOptions(t *testing.T) {
 		{[]string{"--minimum-release-age", "0h", "doctor"}, "0"},
 	} {
 		var out, diagnostics bytes.Buffer
-		if RunWithConfig(tc.args, &out, &diagnostics, configSource{}) != 1 || !strings.Contains(diagnostics.String(), "minimum_release_age_seconds: "+tc.seconds+"\n") {
-			t.Fatalf("unexpected diagnostic: %s", &diagnostics)
+		if code := RunWithConfig(tc.args, &out, &diagnostics, configSource{}); code != 1 || !strings.Contains(diagnostics.String(), "minimum_release_age_seconds: "+tc.seconds+"\n") {
+			t.Fatalf("options %q: want exit 1 and minimum age %s seconds, got exit=%d diagnostics=%q", tc.args, tc.seconds, code, &diagnostics)
 		}
 	}
 	for _, args := range [][]string{

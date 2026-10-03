@@ -11,7 +11,7 @@ var ErrNothingToDo = errors.New("no installed formulae to upgrade")
 
 type AgeOverride struct{ Name, Reason string }
 type Planner interface {
-	Prepare(context.Context, Request, domain.Policy, []AgeOverride, int64) (Prepared, ExecutionSession, error)
+	Prepare(ctx context.Context, request Request, policy domain.Policy, overrides []AgeOverride, now int64) (Prepared, ExecutionSession, error)
 }
 type Diagnostics interface{ Check(context.Context) error }
 

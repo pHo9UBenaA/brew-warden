@@ -69,7 +69,7 @@ func TestCandidateEvidenceRequiresBoundVerifierClaims(t *testing.T) {
 				path := filepath.Join(w.root, "observations", string(evidence.RawSHA256)+".json")
 				raw, err := os.ReadFile(path)
 				if err != nil || digestBytes(raw) != evidence.RawSHA256 {
-					t.Fatalf("claim %v has no matching observation: error=%v", evidence.Claim, err)
+					t.Fatalf("claim %v observation at %s: want digest=%s got=%s error=%v", evidence.Claim, path, evidence.RawSHA256, digestBytes(raw), err)
 				}
 			}
 		})

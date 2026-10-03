@@ -152,7 +152,7 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 		return "", err
 	}
 	manifest := runtimeManifest{Schema: 2, BrewRevision: revision, Files: []runtimeEntry{}}
-	var total int64
+	var totalFileBytes int64
 	for _, root := range []string{"bin/brew", "Library/Homebrew"} {
 		err := filepath.WalkDir(filepath.Join(prefix, root), func(file string, item os.DirEntry, walkErr error) error {
 			if walkErr != nil {
@@ -189,8 +189,8 @@ func (r Runtime) materializeFrom(destination, prefix string) (domain.Digest, err
 				if !info.Mode().IsRegular() || info.Size() < 0 || info.Size() > 128*1024*1024 {
 					return errors.New("unsupported Homebrew runtime file")
 				}
-				total += info.Size()
-				if total > 2*1024*1024*1024 {
+				totalFileBytes += info.Size()
+				if totalFileBytes > 2*1024*1024*1024 {
 					return errors.New("installed Homebrew runtime exceeds size limit")
 				}
 				if info.Mode().Perm()&0111 != 0 {

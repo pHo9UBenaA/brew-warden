@@ -77,7 +77,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 		}
 		after, err := kegSnapshot(filepath.Join("/opt/homebrew/Cellar", rack.Name()))
 		if err != nil || before[rack.Name()] != after {
-			t.Fatal("unplanned package changed", rack.Name(), err)
+			t.Fatalf("unplanned package %s changed: before=%s after=%s error=%v", rack.Name(), before[rack.Name()], after, err)
 		}
 	}
 	for name := range before {

@@ -23,7 +23,7 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 			}
 			selected, err := parseInfo(info, []string{"jq"})
 			if err != nil || len(selected) != 1 {
-				t.Fatalf("selected public bottle not interpretable: %v", err)
+				t.Fatalf("want one selected public bottle: candidates=%+v error=%v", selected, err)
 			}
 			jq := selected[0]
 			if jq.artifact().SHA256 != domain.Digest("ca67c64d0aaf1e5472790ec2cc081ff7972316f27095d8a8aab81b3321247036") ||
@@ -37,7 +37,7 @@ func TestCapturedHomebrewInfoAndScannerCohorts(t *testing.T) {
 			}
 			report, err := parsePublicVulns(scan, 0, selected)
 			if err != nil || len(report.Skipped) != 0 || len(report.Findings) != 0 {
-				t.Fatalf("captured scanner output incompatible with selected candidate: %v", err)
+				t.Fatalf("want captured scan without findings or skipped subjects: report=%+v error=%v", report, err)
 			}
 			// Exit zero without the explicit skipped-subject inventory cannot
 			// justify a clean result. Derive the failure from the real response.

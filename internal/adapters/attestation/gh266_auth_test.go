@@ -54,6 +54,6 @@ exit 4
 	provenance, age, raw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, time.Date(2026, 9, 24, 0, 0, 0, 0, time.UTC).Unix())
 	if err == nil || !strings.Contains(err.Error(), "gh authentication required") ||
 		provenance != (domain.Evidence{}) || age != (domain.Evidence{}) || raw != nil {
-		t.Fatalf("unauthenticated gh 2.66.0 produced evidence: %v", err)
+		t.Fatalf("want authentication refusal with no evidence: provenance=%+v age=%+v raw=%q error=%v", provenance, age, raw, err)
 	}
 }

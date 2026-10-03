@@ -25,7 +25,7 @@ func TestAdvisoryInventoryAndOmittedStatus(t *testing.T) {
 		feed + `{}`, feed[:len(feed)-1],
 	} {
 		if _, err := parseAdvisoryIndex([]byte(raw)); err == nil {
-			t.Fatal("incomplete feed accepted")
+			t.Fatalf("incomplete feed accepted: %s", raw)
 		}
 	}
 	var wrapper struct {
@@ -56,7 +56,7 @@ func TestAdvisoryInventoryAndOmittedStatus(t *testing.T) {
 	} {
 		withStatus := append(append([]byte{}, raw[:len(raw)-1]...), []byte(`,"vulnerabilities":`+status+`}`)...)
 		if _, err := parseBrewAdvisoryStatus(withStatus, candidates[0], index.Records["jq"]); err != nil {
-			t.Fatal(err)
+			t.Fatalf("supported advisory status %s rejected: %v", status, err)
 		}
 	}
 }
@@ -92,7 +92,7 @@ func TestPublicAdvisoryTransport(t *testing.T) {
 		name      string
 		status    int
 		age, body string
-		limit     int64
+		maxBytes  int64
 		ok        bool
 	}{
 		{"complete", 200, "0", "{}", 2, true}, {"oversized", 200, "0", "{}x", 2, false},
@@ -105,7 +105,7 @@ func TestPublicAdvisoryTransport(t *testing.T) {
 				}
 				return &http.Response{StatusCode: tc.status, Header: http.Header{"Age": []string{tc.age}}, Body: io.NopCloser(strings.NewReader(tc.body))}, nil
 			})}
-			_, err := fetchAdvisoryJSON(context.Background(), client, advisoryFeedURL, tc.limit)
+			_, err := fetchAdvisoryJSON(context.Background(), client, advisoryFeedURL, tc.maxBytes)
 			if (err == nil) != tc.ok {
 				t.Fatalf("want success=%t, got error=%v", tc.ok, err)
 			}

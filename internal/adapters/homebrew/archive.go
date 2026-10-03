@@ -7,7 +7,6 @@ import (
 	"errors"
 	"io"
 	"path"
-	"strconv"
 	"strings"
 )
 
@@ -22,13 +21,9 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 	}
 	defer compressed.Close()
 	archive := tar.NewReader(compressed)
-	version := f.Version
-	if f.Revision > 0 {
-		version += "_" + strconv.Itoa(f.Revision)
-	}
-	prefix := f.Name + "/" + version
+	prefix := f.Name + "/" + kegVersion(f.Version, f.Revision)
 	entries := map[string]byte{}
-	var total int64
+	var totalPayloadBytes int64
 	for {
 		header, err := archive.Next()
 		if err == io.EOF {
@@ -69,8 +64,8 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 			if header.Size < 0 || header.Size > 128*1024*1024 {
 				return errors.New("bottle file exceeds limit")
 			}
-			total += header.Size
-			if total > 2*1024*1024*1024 {
+			totalPayloadBytes += header.Size
+			if totalPayloadBytes > 2*1024*1024*1024 {
 				return errors.New("bottle payload exceeds limit")
 			}
 		case tar.TypeSymlink:
@@ -94,8 +89,8 @@ func validateBottleArchive(data []byte, f formulaMetadata) error {
 		}
 	}
 	// Consume bounded tar padding and validate the gzip footer, including CRC.
-	n, err := io.Copy(io.Discard, io.LimitReader(compressed, 1024*1024+1))
-	if err != nil || n > 1024*1024 {
+	trailerBytes, err := io.Copy(io.Discard, io.LimitReader(compressed, 1024*1024+1))
+	if err != nil || trailerBytes > 1024*1024 {
 		return errors.New("invalid bottle archive trailer")
 	}
 	return nil

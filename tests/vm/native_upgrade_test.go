@@ -86,7 +86,7 @@ func TestLiveExplicitUpgradeChangesSelectedVersion(t *testing.T) {
 	for name, before := range unrelated {
 		after, err := kegSnapshot(filepath.Join("/opt/homebrew/Cellar", name))
 		if err != nil || after != before {
-			t.Fatal("upgrade changed an unrelated keg", name, err)
+			t.Fatalf("upgrade changed unrelated keg %s: before=%s after=%s error=%v", name, before, after, err)
 		}
 	}
 	t.Log("verified explicit upgrade", target, filepath.Base(prior), "->", wanted)

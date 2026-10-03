@@ -173,8 +173,8 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 				if err == nil {
 					t.Fatal("unsupported state accepted")
 				}
-			} else if err != nil || got[0].Operation != tc.want {
-				t.Fatal(got, err)
+			} else if err != nil || len(got) != 1 || got[0].Operation != tc.want {
+				t.Fatalf("want one %q action, got %+v: error=%v", tc.want, got, err)
 			}
 		})
 	}

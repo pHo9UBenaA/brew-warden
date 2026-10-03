@@ -8,6 +8,6 @@ import (
 
 // BottleVerifier binds both provenance and age to one verified CLI response.
 type BottleVerifier interface {
-	Check(context.Context) error
-	VerifyEvidence(context.Context, domain.Artifact, string, int64) (domain.Evidence, domain.Evidence, []byte, error)
+	Check(ctx context.Context) error
+	VerifyEvidence(ctx context.Context, artifact domain.Artifact, bottlePath string, observedAt int64) (provenance domain.Evidence, publication domain.Evidence, rawResponse []byte, err error)
 }

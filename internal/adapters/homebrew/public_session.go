@@ -11,7 +11,6 @@ import (
 	"os/exec"
 	"path/filepath"
 	"slices"
-	"strconv"
 	"strings"
 	"syscall"
 	"time"
@@ -111,20 +110,30 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 			}
 		}
 	}
-	raw, err := json.Marshal(document.Formulae)
+	digest, err := w.saveInstalledState(document.Formulae)
 	if err != nil {
 		return nil, "", err
+	}
+	return document.Formulae, digest, nil
+}
+
+// Store the exact observation once; an existing digest path must still contain
+// the same bytes. Saving a snapshot does not establish installation success.
+func (w workspace) saveInstalledState(formulae []installedFormula) (domain.Digest, error) {
+	raw, err := json.Marshal(formulae)
+	if err != nil {
+		return "", err
 	}
 	digest := digestBytes(raw)
 	destination := filepath.Join(w.root, "states", string(digest)+".json")
 	if old, err := readRegular(destination, maxManifest); err == nil {
 		if digestBytes(old) != digest {
-			return nil, "", errors.New("saved installed observation changed")
+			return "", errors.New("saved installed observation changed")
 		}
 	} else if err := writeRecord(destination, raw); err != nil {
-		return nil, "", err
+		return "", err
 	}
-	return document.Formulae, digest, nil
+	return digest, nil
 }
 
 // parseInfo has already established that metadata contains exactly the requested
@@ -248,10 +257,7 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 		}
 		return "install", nil
 	}
-	candidateKegVersion := candidate.Version
-	if candidate.Revision > 0 {
-		candidateKegVersion += "_" + strconv.Itoa(candidate.Revision)
-	}
+	candidateKegVersion := kegVersion(candidate.Version, candidate.Revision)
 	if state.ActiveVersion == nil || *state.ActiveVersion == "" {
 		return "", errors.New("unlinked installed candidate requires manual Homebrew repair")
 	}
@@ -502,7 +508,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		return ports.ExecutionResult{ExitKnown: true, ExitCode: 0}, err
 	}
 	actions, err := publicActions(states, s.plan.Nodes, collectionInputs{Operation: "install"})
-	matches := err == nil && slices.IndexFunc(actions, func(a plannedAction) bool { return a.Operation != "keep" }) < 0
+	matches := err == nil && !slices.ContainsFunc(actions, func(action plannedAction) bool { return action.Operation != "keep" })
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }
 
