@@ -1,8 +1,9 @@
 # Resolution work for Issues #3–20
 
-Base: `494ed92c6650f8c9ca97e95958d3b335d23a323c`. This record describes the
-accompanying changes and their verification, not a product-readiness result.
-The GitHub issues were read but not closed; nothing was pushed or published.
+Base: `494ed92c6650f8c9ca97e95958d3b335d23a323c`. Implementation commit:
+`23b2902ddb181e75b621dbf360b18a46c40297af`. The initial verification below
+preceded native acceptance and issue closure. The follow-up records readiness
+only for that exact tested revision; nothing was pushed or published.
 
 ## Scope and ownership
 
@@ -106,9 +107,50 @@ Using the existing Go 1.27.1 toolchain and pinned development tools:
 - Skill frontmatter/relative links, Task descriptions and the complete diff were
   inspected. The user's unrelated `.gitignore` edit was preserved and excluded.
 
-No native authenticated Homebrew execution or real Tart/Keychain acceptance was
-run for this revision. In particular, the new packaged ownership test and fresh
-private-file login/cleanup flow still require disposable-VM acceptance with
-human-mediated device authorization. No host Homebrew installation, real host
-authentication or VM was modified by these checks. The offline/source/shell
-results above are not a replacement for that native release evidence.
+At the initial implementation commit, native authenticated Homebrew execution
+and the fresh private-file login/cleanup flow had not yet been exercised. The
+offline/source/shell checks did not modify host Homebrew or host authentication
+and were not treated as a replacement for native release evidence.
+
+## Authenticated native follow-up, 2026-10-03
+
+After the user approved guest-only device authorization, the complete local
+readiness gate passed for `23b2902ddb181e75b621dbf360b18a46c40297af`:
+
+- Artifact: `brewwarden-darwin-arm64.tar.gz`, SHA-256
+  `6ad228661dcdededdfd6c07937f6a4b651df0786299757e55e6b02214c2ec2b9`.
+- Runtime: reviewed Homebrew 7.0.6 at
+  `570982948a8a194f0f42f43f4a5bce2d1c9f64cb`, installed gh 2.101.0,
+  disposable Apple Silicon Tahoe VM `brewwarden-issues-17-18-02`.
+- A clean detached worktree preserved the user's unrelated `.gitignore` edit.
+  The initial cache-root symlink was refused by hygiene before VM creation;
+  replacing it with a real ignored cache directory allowed normal checks.
+  No check was bypassed.
+- `product-ready.sh start` passed full offline/race/coverage/fuzz/lint/vulnerability
+  checks, tagged native vet/lint/vulnerability checks and arm64 compilation,
+  two matching distribution builds, and guest preparation/doctor.
+- `product-ready.sh complete` passed the entire fixed-order native suite:
+  18 tagged test invocations, no failures or skips, plus the packaged commands.
+  Survey completion was not interpreted as eligibility for every surveyed bottle.
+- For #17, `TestLiveDistributionPromotesExplicitInstallOwnership` passed against
+  the packaged binary. An unchanged jq install retained dependency-only
+  oniguruma ownership; explicit oniguruma install promoted `installed_on_request`
+  while preserving payload bytes and installation time. Install/upgrade,
+  refusal, exception, interruption, partial-link, parent-death and fresh-retry
+  cases also passed.
+- For #18, real guest gh device login used explicit private-file storage. After
+  the suite, pending-login cleanup, logout, credential/config/log removal and
+  Tart stop succeeded. An independent Tart inventory showed the retained VM
+  stopped. The gate wrote its readiness record only after successful cleanup,
+  at `2026-10-03T12:08:17Z`.
+
+Private evidence is retained under the detached worktree's ignored
+`.cache/product-ready.brewwarden-issues-17-18-02/` directory. This is native
+private-file credential cleanup evidence, not proof of deleting a legacy
+Keychain entry. OAuth grant revocation remains an account-owner action; no host
+credentials were forwarded to the guest and no host Homebrew prefix was changed.
+
+The user authorized issue closure: #3–16 and #19–20 were closed after their
+respective checks; #17–18 were closed after native acceptance. GitHub reported
+no remaining open issues. The later documentation-only commit recording these
+results does not inherit the tested revision's readiness certification.
