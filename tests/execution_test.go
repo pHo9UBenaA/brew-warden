@@ -34,17 +34,20 @@ func (s *executionSession) Revalidate(context.Context) (ports.Prepared, error) {
 	}
 	return s.prepared, s.validationErr
 }
+
 func (s *executionSession) Run(_ context.Context, _ domain.Binding) (ports.ExecutionResult, error) {
 	s.ran = true
 	return s.result, s.runErr
 }
+
 func (s *executionSession) Close() error {
 	s.closed = true
 	return s.closeErr
 }
 
-func preparedExecution() ports.Prepared {
-	a := eligibleAssessment()
+func preparedExecution(t testing.TB) ports.Prepared {
+	t.Helper()
+	a := eligibleAssessment(t)
 	return ports.Prepared{Assessment: a, BeforeState: domain.Digest(strings.Repeat("b", 64)), ExpiresAt: a.Now + 120}
 }
 
@@ -61,7 +64,7 @@ func TestFreshExecutionReportsActualExitAndState(t *testing.T) {
 		{"lost child", ports.ExecutionResult{}, domain.AttemptUnknown},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			p := preparedExecution()
+			p := preparedExecution(t)
 			s := &executionSession{prepared: p, result: tc.actual}
 			result, err := application.Execute(context.Background(), p, s, &executionClock{p.Assessment.Now})
 			if result.Outcome != tc.want || !s.ran || !s.closed || (err == nil) != (tc.want == domain.AttemptSucceeded) {
@@ -72,8 +75,8 @@ func TestFreshExecutionReportsActualExitAndState(t *testing.T) {
 }
 
 func TestExecutionRejectsChangedAttemptWithoutLaunch(t *testing.T) {
-	original := preparedExecution()
-	fresh := preparedExecution()
+	original := preparedExecution(t)
+	fresh := preparedExecution(t)
 	fresh.Assessment.Binding.Attempt = domain.Digest(strings.Repeat("d", 64))
 	session := &executionSession{prepared: fresh}
 	_, err := application.Execute(context.Background(), original, session, &executionClock{original.Assessment.Now})
@@ -83,7 +86,7 @@ func TestExecutionRejectsChangedAttemptWithoutLaunch(t *testing.T) {
 }
 
 func TestExecutionCannotReportSuccessWhenOwnedProcessStateIsUnresolved(t *testing.T) {
-	p := preparedExecution()
+	p := preparedExecution(t)
 	s := &executionSession{
 		prepared: p,
 		result:   ports.ExecutionResult{ExitKnown: true, AfterState: domain.Digest(strings.Repeat("c", 64)), MatchesPlan: true},
@@ -98,9 +101,9 @@ func TestExecutionCannotReportSuccessWhenOwnedProcessStateIsUnresolved(t *testin
 func TestFreshExecutionFailureGatesNeverLaunch(t *testing.T) {
 	for _, reason := range []string{"plan changed", "state changed", "expired", "emergency signature", "stale vulnerability", "cancel during revalidation", "clock advances"} {
 		t.Run(reason, func(t *testing.T) {
-			p := preparedExecution()
+			p := preparedExecution(t)
 			clock := &executionClock{p.Assessment.Now}
-			s := &executionSession{prepared: preparedExecution()}
+			s := &executionSession{prepared: preparedExecution(t)}
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
 			switch reason {

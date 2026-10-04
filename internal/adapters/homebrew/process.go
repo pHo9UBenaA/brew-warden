@@ -33,6 +33,7 @@ func (w workspace) environment() []string {
 		"TZ=UTC",
 	}
 }
+
 func (w workspace) initialize() error {
 	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations", "states"} {
 		if err := os.Mkdir(filepath.Join(w.root, name), 0700); err != nil {
@@ -70,6 +71,7 @@ func (w workspace) sandbox(name string, permissions sandboxPermissions, immutabl
 	}
 	return destination, nil
 }
+
 func (w workspace) command(ctx context.Context, profile string, args ...string) *exec.Cmd {
 	brew := filepath.Join(w.root, "runtime/brew/bin/brew")
 	command := exec.CommandContext(ctx, "/usr/bin/arch", append([]string{"-arm64", "/usr/bin/sandbox-exec", "-f", profile, brew}, args...)...)

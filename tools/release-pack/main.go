@@ -27,10 +27,12 @@ func main() {
 		os.Exit(1)
 	}
 }
+
 func hash(data []byte) string {
 	sum := sha256.Sum256(data)
 	return hex.EncodeToString(sum[:])
 }
+
 func run(args []string) error {
 	if len(args) != 4 {
 		return fmt.Errorf("usage: release-pack BINARY GO_LICENSE SOURCE_REVISION OUTPUT.tar.gz")
@@ -83,6 +85,7 @@ func run(args []string) error {
 	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0644})
 	return archive(output, items)
 }
+
 func archive(output string, items []item) error {
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
 	sums := ""

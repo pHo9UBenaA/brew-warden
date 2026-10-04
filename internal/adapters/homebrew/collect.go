@@ -25,6 +25,7 @@ type Collector struct {
 	LegacyState    string
 	client         *http.Client
 }
+
 type Collection struct {
 	root            string
 	inputs          collectionInputs
@@ -34,10 +35,12 @@ type Collection struct {
 	runtimeRevision string
 	frozen          []frozenInput
 }
+
 type downloadEntry struct {
 	Name string `json:"name" required:"true"`
 	Path string `json:"path" required:"true"`
 }
+
 type downloadDocument struct {
 	Schema    int             `json:"schema" required:"true"`
 	Downloads []downloadEntry `json:"downloads" required:"true"`
@@ -78,6 +81,7 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 	}
 	return result, nil
 }
+
 func (c *Collector) collect(ctx context.Context, result *Collection, request ports.Request) error {
 	ctx, cancel := context.WithTimeout(ctx, 10*time.Minute)
 	defer cancel()
@@ -224,6 +228,7 @@ func checkClaim(evidence domain.Evidence, artifact domain.Artifact, claim domain
 	}
 	return nil
 }
+
 func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error {
 	var doc downloadDocument
 	if err := decodeStrict(raw, &doc); err != nil || doc.Schema != 1 || len(doc.Downloads) != len(candidates) {
@@ -253,12 +258,14 @@ func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error
 	}
 	return nil
 }
+
 func (w workspace) observation(evidence domain.Evidence, raw []byte) error {
 	if digestBytes(raw) != evidence.RawSHA256 {
 		return errors.New("evidence observation digest mismatch")
 	}
 	return w.rawObservation(raw)
 }
+
 func (w workspace) rawObservation(raw []byte) error {
 	if len(raw) == 0 || len(raw) > 16*1024*1024 {
 		return errors.New("observation exceeds limit")

@@ -1,6 +1,7 @@
 package tests
 
 import (
+	"fmt"
 	"slices"
 	"strings"
 	"testing"
@@ -8,7 +9,8 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-func eligibleAssessment() domain.Assessment {
+func eligibleAssessment(t testing.TB) domain.Assessment {
+	t.Helper()
 	const now = int64(2000000)
 	digest := domain.Digest(strings.Repeat("a", 64))
 	root := domain.Artifact{Tap: "homebrew/core", Name: "wget", Version: "1.0", OS: "macos", Arch: "arm64", BottleTag: "arm64_tahoe", SHA256: digest}
@@ -25,7 +27,7 @@ func eligibleAssessment() domain.Assessment {
 				Applicability: domain.NoKnownApplicableFindings,
 			})
 			if err != nil {
-				panic(err)
+				t.Fatalf("cannot construct eligible evidence for %s claim %d: %v", nodes[i].Artifact.Name, claim, err)
 			}
 			nodes[i].Evidence = append(nodes[i].Evidence, evidence)
 		}
@@ -44,7 +46,7 @@ func evidenceFor(node *domain.Node, claim domain.Claim) *domain.Evidence {
 			return &node.Evidence[i]
 		}
 	}
-	panic("required claim missing from assessment fixture")
+	panic(fmt.Sprintf("assessment fixture for %s is missing required claim %d", node.Artifact.Name, claim))
 }
 
 func waiveYoung(a *domain.Assessment) {
@@ -144,7 +146,7 @@ func TestEvidenceDecisions(t *testing.T) {
 	}
 	for _, tc := range tests {
 		t.Run(tc.name, func(t *testing.T) {
-			a := eligibleAssessment()
+			a := eligibleAssessment(t)
 			tc.edit(&a)
 			decision := domain.Evaluate(a)
 			if decision.Outcome != tc.want || (decision.Outcome != domain.Allow && len(decision.Reasons) == 0) {
@@ -165,7 +167,7 @@ func TestPolicyDurationRange(t *testing.T) {
 }
 
 func TestAgeAllowsExactMinimum(t *testing.T) {
-	assessment := eligibleAssessment()
+	assessment := eligibleAssessment(t)
 	evidenceFor(&assessment.Nodes[0], domain.Publication).PublishedAt = assessment.Now - assessment.Policy.MinimumAgeSeconds()
 	if got := domain.Evaluate(assessment); got.Outcome != domain.Allow {
 		t.Fatalf("exact minimum age must allow: got %+v", got)
@@ -173,7 +175,7 @@ func TestAgeAllowsExactMinimum(t *testing.T) {
 }
 
 func TestAgeHoldsOneSecondBelowMinimum(t *testing.T) {
-	assessment := eligibleAssessment()
+	assessment := eligibleAssessment(t)
 	evidenceFor(&assessment.Nodes[0], domain.Publication).PublishedAt = assessment.Now - assessment.Policy.MinimumAgeSeconds() + 1
 	if got := domain.Evaluate(assessment); got.Outcome != domain.Hold {
 		t.Fatalf("one second young must hold: got %+v", got)
@@ -181,7 +183,7 @@ func TestAgeHoldsOneSecondBelowMinimum(t *testing.T) {
 }
 
 func TestAgeExceptionReportsAllWaivedArtifacts(t *testing.T) {
-	assessment := eligibleAssessment()
+	assessment := eligibleAssessment(t)
 	waiveYoung(&assessment)
 	if got := domain.Evaluate(assessment); got.Outcome != domain.Allow || len(got.Waived) != 2 {
 		t.Fatalf("missing waiver accounting: %+v", got)

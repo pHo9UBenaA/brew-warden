@@ -9,17 +9,18 @@ import (
 
 func metadataFixture() metadataDocument {
 	digest := domain.Digest(strings.Repeat("a", 64))
-	f := formulaMetadata{
+	root := formulaMetadata{
 		BottleTag: "arm64_tahoe", Name: "jq", Version: "1.8.2", Rebuild: 1,
 		BottleURL:    "https://ghcr.io/v2/homebrew/core/jq/blobs/sha256:" + string(digest),
 		BottleSHA256: digest, Cellar: ":any", Dependencies: []string{"oniguruma"},
 	}
-	dep := f
-	dep.Name = "oniguruma"
-	dep.BottleURL = strings.Replace(f.BottleURL, "/jq/", "/oniguruma/", 1)
-	dep.Dependencies = []string{}
-	return metadataDocument{1, "arm64_tahoe", []formulaMetadata{f, dep}}
+	dependency := root
+	dependency.Name = "oniguruma"
+	dependency.BottleURL = strings.Replace(root.BottleURL, "/jq/", "/oniguruma/", 1)
+	dependency.Dependencies = []string{}
+	return metadataDocument{Schema: 1, Platform: "arm64_tahoe", Formulae: []formulaMetadata{root, dependency}}
 }
+
 func TestMetadataClosureAndIdentity(t *testing.T) {
 	doc := metadataFixture()
 	raw := marshalFixture(t, doc)
@@ -58,6 +59,7 @@ func TestMetadataClosureAndIdentity(t *testing.T) {
 		})
 	}
 }
+
 func FuzzNativeMetadata(f *testing.F) {
 	raw := marshalFixture(f, metadataFixture())
 	f.Add(string(raw))

@@ -30,6 +30,7 @@ type publicSession struct {
 	lock     *os.File
 	consumed bool
 }
+
 type installedFormula struct {
 	Name           string             `json:"name" required:"true"`
 	Pinned         bool               `json:"pinned" required:"true"`
@@ -39,6 +40,7 @@ type installedFormula struct {
 	LinkIncomplete bool               `json:"link_incomplete,omitempty"`
 	Installed      []installedVersion `json:"installed" required:"true"`
 }
+
 type installedVersion struct {
 	Version       string                `json:"version" required:"true"`
 	OnRequest     bool                  `json:"installed_on_request" required:"true"`
@@ -49,6 +51,7 @@ type installedVersion struct {
 	Dependencies  []installedDependency `json:"runtime_dependencies" required:"true"`
 	ReceiptSHA256 domain.Digest         `json:"receipt_sha256,omitempty"`
 }
+
 type installedDependency struct {
 	Name     string `json:"full_name" required:"true"`
 	Version  string `json:"version" required:"true"`
@@ -63,6 +66,7 @@ func publicBrewCommand(ctx context.Context, w workspace, profile string, args ..
 	command.WaitDelay = 2 * time.Second
 	return command
 }
+
 func (w workspace) publicState(ctx context.Context, profile string, nodes []domain.Node) ([]installedFormula, domain.Digest, error) {
 	names := make([]string, 0, len(nodes))
 	args := []string{"info", "--json=v2", "--formula"}
@@ -265,6 +269,7 @@ func publicActions(states []installedFormula, nodes []domain.Node, request colle
 	}
 	return result, nil
 }
+
 func installedAction(state installedFormula, candidate domain.Artifact, request collectionInputs) (string, error) {
 	if len(state.Installed) == 0 {
 		if request.Operation == "upgrade" && slices.Contains(request.Targets, state.Name) {
@@ -391,6 +396,7 @@ func (w workspace) checkPublicRuntime(ctx context.Context, revision string) erro
 	}
 	return ctx.Err()
 }
+
 func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers []domain.AgeWaiver, now int64, streams Streams) (ports.Prepared, ports.ExecutionSession, error) {
 	if c == nil || ctx == nil || !policy.Valid() || now < c.observedAt || now >= c.observedAt+3600 || len(c.nodes) == 0 {
 		return ports.Prepared{}, nil, errors.New("collection unavailable or expired")
@@ -481,6 +487,7 @@ func (c *Collection) Prepare(ctx context.Context, policy domain.Policy, waivers 
 	}
 	return s.prepared, s, nil
 }
+
 func (s *publicSession) Revalidate(ctx context.Context) (ports.Prepared, error) {
 	if s.consumed {
 		return ports.Prepared{}, errors.New("session already consumed")
@@ -495,6 +502,7 @@ func (s *publicSession) Revalidate(ctx context.Context) (ports.Prepared, error) 
 	}
 	return fresh, nil
 }
+
 func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.ExecutionResult, error) {
 	if s.consumed || binding != s.prepared.Assessment.Binding {
 		return ports.ExecutionResult{}, errors.New("session binding mismatch or replay")
@@ -634,6 +642,7 @@ exec "$@"`
 	}
 	return result, nil
 }
+
 func (s *publicSession) Close() error {
 	s.consumed = true
 	if s.lock == nil {

@@ -24,6 +24,7 @@ func textHygiene(b []byte) error {
 	}
 	return nil
 }
+
 func hygiene(root string) error {
 	return walkSources(root, func(rel string, entry fs.DirEntry) error {
 		if entry.IsDir() {

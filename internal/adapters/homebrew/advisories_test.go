@@ -90,6 +90,7 @@ func TestAdvisoryCombination(t *testing.T) {
 type advisoryTransport func(*http.Request) (*http.Response, error)
 
 func (f advisoryTransport) RoundTrip(r *http.Request) (*http.Response, error) { return f(r) }
+
 func TestPublicAdvisoryTransport(t *testing.T) {
 	for _, tc := range []struct {
 		name      string

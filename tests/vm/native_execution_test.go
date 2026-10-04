@@ -24,6 +24,7 @@ import (
 type nativeClock struct{}
 
 func (nativeClock) Now() int64 { return time.Now().Unix() }
+
 func kegSnapshot(root string) (string, error) {
 	h := sha256.New()
 	err := filepath.WalkDir(root, func(path string, entry os.DirEntry, err error) error {
@@ -65,6 +66,7 @@ func kegSnapshot(root string) (string, error) {
 	}
 	return hex.EncodeToString(h.Sum(nil)), nil
 }
+
 func TestLiveNativeExecution(t *testing.T) {
 	source := os.Getenv("BREWWARDEN_VM_RUNTIME")
 	if source == "" {

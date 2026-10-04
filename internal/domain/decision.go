@@ -51,6 +51,7 @@ type AgeWaiver struct {
 
 // An exception is explicitly requested by the user and bound to one current
 // plan, attempt and expiry. It cannot be replayed from saved process state.
+// IssuedAt and ExpiresAt are Unix seconds; validity is [IssuedAt, ExpiresAt).
 type AgeException struct {
 	Binding   Binding
 	IssuedAt  int64
@@ -141,19 +142,19 @@ func requiredEvidenceReason(items []Evidence, claim Claim, policy Policy, now in
 	if len(items) != 1 {
 		return "evidence_missing_or_ambiguous"
 	}
-	e := items[0]
+	evidence := items[0]
 	switch {
-	case !e.valid() || e.ObservedAt > now || e.ExpiresAt <= now:
+	case !evidence.valid() || evidence.ObservedAt > now || evidence.ExpiresAt <= now:
 		return "evidence_invalid_or_stale"
-	case e.Status != Verified:
+	case evidence.Status != Verified:
 		return "required_evidence_unverified"
-	case claim == Vulnerabilities && e.Applicability != NoKnownApplicableFindings:
+	case claim == Vulnerabilities && evidence.Applicability != NoKnownApplicableFindings:
 		return "vulnerability_applicability_unresolved"
 	case claim == Publication:
-		if e.Publication != VerifiedAttestation || e.PublishedAt <= 0 || e.PublishedAt > e.ObservedAt {
+		if evidence.Publication != VerifiedAttestation || evidence.PublishedAt <= 0 || evidence.PublishedAt > evidence.ObservedAt {
 			return "publication_unknown_or_conflicting"
 		}
-		if now-e.PublishedAt < policy.MinimumAgeSeconds() {
+		if now-evidence.PublishedAt < policy.MinimumAgeSeconds() {
 			return "release_too_young"
 		}
 	}
@@ -164,46 +165,47 @@ func validGraph(targets []Artifact, nodes []Node) bool {
 	if len(targets) == 0 || len(nodes) == 0 || len(nodes) > 4096 || len(targets) > len(nodes) {
 		return false
 	}
-	index := map[Artifact]Node{}
-	names := map[string]bool{}
-	for _, n := range nodes {
-		if !n.Artifact.Valid() || names[n.Artifact.Name] || len(n.Dependencies) > len(nodes) || len(n.Evidence) > 32 {
+	nodesByArtifact := map[Artifact]Node{}
+	seenNames := map[string]bool{}
+	for _, node := range nodes {
+		if !node.Artifact.Valid() || seenNames[node.Artifact.Name] || len(node.Dependencies) > len(nodes) || len(node.Evidence) > 32 {
 			return false
 		}
-		names[n.Artifact.Name] = true
-		index[n.Artifact] = n
+		seenNames[node.Artifact.Name] = true
+		nodesByArtifact[node.Artifact] = node
 	}
 	const (
 		visiting uint8 = iota + 1
 		visited
 	)
-	state := map[Artifact]uint8{}
+	visitState := map[Artifact]uint8{}
 	var visit func(Artifact) bool
-	visit = func(id Artifact) bool {
-		n, exists := index[id]
-		if !exists || state[id] == visiting {
+	visit = func(artifact Artifact) bool {
+		node, exists := nodesByArtifact[artifact]
+		if !exists || visitState[artifact] == visiting {
 			return false
 		}
-		if state[id] == visited {
+		if visitState[artifact] == visited {
 			return true
 		}
-		state[id] = visiting
-		seen := map[Artifact]bool{}
-		for _, dep := range n.Dependencies {
-			if seen[dep] || !visit(dep) {
+		visitState[artifact] = visiting
+		seenDependencies := map[Artifact]bool{}
+		for _, dependency := range node.Dependencies {
+			if seenDependencies[dependency] || !visit(dependency) {
 				return false
 			}
-			seen[dep] = true
+			seenDependencies[dependency] = true
 		}
-		state[id] = visited
+		visitState[artifact] = visited
 		return true
 	}
-	seen := map[Artifact]bool{}
+
+	seenTargets := map[Artifact]bool{}
 	for _, target := range targets {
-		if seen[target] || !visit(target) {
+		if seenTargets[target] || !visit(target) {
 			return false
 		}
-		seen[target] = true
+		seenTargets[target] = true
 	}
-	return len(state) == len(nodes)
+	return len(visitState) == len(nodes)
 }

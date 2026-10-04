@@ -14,25 +14,30 @@ usage() {
   printf '       %s cancel VM\n' "$0" >&2
   exit 2
 }
+
 fail() {
   printf '%s\n' "$*" >&2
   exit 1
 }
+
 valid_name() {
   case "$1" in
     ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
   esac
 }
+
 clean_source() {
   [ -z "$(git status --porcelain --untracked-files=all)" ] || fail 'Commit all repository changes before local product-readiness acceptance'
   [ "$(git rev-parse HEAD)" = "$revision" ] || fail 'Source revision changed since readiness checks started'
   [ "$(go env GOVERSION)" = "go$(cat .go-version)" ] || fail 'Pinned Go toolchain required'
 }
+
 read_line() {
   IFS= read -r value < "$1" || fail "Incomplete readiness evidence: $1"
   [ -n "$value" ] || fail "Empty readiness evidence: $1"
   printf '%s' "$value"
 }
+
 run_logged() {
   label=$1
   shift
@@ -46,6 +51,7 @@ run_logged() {
     return "$result"
   fi
 }
+
 start() {
   [ "$#" -eq 4 ] || usage
   base=$1
@@ -93,6 +99,7 @@ start() {
   printf 'Approve the device code in your browser, then run: %s complete %s\n' "$0" "$vm"
   printf 'If approval expires, request a fresh code with the guest runner or run: %s cancel %s\n' "$0" "$vm"
 }
+
 mark_prepare_failure() {
   result=$1
   trap - 0
@@ -102,6 +109,7 @@ mark_prepare_failure() {
   fi
   exit "$result"
 }
+
 finish_on_exit() {
   result=$1
   trap - 0
@@ -129,6 +137,7 @@ finish_on_exit() {
   fi
   exit "$result"
 }
+
 cancel() {
   [ "$#" -eq 1 ] || usage
   vm=$1
@@ -143,6 +152,7 @@ cancel() {
   trap 'exit 143' TERM
   exit 1
 }
+
 complete() {
   [ "$#" -eq 1 ] || usage
   vm=$1
@@ -166,6 +176,7 @@ complete() {
   /usr/bin/grep -Fxq 'Local VM acceptance suite passed. Recheck guest evidence, then run finish.' "$root/vm-suite.log" || fail 'Native acceptance did not report completion'
   clean_source
 }
+
 [ "$#" -ge 1 ] || usage
 operation=$1
 shift

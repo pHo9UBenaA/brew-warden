@@ -21,18 +21,20 @@ type publicAdvisory struct {
 	ID      string   `json:"id" required:"true"`
 	Aliases []string `json:"aliases" required:"true"`
 }
+
 type publicFinding struct {
 	Formula string           `json:"formula" required:"true"`
 	Version string           `json:"version" required:"true"`
 	Open    []publicAdvisory `json:"vulnerabilities" required:"true"`
 	Patched []publicAdvisory `json:"patched" required:"true"`
 }
+
 type publicVulnsReport struct {
 	Findings []publicFinding `json:"findings" required:"true"`
 	Skipped  []string        `json:"skipped_formulae" required:"true"`
 }
 
-// Valid only with the pinned scanner, explicit authenticated candidates and an
+// Valid only with a reviewed scanner, explicit authenticated candidates and an
 // empty inspection prefix. JSON has no clean-subject list; it is not portable
 // standalone proof that an arbitrary invocation checked the requested plan.
 func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (publicVulnsReport, error) {
@@ -40,12 +42,12 @@ func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (p
 	if len(candidates) == 0 || len(candidates) > 128 || (exitCode != 0 && exitCode != 1) {
 		return report, errors.New("unsupported advisory invocation")
 	}
-	expected := map[string]string{}
-	for _, c := range candidates {
-		if !c.artifact().Valid() || expected[c.Name] != "" {
+	expectedVersions := map[string]string{}
+	for _, candidate := range candidates {
+		if !candidate.artifact().Valid() || expectedVersions[candidate.Name] != "" {
 			return report, errors.New("invalid advisory candidate")
 		}
-		expected[c.Name] = c.Version
+		expectedVersions[candidate.Name] = candidate.Version
 	}
 	if err := decodeSchema(raw, &report, true); err != nil {
 		return publicVulnsReport{}, err
@@ -55,40 +57,43 @@ func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (p
 			return publicVulnsReport{}, errors.New("invalid skipped advisory inventory")
 		}
 		for _, name := range report.Skipped {
-			if expected[name] == "" {
+			if expectedVersions[name] == "" {
 				return publicVulnsReport{}, errors.New("unknown skipped advisory subject")
 			}
 		}
 		return publicVulnsReport{}, fmt.Errorf("homebrew skipped required advisory subjects: %s", strings.Join(report.Skipped, ", "))
 	}
-	seen := map[string]bool{}
+	seenFormulae := map[string]bool{}
 	hasOpen := false
-	for _, f := range report.Findings {
-		if expected[f.Formula] == "" || expected[f.Formula] != f.Version || seen[f.Formula] || len(f.Open)+len(f.Patched) == 0 {
+	for _, finding := range report.Findings {
+		expectedVersion := expectedVersions[finding.Formula]
+		hasFindings := len(finding.Open)+len(finding.Patched) > 0
+		if expectedVersion == "" || expectedVersion != finding.Version || seenFormulae[finding.Formula] || !hasFindings {
 			return publicVulnsReport{}, errors.New("homebrew advisory subject mismatch")
 		}
-		seen[f.Formula] = true
-		ids := map[string]bool{}
-		for _, list := range [][]publicAdvisory{f.Open, f.Patched} {
-			for _, a := range list {
-				if !validAdvisoryID(a.ID) || ids[a.ID] {
+		seenFormulae[finding.Formula] = true
+		seenAdvisories := map[string]bool{}
+		for _, group := range [][]publicAdvisory{finding.Open, finding.Patched} {
+			for _, advisory := range group {
+				if !validAdvisoryID(advisory.ID) || seenAdvisories[advisory.ID] {
 					return publicVulnsReport{}, errors.New("invalid or contradictory advisory identifier")
 				}
-				ids[a.ID] = true
-				for _, alias := range a.Aliases {
+				seenAdvisories[advisory.ID] = true
+				for _, alias := range advisory.Aliases {
 					if !validAdvisoryID(alias) {
 						return publicVulnsReport{}, errors.New("invalid advisory alias")
 					}
 				}
 			}
 		}
-		hasOpen = hasOpen || len(f.Open) > 0
+		hasOpen = hasOpen || len(finding.Open) > 0
 	}
 	if (exitCode == 1) != hasOpen {
 		return publicVulnsReport{}, errors.New("homebrew advisory exit and findings disagree")
 	}
 	return report, nil
 }
+
 func validAdvisoryID(id string) bool {
 	if len(id) == 0 || len(id) > 128 {
 		return false
@@ -126,15 +131,15 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	}
 	names := make([]string, 0, len(candidates))
 	args := []string{"vulns", "--json"}
-	for _, c := range candidates {
-		if !c.artifact().Valid() || !domain.ValidRequest("install", []string{c.Name}) || slices.Contains(names, c.Name) {
+	for _, candidate := range candidates {
+		if !candidate.artifact().Valid() || !domain.ValidRequest("install", []string{candidate.Name}) || slices.Contains(names, candidate.Name) {
 			return fail(errors.New("invalid advisory candidate"))
 		}
-		names = append(names, c.Name)
-		args = append(args, "homebrew/core/"+c.Name)
+		names = append(names, candidate.Name)
+		args = append(args, "homebrew/core/"+candidate.Name)
 	}
-	for _, c := range candidates {
-		for _, dependency := range c.Dependencies {
+	for _, candidate := range candidates {
+		for _, dependency := range candidate.Dependencies {
 			if !slices.Contains(names, dependency) {
 				return fail(errors.New("incomplete advisory dependency closure"))
 			}
@@ -158,10 +163,9 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	if err != nil {
 		return fail(err)
 	}
-	for _, f := range actual {
-		i := slices.Index(names, f.Name)
-		c := candidates[i]
-		if f.artifact() != c.artifact() || !slices.Equal(f.Dependencies, c.Dependencies) {
+	for _, formula := range actual {
+		candidate := candidates[slices.Index(names, formula.Name)]
+		if formula.artifact() != candidate.artifact() || !slices.Equal(formula.Dependencies, candidate.Dependencies) {
 			return fail(errors.New("advisory candidate metadata changed"))
 		}
 	}

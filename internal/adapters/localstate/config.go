@@ -14,16 +14,20 @@ type configDocument struct {
 	Verification  *verificationConfig `json:"verification"`
 	Emergency     *emergencyConfig    `json:"emergency"`
 }
+
 type ageConfig struct {
 	MinimumHours *int64 `json:"minimumHours"`
 }
+
 type trustConfig struct {
 	AllowedTaps []string `json:"allowedTaps"`
 }
+
 type verificationConfig struct {
 	RequireChecksum          *bool `json:"requireChecksum"`
 	RequireBottleAttestation *bool `json:"requireBottleAttestation"`
 }
+
 type emergencyConfig struct {
 	Mode          string   `json:"mode"`
 	WaivableRules []string `json:"waivableRules"`

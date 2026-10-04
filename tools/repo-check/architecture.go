@@ -34,14 +34,14 @@ func walkSources(root string, visit func(string, fs.DirEntry) error) error {
 }
 
 func moduleName(root string) (string, error) {
-	b, err := os.ReadFile(filepath.Join(root, "go.mod"))
+	moduleFile, err := os.ReadFile(filepath.Join(root, "go.mod"))
 	if err != nil {
 		return "", err
 	}
-	for _, line := range strings.Split(string(b), "\n") {
-		f := strings.Fields(line)
-		if len(f) == 2 && f[0] == "module" {
-			return f[1], nil
+	for _, line := range strings.Split(string(moduleFile), "\n") {
+		fields := strings.Fields(line)
+		if len(fields) == 2 && fields[0] == "module" {
+			return fields[1], nil
 		}
 	}
 	return "", fmt.Errorf("missing module directive")
@@ -54,28 +54,29 @@ type source struct {
 }
 
 func layerOf(dir string) string {
-	p := strings.Split(dir, "/")
-	if len(p) >= 2 && p[0] == "internal" {
-		switch p[1] {
+	parts := strings.Split(dir, "/")
+	if len(parts) >= 2 && parts[0] == "internal" {
+		switch parts[1] {
 		case "domain", "ports", "application", "cli", "composition":
-			return p[1]
+			return parts[1]
 		case "adapters":
-			if len(p) >= 3 {
-				return "adapter:" + p[2]
+			if len(parts) >= 3 {
+				return "adapter:" + parts[2]
 			}
 		}
 	}
-	if len(p) >= 2 && p[0] == "cmd" {
+	if len(parts) >= 2 && parts[0] == "cmd" {
 		return "cmd"
 	}
-	if p[0] == "tools" {
+	if parts[0] == "tools" {
 		return "tools"
 	}
-	if p[0] == "tests" {
+	if parts[0] == "tests" {
 		return "tests"
 	}
 	return ""
 }
+
 func permits(from, to string) bool {
 	if to == "" {
 		return false
@@ -100,6 +101,7 @@ func permits(from, to string) bool {
 	}
 	return strings.HasPrefix(from, "adapter:") && (to == "ports" || to == "domain")
 }
+
 func coreStandard(layer, imp string) bool {
 	pure := " bytes cmp errors math math/bits regexp slices sort strconv strings unicode unicode/utf8 "
 	if strings.Contains(pure, " "+imp+" ") {
@@ -221,13 +223,13 @@ func architecture(root string) error {
 		state[directory] = visited
 		return nil
 	}
-	keys := make([]string, 0, len(graph))
-	for k := range graph {
-		keys = append(keys, k)
+	directories := make([]string, 0, len(graph))
+	for directory := range graph {
+		directories = append(directories, directory)
 	}
-	sort.Strings(keys)
-	for _, k := range keys {
-		if err := visit(k); err != nil {
+	sort.Strings(directories)
+	for _, directory := range directories {
+		if err := visit(directory); err != nil {
 			return err
 		}
 	}

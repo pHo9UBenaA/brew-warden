@@ -16,20 +16,24 @@ type Streams struct {
 	In       io.Reader
 	Out, Err io.Writer
 }
+
 type plannedAction struct {
 	Name      string `json:"name" required:"true"`
 	Operation string `json:"operation" required:"true"`
 }
+
 type frozenInput struct {
 	Path   string        `json:"path" required:"true"`
 	SHA256 domain.Digest `json:"sha256" required:"true"`
 }
+
 type executionEnvironment struct {
 	Runtime      domain.Digest `json:"runtime" required:"true"`
 	BrewRevision string        `json:"brewRevision" required:"true"`
 	OSVersion    string        `json:"osVersion" required:"true"`
 	Prefix       string        `json:"prefix" required:"true"`
 }
+
 type executionPlan struct {
 	Schema            int                  `json:"schema" required:"true"`
 	MinimumAgeSeconds int64                `json:"minimumAge" required:"true"`
@@ -111,6 +115,7 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	}
 	return result, nil
 }
+
 func (w workspace) freezeInputs() ([]frozenInput, error) {
 	names := []string{"inputs.json", metadataCachePath, "metadata.json", "fetch.json"}
 	for _, directory := range []string{"inputs", "observations", "cache/downloads"} {
@@ -148,7 +153,7 @@ func (w workspace) freezeInputs() ([]frozenInput, error) {
 		if err != nil {
 			return nil, err
 		}
-		result = append(result, frozenInput{filepath.ToSlash(name), digestBytes(raw)})
+		result = append(result, frozenInput{Path: filepath.ToSlash(name), SHA256: digestBytes(raw)})
 		file, err := os.Open(filepath.Join(w.root, name))
 		if err != nil {
 			return nil, err
@@ -161,6 +166,7 @@ func (w workspace) freezeInputs() ([]frozenInput, error) {
 	}
 	return result, nil
 }
+
 func (w workspace) readPrepared(expected domain.Digest) (ports.Prepared, error) {
 	raw, err := readRegular(filepath.Join(w.root, "plan.json"), maxManifest)
 	if err != nil || digestBytes(raw) != expected {

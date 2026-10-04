@@ -26,11 +26,13 @@ type advisoryIndex struct {
 		Schema string `json:"schema_version"`
 	} `json:"meta"`
 }
+
 type brewAdvisoryStatus struct {
 	Open       []brewAdvisoryEntry `json:"open" required:"true"`
 	Patched    []brewAdvisoryEntry `json:"patched" required:"true"`
 	FixedCount int                 `json:"fixed_count" required:"true"`
 }
+
 type brewAdvisoryEntry struct {
 	ID       string   `json:"id" required:"true"`
 	Upstream []string `json:"upstream"`

@@ -99,7 +99,8 @@ const (
 
 // Evidence is an adapter claim, not a verifier. The adapter must establish the
 // claim for these exact bytes and must not convert a successful process exit or
-// an empty/incomplete advisory response into Verified.
+// an empty/incomplete advisory response into Verified. Timestamps are Unix
+// seconds; evaluation requires ObservedAt <= now < ExpiresAt.
 type Evidence struct {
 	Claim           Claim
 	Subject         Artifact

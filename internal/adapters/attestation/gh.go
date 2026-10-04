@@ -60,7 +60,7 @@ func supportedGHVersion(raw []byte) (string, error) {
 	}
 	values := [3]int{}
 	for i, part := range parts {
-		if len(part) == 0 || len(part) > 3 || len(part) > 1 && part[0] == '0' {
+		if len(part) == 0 || len(part) > 3 || (len(part) > 1 && part[0] == '0') {
 			return "", errUnsupportedGHVersion
 		}
 		for _, digit := range part {

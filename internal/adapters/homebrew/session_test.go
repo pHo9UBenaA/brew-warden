@@ -21,6 +21,7 @@ func planFixture() executionPlan {
 		Attempt:     digest, IssuedAt: 100, ExpiresAt: 200, Waivers: []domain.AgeWaiver{},
 	}
 }
+
 func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 	p := planFixture()
 	p.Waivers = []domain.AgeWaiver{{Artifact: p.Targets[0], Reason: "Explicit emergency test"}}
@@ -87,6 +88,7 @@ func TestPersistedPlanStrictIdentityAndException(t *testing.T) {
 		})
 	}
 }
+
 func TestExecutionPlanBindsReviewedHomebrewRevision(t *testing.T) {
 	plan := planFixture()
 	for _, schema := range []int{1, 2, 4} {
@@ -120,7 +122,7 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 		t.Fatal(err)
 	}
 	data := []byte("authenticated candidate bytes")
-	p.Inputs = []frozenInput{{"bottle", digestBytes(data)}}
+	p.Inputs = []frozenInput{{Path: "bottle", SHA256: digestBytes(data)}}
 	if err := writeNew(filepath.Join(root, "bottle"), data, 0600); err != nil {
 		t.Fatal(err)
 	}

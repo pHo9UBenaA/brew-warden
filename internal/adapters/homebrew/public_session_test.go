@@ -203,6 +203,7 @@ func TestPublicActionsUseInstalledAndCandidateVersions(t *testing.T) {
 		t.Fatal("upgrade of absent root accepted")
 	}
 }
+
 func TestPublicOperationLockRejectsUnsafeFiles(t *testing.T) {
 	for _, kind := range []string{"symlink", "shared file"} {
 		t.Run(kind, func(t *testing.T) {

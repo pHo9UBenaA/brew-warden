@@ -22,6 +22,7 @@ func sourceTreeFixture(t *testing.T, files map[string]string) string {
 	}
 	return root
 }
+
 func TestArchitecture(t *testing.T) {
 	cases := []struct {
 		name  string

@@ -21,26 +21,32 @@ usage() {
   printf '       %s fixture VM absent-jq|absent-xz|older-xz|repair-jq\n' "$0" >&2
   exit 2
 }
+
 fail() {
   printf '%s\n' "$*" >&2
   exit 1
 }
+
 valid_name() {
   case "$1" in
     ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
   esac
 }
+
 tart_run() {
   env -i HOME="$tart_user_home" TART_HOME="$tart_home" TART_NO_AUTO_PRUNE=1 \
     PATH=/usr/bin:/bin "$tart" "$@"
 }
+
 guest() {
   tart_run exec "$@"
 }
+
 guest_auth() {
   guest "$1" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" \
     PATH="$guest_path" "$guest_gh" auth status >/dev/null 2>&1
 }
+
 guest_brew() {
   vm=$1
   shift
@@ -48,11 +54,13 @@ guest_brew() {
     HOMEBREW_NO_AUTO_UPDATE=1 HOMEBREW_NO_ANALYTICS=1 HOMEBREW_NO_AUTOREMOVE=1 \
     HOMEBREW_NO_INSTALL_CLEANUP=1 /opt/homebrew/bin/brew "$@"
 }
+
 require_guest() {
   model=$(guest "$1" /usr/sbin/sysctl -n hw.model) || fail 'Guest agent unavailable; use a fresh clone of the base image'
   arch=$(guest "$1" /usr/bin/arch) || fail 'Guest architecture unavailable'
   case "$model:$arch" in VirtualMac*:arm64) ;; *) fail 'Only a disposable Apple Silicon VirtualMac is supported' ;; esac
 }
+
 cleanup_prepare_on_exit() {
   result=$1
   trap - 0
@@ -68,6 +76,7 @@ cleanup_prepare_on_exit() {
   fi
   exit "$result"
 }
+
 prepare() {
   [ "$#" -eq 5 ] || usage
   base=$1
@@ -148,6 +157,7 @@ prepare() {
   printf 'Do not reboot this modified clone: its guest agent still refers to the original prefix.\n'
   trap - 0 INT TERM
 }
+
 auth() {
   [ "$#" -eq 1 ] || usage
   vm=$1
@@ -186,6 +196,7 @@ auth() {
   done
   fail 'Device authorization code unavailable; inspect guest device.log without copying credentials'
 }
+
 run_test() {
   expected=$1
   shift
@@ -206,6 +217,7 @@ run_test() {
   fi
   rm -f "$result_log"
 }
+
 run_case() {
   [ "$#" -ge 2 ] || usage
   vm=$1
@@ -269,6 +281,7 @@ run_case() {
     *) usage ;;
   esac
 }
+
 remove_if_installed() {
   vm=$1
   name=$2
@@ -279,6 +292,7 @@ remove_if_installed() {
   [ -n "$installed" ] || fail "Cannot confirm installed guest formula $name"
   guest_brew "$vm" uninstall --formula --force "$name"
 }
+
 fixture() {
   [ "$#" -eq 2 ] || usage
   vm=$1
@@ -304,6 +318,7 @@ fixture() {
     *) usage ;;
   esac
 }
+
 suite() {
   [ "$#" -eq 1 ] || usage
   vm=$1
@@ -343,6 +358,7 @@ suite() {
   run_case "$vm" general 'libuv gmp'
   printf 'Local VM acceptance suite passed. Recheck guest evidence, then run finish.\n'
 }
+
 finish() {
   [ "$#" -eq 1 ] || usage
   vm=$1
@@ -401,6 +417,7 @@ finish() {
   [ "$cleaned" -eq 1 ] || fail 'Guest credential cleanup unconfirmed; VM stopped. Revoke the OAuth grant and inspect the retained guest'
   printf 'Guest credentials removed and VM stopped. If device login was approved, also revoke its GitHub CLI OAuth grant in your account settings.\n'
 }
+
 [ "$#" -ge 1 ] || usage
 command=$1
 shift

@@ -89,6 +89,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	}
 	return collection.Prepare(ctx, policy, waivers, now, e.Streams)
 }
+
 func (e Engine) Check(ctx context.Context) error {
 	if e.Collector == nil || e.Collector.BottleVerifier == nil || runtime.GOOS != "darwin" || runtime.GOARCH != "arm64" {
 		return errors.New("runtime requires Apple Silicon macOS Tahoe")

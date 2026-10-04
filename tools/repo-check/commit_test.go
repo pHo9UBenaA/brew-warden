@@ -28,6 +28,7 @@ func TestCommitMessages(t *testing.T) {
 		}
 	}
 }
+
 func TestTextHygiene(t *testing.T) {
 	for _, s := range []string{"English text\n", "A developer’s choice\n"} {
 		if err := textHygiene([]byte(s)); err != nil {

@@ -30,7 +30,7 @@ func (p *servicePlanner) Prepare(_ context.Context, request ports.Request, _ dom
 }
 
 func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
-	p := preparedExecution()
+	p := preparedExecution(t)
 	session := &executionSession{prepared: p}
 	planner := &servicePlanner{prepared: p, session: session}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}, Present: func(ports.Prepared) error { return io.ErrClosedPipe }}
@@ -40,7 +40,7 @@ func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
 }
 
 func TestFreshRetryRequiresNewBoundPlan(t *testing.T) {
-	p := preparedExecution()
+	p := preparedExecution(t)
 	first := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 2, AfterState: p.BeforeState}}
 	planner := &servicePlanner{prepared: p, session: first}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}}
@@ -75,7 +75,7 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 }
 
 func TestRuntimeCLIPreservesExitCodeAndPrintableAgeReason(t *testing.T) {
-	p := preparedExecution()
+	p := preparedExecution(t)
 	session := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 7, AfterState: p.BeforeState}}
 	planner := &servicePlanner{prepared: p, session: session}
 	s := application.Service{Planner: planner, Clock: &executionClock{p.Assessment.Now}}
@@ -91,6 +91,7 @@ func TestRuntimeCLIPreservesExitCodeAndPrintableAgeReason(t *testing.T) {
 		t.Fatalf("candidate presentation missing: output=%q", &out)
 	}
 }
+
 func TestRuntimeReportsPreflightHoldWithoutInventingExecutionOutcome(t *testing.T) {
 	planner := &servicePlanner{err: io.ErrUnexpectedEOF}
 	s := application.Service{Planner: planner, Clock: &executionClock{now: 1000}}

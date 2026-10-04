@@ -26,6 +26,7 @@ func validCollection(name string) bool {
 	suffix := strings.TrimPrefix(name, "collection-")
 	return strings.HasPrefix(name, "collection-") && len(suffix) > 0 && len(suffix) <= 32 && strings.Trim(suffix, "0123456789") == ""
 }
+
 func (r inFlight) valid() bool {
 	return r.Schema == 1 && r.Plan.Valid() && r.Attempt.Valid() && r.PID > 1 && r.PID < 1<<30 && r.PID == r.Session && validCollection(r.Collection)
 }

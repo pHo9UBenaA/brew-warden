@@ -20,6 +20,7 @@ type formulaMetadata struct {
 	Cellar       string        `json:"cellar" required:"true"`
 	Dependencies []string      `json:"dependencies" required:"true"`
 }
+
 type metadataDocument struct {
 	Schema   int               `json:"schema" required:"true"`
 	Platform string            `json:"platform" required:"true"`

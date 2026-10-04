@@ -21,52 +21,46 @@ func artifactFixture() domain.Artifact {
 		SHA256: domain.Digest(strings.Repeat("a", 64)),
 	}
 }
-func resultFixture(a domain.Artifact) string {
-	return `[{"verificationResult":{
-		"signature":{"certificate":{
-			"subjectAlternativeName":"` + identityPrefix + `publish-commit-bottles.yml@refs/heads/main",
-			"issuer":"` + issuer + `",
-			"sourceRepositoryURI":"` + repository + `",
-			"runnerEnvironment":"github-hosted"
-		}},
-		"statement":{
-			"_type":"https://in-toto.io/Statement/v1",
-			"predicateType":"https://slsa.dev/provenance/v1",
-			"subject":[{"name":"` + bottleName(a) + `","digest":{"sha256":"` + string(a.SHA256) + `"}}]
-		}
-	}}]`
-}
 
-func ghResult(a domain.Artifact, timestamps ...string) string {
-	var entries []map[string]json.RawMessage
-	if err := json.Unmarshal([]byte(resultFixture(a)), &entries); err != nil {
-		panic(err)
+func ghResult(t testing.TB, artifact domain.Artifact, timestamps ...string) string {
+	t.Helper()
+	certificate := map[string]string{
+		"subjectAlternativeName": identityPrefix + "publish-commit-bottles.yml@refs/heads/main",
+		"issuer":                 issuer,
+		"sourceRepositoryURI":    repository,
+		"runnerEnvironment":      "github-hosted",
 	}
-	var verification map[string]json.RawMessage
-	if err := json.Unmarshal(entries[0]["verificationResult"], &verification); err != nil {
-		panic(err)
+	subject := map[string]any{
+		"name":   bottleName(artifact),
+		"digest": map[string]domain.Digest{"sha256": artifact.SHA256},
 	}
-	var values []map[string]string
-	for _, ts := range timestamps {
-		values = append(values, map[string]string{"type": "Tlog", "uri": "https://rekor.sigstore.dev", "timestamp": ts})
+	statement := map[string]any{
+		"_type":         "https://in-toto.io/Statement/v1",
+		"predicateType": "https://slsa.dev/provenance/v1",
+		"subject":       []map[string]any{subject},
 	}
-	verification["verifiedTimestamps"] = marshalResultFixture(values)
-	entries[0]["verificationResult"] = marshalResultFixture(verification)
-	return string(marshalResultFixture(entries[0]))
-}
-
-func marshalResultFixture(value any) []byte {
-	raw, err := json.Marshal(value)
+	var verifiedTimestamps []map[string]string
+	for _, timestamp := range timestamps {
+		verifiedTimestamps = append(verifiedTimestamps, map[string]string{
+			"type": "Tlog", "uri": "https://rekor.sigstore.dev", "timestamp": timestamp,
+		})
+	}
+	verification := map[string]any{
+		"signature":          map[string]any{"certificate": certificate},
+		"statement":          statement,
+		"verifiedTimestamps": verifiedTimestamps,
+	}
+	raw, err := json.Marshal(map[string]any{"verificationResult": verification})
 	if err != nil {
-		panic(err)
+		t.Fatalf("cannot serialize attestation fixture: %v", err)
 	}
-	return raw
+	return string(raw)
 }
 
 func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 	a := artifactFixture()
-	one := ghResult(a, "2026-09-20T12:00:00Z", "2026-09-10T12:00:00Z")
-	two := ghResult(a, "2026-09-22T12:00:00Z")
+	one := ghResult(t, a, "2026-09-20T12:00:00Z", "2026-09-10T12:00:00Z")
+	two := ghResult(t, a, "2026-09-22T12:00:00Z")
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
 	got, err := oldestVerifiedTimestamp([]byte("["+two+","+one+"]"), a, now)
 	want := time.Date(2026, 9, 10, 12, 0, 0, 0, time.UTC).Unix()
@@ -80,10 +74,10 @@ func TestOldestVerifiedTimestampBoundToEachDigest(t *testing.T) {
 		"null results":           "null",
 		"trailing JSON":          "[" + one + "]{}",
 		"saturated results":      "[" + strings.TrimSuffix(strings.Repeat(one+",", attestationResultLimit), ",") + "]",
-		"unrelated older result": "[" + one + "," + ghResult(b, "2026-01-01T00:00:00Z") + "]",
-		"missing timestamps":     "[" + ghResult(a) + "]",
-		"malformed timestamp":    "[" + ghResult(a, "invalid") + "]",
-		"future timestamp":       "[" + ghResult(a, "2026-09-24T00:00:00Z") + "]",
+		"unrelated older result": "[" + one + "," + ghResult(t, b, "2026-01-01T00:00:00Z") + "]",
+		"missing timestamps":     "[" + ghResult(t, a) + "]",
+		"malformed timestamp":    "[" + ghResult(t, a, "invalid") + "]",
+		"future timestamp":       "[" + ghResult(t, a, "2026-09-24T00:00:00Z") + "]",
 		"untrusted log":          "[" + replaceFixtureText(t, one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"https://invalid.example"`) + "]",
 		"unknown log":            "[" + replaceFixtureText(t, one, `"uri":"https://rekor.sigstore.dev"`, `"uri":"TODO"`) + "]",
 		"untrusted repository":   "[" + replaceFixtureText(t, one, `"sourceRepositoryURI":"`+repository+`"`, `"sourceRepositoryURI":"https://example.invalid"`) + "]",
@@ -115,7 +109,7 @@ func FuzzVerifiedSubject(f *testing.F) {
 		const now = int64(1800000000)
 		// Exercise the public evidence parser, including arbitrary untrusted output.
 		_, _ = oldestVerifiedTimestamp(data, a, now)
-		valid := []byte("[" + ghResult(a, time.Unix(now-60, 0).UTC().Format(time.RFC3339)) + "]")
+		valid := []byte("[" + ghResult(t, a, time.Unix(now-60, 0).UTC().Format(time.RFC3339)) + "]")
 		if _, err := oldestVerifiedTimestamp(valid, a, now); err != nil {
 			t.Fatal("matching verified subject was refused", err)
 		}
@@ -136,8 +130,8 @@ func FuzzVerifiedSubject(f *testing.F) {
 		}
 		oneTime := now - int64(len(data)%4096+1)*60
 		twoTime := now - int64(sum[0]+1)*30
-		one := ghResult(a, time.Unix(oneTime, 0).UTC().Format(time.RFC3339))
-		two := ghResult(a, time.Unix(twoTime, 0).UTC().Format(time.RFC3339))
+		one := ghResult(t, a, time.Unix(oneTime, 0).UTC().Format(time.RFC3339))
+		two := ghResult(t, a, time.Unix(twoTime, 0).UTC().Format(time.RFC3339))
 		want := min(oneTime, twoTime)
 		for _, raw := range []string{"[" + one + "," + two + "]", "[" + two + "," + one + "]"} {
 			got, err := oldestVerifiedTimestamp([]byte(raw), a, now)
@@ -153,7 +147,7 @@ func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {
 	all := platform
 	all.BottleTag = "all"
 	now := time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix()
-	raw := ghResult(platform, "2026-09-10T00:00:00Z")
+	raw := ghResult(t, platform, "2026-09-10T00:00:00Z")
 	if _, err := oldestVerifiedTimestamp([]byte("["+raw+"]"), all, now); err != nil {
 		t.Fatal(err)
 	}
@@ -203,7 +197,7 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 	if err != nil {
 		t.Fatal("cannot hash cohort bottle fixture", err)
 	}
-	verified := "[" + ghResult(artifact, "2026-09-10T00:00:00Z") + "]"
+	verified := "[" + ghResult(t, artifact, "2026-09-10T00:00:00Z") + "]"
 	for _, tc := range []struct {
 		version string
 		allowed bool
@@ -246,7 +240,7 @@ func ghCommandFixture(t *testing.T) (domain.Artifact, string, string) {
 
 func TestPublicGHCommandBoundary(t *testing.T) {
 	a, bottle, tool := ghCommandFixture(t)
-	verified := "[" + ghResult(a, "2026-09-10T00:00:00Z") + "]"
+	verified := "[" + ghResult(t, a, "2026-09-10T00:00:00Z") + "]"
 	version, err := filepath.Abs("testdata/gh-2.66.0-version.txt")
 	if err != nil {
 		t.Fatal(err)

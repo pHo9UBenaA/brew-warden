@@ -20,7 +20,7 @@ func FuzzPolicyRequiresCompleteEvidence(f *testing.F) {
 		if len(data) < 5 || len(data) > 128 {
 			return
 		}
-		a := eligibleAssessment()
+		a := eligibleAssessment(t)
 		count := 2 + int(data[0]%8)
 		for i := 2; i < count; i++ {
 			node := a.Nodes[1]

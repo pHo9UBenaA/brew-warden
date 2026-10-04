@@ -56,6 +56,7 @@ type runtimeEntry struct {
 	SHA256 domain.Digest `json:"sha256"`
 	Link   string        `json:"link"`
 }
+
 type runtimeManifest struct {
 	Schema       int            `json:"schema"`
 	BrewRevision string         `json:"brewRevision"`
@@ -180,11 +181,44 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 	if err := os.Mkdir(brew, 0700); err != nil {
 		return "", err
 	}
-	manifest := runtimeManifest{Schema: 2, BrewRevision: revision, Files: []runtimeEntry{}}
+	files, err := copyRuntimeFiles(ctx, prefix, destination)
+	if err != nil {
+		return "", err
+	}
+	manifest := runtimeManifest{Schema: 2, BrewRevision: revision, Files: files}
+	slices.SortFunc(manifest.Files, func(a, b runtimeEntry) int { return strings.Compare(a.Path, b.Path) })
+	raw, err := json.Marshal(manifest)
+	if err != nil {
+		return "", err
+	}
+	raw = append(raw, '\n')
+	digest := digestBytes(raw)
+	fixtureMismatch := pin != "" && digest != pin
+	unreviewedRuntime := pin == "" && !sourceReviewed && digest != supportedRuntimeDigest
+	if fixtureMismatch || unreviewedRuntime {
+		return digest, errors.New("installed Homebrew version or runtime differs from supported build")
+	}
+	if pin == "" && sourceReviewed {
+		fresh, err := reviewedBrewSource(ctx, prefix)
+		if err != nil {
+			return digest, err
+		}
+		if fresh != revision {
+			return digest, errors.New("installed Homebrew source changed during inspection")
+		}
+	}
+	return digest, ctx.Err()
+}
+
+// Copy and inventory executable source without choosing its trusted release.
+// The caller creates the empty destination; limits cover both source subtrees.
+func copyRuntimeFiles(ctx context.Context, prefix, destination string) ([]runtimeEntry, error) {
+	brew := filepath.Join(destination, "brew")
+	files := []runtimeEntry{}
 	var totalFileBytes int64
 	for _, root := range []string{"bin/brew", "Library/Homebrew"} {
 		if err := ctx.Err(); err != nil {
-			return "", err
+			return nil, err
 		}
 		err := filepath.WalkDir(filepath.Join(prefix, root), func(file string, item os.DirEntry, walkErr error) error {
 			if err := ctx.Err(); err != nil {
@@ -197,7 +231,7 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 			if err != nil || !safeRelative(filepath.ToSlash(relative)) {
 				return errors.New("unsafe Homebrew runtime path")
 			}
-			if len(manifest.Files) >= 10000 {
+			if len(files) >= 10000 {
 				return errors.New("installed Homebrew runtime inventory exceeds limit")
 			}
 			destinationFile := filepath.Join(brew, relative)
@@ -243,46 +277,26 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 					return err
 				}
 			}
-			manifest.Files = append(manifest.Files, entry)
+			files = append(files, entry)
 			return nil
 		})
 		if err != nil {
-			return "", err
+			return nil, err
 		}
 	}
-	for _, entry := range manifest.Files {
+	for _, entry := range files {
 		if err := ctx.Err(); err != nil {
-			return "", err
+			return nil, err
 		}
-		if entry.Link != "" {
-			resolved, err := filepath.EvalSymlinks(filepath.Join(destination, filepath.FromSlash(entry.Path)))
-			if err != nil || !strings.HasPrefix(resolved, brew+string(filepath.Separator)) {
-				return "", errors.New("installed Homebrew runtime link escapes or is unresolved")
-			}
+		if entry.Link == "" {
+			continue
 		}
-	}
-	slices.SortFunc(manifest.Files, func(a, b runtimeEntry) int { return strings.Compare(a.Path, b.Path) })
-	raw, err := json.Marshal(manifest)
-	if err != nil {
-		return "", err
-	}
-	raw = append(raw, '\n')
-	digest := digestBytes(raw)
-	fixtureMismatch := pin != "" && digest != pin
-	unreviewedRuntime := pin == "" && !sourceReviewed && digest != supportedRuntimeDigest
-	if fixtureMismatch || unreviewedRuntime {
-		return digest, errors.New("installed Homebrew version or runtime differs from supported build")
-	}
-	if pin == "" && sourceReviewed {
-		fresh, err := reviewedBrewSource(ctx, prefix)
-		if err != nil {
-			return digest, err
-		}
-		if fresh != revision {
-			return digest, errors.New("installed Homebrew source changed during inspection")
+		resolved, err := filepath.EvalSymlinks(filepath.Join(destination, filepath.FromSlash(entry.Path)))
+		if err != nil || !strings.HasPrefix(resolved, brew+string(filepath.Separator)) {
+			return nil, errors.New("installed Homebrew runtime link escapes or is unresolved")
 		}
 	}
-	return digest, ctx.Err()
+	return files, nil
 }
 
 func safeRelative(value string) bool {
@@ -296,10 +310,12 @@ func safeRelative(value string) bool {
 	}
 	return true
 }
+
 func digestBytes(data []byte) domain.Digest {
 	sum := sha256.Sum256(data)
 	return domain.Digest(hex.EncodeToString(sum[:]))
 }
+
 func readRegular(file string, maxBytes int64) ([]byte, error) {
 	info, err := os.Lstat(file)
 	if err != nil {
@@ -323,6 +339,7 @@ func readRegular(file string, maxBytes int64) ([]byte, error) {
 	}
 	return data, nil
 }
+
 func writeNew(file string, data []byte, mode os.FileMode) error {
 	f, err := os.OpenFile(file, os.O_WRONLY|os.O_CREATE|os.O_EXCL, mode)
 	if err != nil {

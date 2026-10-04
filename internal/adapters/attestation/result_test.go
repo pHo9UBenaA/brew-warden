@@ -8,10 +8,10 @@ import (
 func TestAttestationAgeChecksEachResultAfterMatchingCandidate(t *testing.T) {
 	const now = int64(1800000000)
 	artifact := artifactFixture()
-	matching := ghResult(artifact, "2026-09-10T00:00:00Z")
+	matching := ghResult(t, artifact, "2026-09-10T00:00:00Z")
 	other := artifact
 	other.Name = "other"
-	unrelated := ghResult(other, "2026-09-01T00:00:00Z")
+	unrelated := ghResult(t, other, "2026-09-01T00:00:00Z")
 	for _, tc := range []struct {
 		name, later string
 		wantError   bool

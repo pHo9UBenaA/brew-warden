@@ -49,7 +49,7 @@ func TestRejectAmbiguousOrWeakenedConfig(t *testing.T) {
 		strings.Repeat(" ", maxDocumentBytes) + `{"schemaVersion":1}`,
 	} {
 		if p, err := ParseConfig(strings.NewReader(data)); err == nil || p.Valid() {
-			t.Fatalf("accepted invalid config %q: %+v", data, p)
+			t.Fatalf("accepted invalid config (%d bytes, prefix %q): policy=%+v error=%v", len(data), data[:min(len(data), 256)], p, err)
 		}
 	}
 }

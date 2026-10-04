@@ -70,6 +70,7 @@ run_brew() {
   printf '%s: exit %s\n' "$label" "$status"
   return "$status"
 }
+
 no_installed_payload() {
   # Homebrew may create an empty rack before a download error. Record that
   # side effect; it must never be reported as an installed or verified keg.
@@ -77,6 +78,7 @@ no_installed_payload() {
   entries=$(/usr/bin/find /opt/homebrew/Cellar -mindepth 2 -print) || return 1
   [ -z "$entries" ]
 }
+
 run_brew version --version
 run_brew candidate-info info --json=v2 --formula homebrew/core/jq homebrew/core/oniguruma
 if [ "$mode" = upgrade ]; then
