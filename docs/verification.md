@@ -53,7 +53,13 @@ advisory response cannot prove absence of vulnerabilities.
   redundant grouping and parentheses, comment spacing and explicit octal notation.
   `format.sh check` reports drift without writing; `format.sh write` repairs it.
   Both enumerate explicit Go files, including platform/VM-tagged tests and any
-  generated or testdata sources. No `-extra` rules are enabled.
+  generated or testdata sources. The extra rules are selected explicitly with
+  `-extra=group_params,clothe_returns,balance_calls`: group adjacent parameters
+  and results with the same type while retaining their names, replace naked
+  returns in named-result functions with explicit results, and put multiline
+  calls' closing parentheses on their own line when the opening ends a line.
+  Bare returns in no-result functions/callbacks remain valid. A formatter update
+  must not silently enable other extra rules.
 - The same formatting commands apply pinned shfmt to `scripts/*.sh` and every
   Git hook, forcing POSIX parsing and matching existing two-space indentation,
   indented cases and spaced redirections (`-ln posix -i 2 -ci -sr`). They separate
@@ -62,9 +68,13 @@ advisory response cannot prove absence of vulnerabilities.
   strings, comments, and YAML shell blocks are not recursively formatted.
 - `scripts/tools.sh` retains Staticcheck's default checks and adds `ST1003`
   (identifier conventions and initialisms), `ST1016` (consistent receiver names),
-  and `ST1023` (redundant declaration types). Ordinary lint and tagged readiness
-  lint use the same selection. Existing simplification and unused-code checks
-  remain enabled; no check exclusions or file exemptions are introduced.
+  `ST1020`/`ST1021`/`ST1022` (existing doc comments identify their exported
+  function, type or variable/constant first), and `ST1023` (redundant declaration
+  types). Missing comments are not failures; these rules do not demand filler
+  comments or mandatory package documentation. They check comment targets, not
+  factual accuracy. Ordinary lint and tagged readiness lint use the same
+  selection. Existing simplification and unused-code checks remain enabled;
+  no check exclusions or file exemptions are introduced.
 - `repo-check test-helpers` parses every `_test.go` file regardless of build tags.
   Named functions/methods whose first parameter is a directly qualified
   `testing.TB`, `*testing.T`, `*testing.B` or `*testing.F` must have one named handle

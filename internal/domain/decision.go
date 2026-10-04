@@ -49,7 +49,7 @@ type AgeWaiver struct {
 	Reason   string
 }
 
-// An exception is explicitly requested by the user and bound to one current
+// AgeException is explicitly requested by the user and bound to one current
 // plan, attempt and expiry. It cannot be replayed from saved process state.
 // IssuedAt and ExpiresAt are Unix seconds; validity is [IssuedAt, ExpiresAt).
 type AgeException struct {

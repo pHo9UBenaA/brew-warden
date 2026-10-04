@@ -20,5 +20,5 @@ checked_tool_path() (
 # Keep ordinary and VM-tagged analysis on the same readability rules.
 run_staticcheck() (
   binary=$(checked_tool_path staticcheck honnef.co/go/tools "$STATICCHECK_VERSION")
-  "$binary" -checks='inherit,ST1003,ST1016,ST1023' "$@"
+  "$binary" -checks='inherit,ST1003,ST1016,ST1020,ST1021,ST1022,ST1023' "$@"
 )

@@ -24,6 +24,7 @@ Supported: verified official core bottles on Apple Silicon macOS Tahoe, /opt/hom
 Age exceptions apply only to named artifacts in this one attempt. Other required checks remain mandatory.
 No casks, third-party taps, source builds or arbitrary Homebrew options.`
 
+// RunWithRuntime routes mutation requests through the supplied service.
 // Unsupported commands never fall through to an unchecked brew process.
 func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, source ports.ConfigSource, service *application.Service) int {
 	if len(args) == 1 && args[0] == "--version" {

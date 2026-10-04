@@ -163,6 +163,139 @@ func (installed Runtime) Second() string { return ArtifactId }
 	}
 }
 
+func TestLintRequiresDocCommentsToIdentifyDeclarations(t *testing.T) {
+	root := readabilityScriptFixture(t, "staticcheck", "gofumpt", "shfmt")
+	path := filepath.Join(root, "internal", "fixture.go")
+	for _, test := range []struct {
+		name, declaration, before, after, rule string
+	}{
+		{
+			name:        "function documentation",
+			declaration: "func Freeze(data []byte) []byte { return append([]byte(nil), data...) }\n",
+			before:      "Retains the acquired bytes for subsequent verification.",
+			after:       "Freeze retains the acquired bytes for subsequent verification.",
+			rule:        "ST1020",
+		},
+		{
+			name:        "type documentation",
+			declaration: "type Snapshot struct{ Digest string }\n",
+			before:      "Captures the digest of frozen input bytes, not an authorization.",
+			after:       "Snapshot captures the digest of frozen input bytes, not an authorization.",
+			rule:        "ST1021",
+		},
+		{
+			name:        "constant documentation",
+			declaration: "const MaxBytes = 1024 * 1024\n",
+			before:      "Bounds buffered input to one MiB.",
+			after:       "MaxBytes bounds buffered input to one MiB.",
+			rule:        "ST1022",
+		},
+	} {
+		t.Run(test.name, func(t *testing.T) {
+			source := "package fixture\n\n// " + test.before + "\n" + test.declaration
+			if err := os.WriteFile(path, []byte(source), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			run := func() (string, error) {
+				t.Helper()
+				command := exec.Command("sh", "scripts/check.sh", "lint")
+				command.Dir = root
+				output, err := command.CombinedOutput()
+				return string(output), err
+			}
+			output, err := run()
+			if err == nil || !strings.Contains(output, test.rule) {
+				t.Fatalf("doc comment lost its target; want %s, got %v: %s", test.rule, err, output)
+			}
+			corrected := strings.Replace(source, test.before, test.after, 1)
+			if err := os.WriteFile(path, []byte(corrected), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if output, err := run(); err != nil {
+				t.Fatalf("accurate doc target rejected: %v: %s", err, output)
+			}
+			// Missing comments must not demand boilerplate or package comments.
+			if err := os.WriteFile(path, []byte("package fixture\n\n"+test.declaration), 0o600); err != nil {
+				t.Fatal(err)
+			}
+			if output, err := run(); err != nil {
+				t.Fatalf("absent documentation demanded filler: %v: %s", err, output)
+			}
+		})
+	}
+}
+
+func TestFormatterMakesResultsAndCallBoundariesExplicit(t *testing.T) {
+	root := readabilityScriptFixture(t, "gofumpt", "shfmt")
+	path := filepath.Join(root, "internal", "fixture.go")
+	source := `package fixture
+
+import "fmt"
+
+func boundBytes(first string, second string) (data []byte, err error) {
+	defer func() {
+		if len(data) == 0 {
+			return
+		}
+		data = append(data, '!')
+	}()
+	data = []byte(fmt.Sprintf(
+		"%s%s",
+		first,
+		second))
+	return
+}
+`
+	if err := os.WriteFile(path, []byte(source), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	contract := `package fixture
+
+import "testing"
+
+func TestBindingIncludesDeferredResult(t *testing.T) {
+	for _, test := range []struct{ first, second, want string }{
+		{"a", "b", "ab!"},
+		{"", "", ""},
+	} {
+		data, err := boundBytes(test.first, test.second)
+		if err != nil || string(data) != test.want {
+			t.Fatalf("inputs %q/%q: want %q and no error, got %q: %v", test.first, test.second, test.want, data, err)
+		}
+	}
+}
+`
+	if err := os.WriteFile(filepath.Join(root, "internal", "fixture_test.go"), []byte(contract), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	run := func(args ...string) (string, error) {
+		t.Helper()
+		command := exec.Command(args[0], args[1:]...)
+		command.Dir = root
+		output, err := command.CombinedOutput()
+		return string(output), err
+	}
+	if output, err := run("go", "test", "./internal"); err != nil {
+		t.Fatalf("original return contract invalid: %v: %s", err, output)
+	}
+	if output, err := run("sh", "scripts/format.sh", "check"); err == nil || !strings.Contains(output, "internal/fixture.go") {
+		t.Fatalf("implicit results/unbalanced call passed formatting: %v: %s", err, output)
+	}
+	if output, err := run("sh", "scripts/format.sh", "write"); err != nil {
+		t.Fatalf("explicit result repair failed: %v: %s", err, output)
+	}
+	repaired, err := os.ReadFile(path)
+	if err != nil || !strings.Contains(string(repaired), "first, second string") || !strings.Contains(string(repaired), "return data, err") || !strings.Contains(string(repaired), "second,\n\t))") {
+		t.Fatalf("want grouped names, explicit return and balanced call, got %v: %s", err, repaired)
+	}
+	if output, err := run("sh", "scripts/format.sh", "check"); err != nil {
+		t.Fatalf("repaired result/call rejected: %v: %s", err, output)
+	}
+	if output, err := run("go", "test", "-count=1", "./internal"); err != nil {
+		t.Fatalf("explicit return changed deferred result: %v: %s", err, output)
+	}
+}
+
 func TestShellFormatterRepairsScriptsAndHooksWithoutChangingArguments(t *testing.T) {
 	root := readabilityScriptFixture(t, "gofumpt", "shfmt")
 	original := "#!/bin/sh\nset -- 'a b' 'c;d'\nif [ \"$#\" -eq 2 ];then printf '%s\\n' \"$1\" \"$2\";fi\n"

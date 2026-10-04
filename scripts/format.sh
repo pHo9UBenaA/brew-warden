@@ -18,7 +18,9 @@ esac
 binary=$(checked_tool_path gofumpt mvdan.cc/gofumpt "$GOFUMPT_VERSION")
 shell_formatter=$(checked_tool_path shfmt mvdan.cc/sh/v3 "$SHFMT_VERSION")
 # Explicit files include tagged tests and avoid gofumpt's generated/testdata skips.
-formatted=$(find tools internal cmd tests -type f -name '*.go' -exec "$binary" "-$mode" {} +)
+# Name reviewed extra rules explicitly so tool updates cannot enable new ones.
+formatted=$(find tools internal cmd tests -type f -name '*.go' -exec "$binary" \
+  -extra=group_params,clothe_returns,balance_calls "-$mode" {} +)
 if [ "$1" = check ] && [ -n "$formatted" ]; then
   printf 'Run ./scripts/format.sh write on:\n%s\n' "$formatted" >&2
   exit 1

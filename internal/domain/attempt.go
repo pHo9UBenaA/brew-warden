@@ -1,7 +1,7 @@
 package domain
 
-// Execution outcomes are in-process diagnostics, never durable authorizations
-// or saved plans. An interrupted process remains unknown until a fresh run.
+// AttemptOutcome is an in-process diagnostic, never a durable authorization
+// or saved plan. An interrupted process remains unknown until a fresh run.
 type AttemptOutcome string
 
 const (
