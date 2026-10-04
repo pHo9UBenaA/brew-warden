@@ -8,22 +8,34 @@ set -eu
 }
 mode=${2:-install}
 case "$mode" in
-  install|upgrade) ;;
-  *) echo 'unsupported probe operation' >&2; exit 2 ;;
+  install | upgrade) ;;
+  *)
+    echo 'unsupported probe operation' >&2
+    exit 2
+    ;;
 esac
 case "$(/usr/sbin/sysctl -n hw.model)" in
   VirtualMac*) ;;
-  *) echo 'requires disposable macOS VM' >&2; exit 2 ;;
+  *)
+    echo 'requires disposable macOS VM' >&2
+    exit 2
+    ;;
 esac
 
 root=$1
 case "$root" in
   /private/tmp/bwd-cli-*) ;;
-  *) echo 'requires dedicated VM workspace' >&2; exit 2 ;;
+  *)
+    echo 'requires dedicated VM workspace' >&2
+    exit 2
+    ;;
 esac
 suffix=${root#/private/tmp/bwd-cli-}
 case "$suffix" in
-  ''|*[!a-zA-Z0-9_-]*) echo 'invalid workspace name' >&2; exit 2 ;;
+  '' | *[!a-zA-Z0-9_-]*)
+    echo 'invalid workspace name' >&2
+    exit 2
+    ;;
 esac
 [ "$(cd "$root" && pwd -P)" = "$root" ] || {
   echo 'workspace must not be a symlink' >&2
@@ -39,12 +51,12 @@ else
   [ -d /opt/homebrew/Cellar/jq/1.8.1 ] &&
     [ ! -e /opt/homebrew/Cellar/jq/1.8.2 ] &&
     [ -d /opt/homebrew/Cellar/oniguruma/6.9.10 ] || {
-      echo 'requires old jq and current oniguruma fixtures' >&2
-      exit 2
-    }
+    echo 'requires old jq and current oniguruma fixtures' >&2
+    exit 2
+  }
 fi
 mkdir -p "$root/home" "$root/tmp" "$root/logs" "$root/results"
-cat > "$root/public-cli.sb" <<PROFILE
+cat > "$root/public-cli.sb" << PROFILE
 (version 1)
 (allow default)
 (deny network*)
@@ -96,7 +108,10 @@ dep_cache=$(sed -n '2p' "$root/results/cache-paths.stdout")
 for file in "$jq_cache" "$dep_cache"; do
   case "$file" in
     "$root"/cache/downloads/*) ;;
-    *) echo 'unexpected cache path' >&2; exit 2 ;;
+    *)
+      echo 'unexpected cache path' >&2
+      exit 2
+      ;;
   esac
   [ -f "$file" ] && [ ! -L "$file" ]
 done

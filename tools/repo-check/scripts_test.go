@@ -20,10 +20,10 @@ func TestWorktreeProbeArchivesCurrentFilesWithoutTrackedDeletions(t *testing.T) 
 		"fake-bin/docker":            "#!/bin/sh\nexit 37\n",
 	} {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(content), 0700); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -31,7 +31,7 @@ func TestWorktreeProbeArchivesCurrentFilesWithoutTrackedDeletions(t *testing.T) 
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "scripts/probe-container.sh"), raw, 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "scripts/probe-container.sh"), raw, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for _, args := range [][]string{{"init", "-q"}, {"add", "."}, {"-c", "user.name=Fixture", "-c", "user.email=fixture@example.org", "commit", "-qm", "fixture"}} {
@@ -51,7 +51,7 @@ func TestWorktreeProbeArchivesCurrentFilesWithoutTrackedDeletions(t *testing.T) 
 		t.Fatal(err)
 	}
 	for name, content := range map[string]string{"modified file": "current", "new\nfile": "new", "ignored": "private"} {
-		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0600); err != nil {
+		if err := os.WriteFile(filepath.Join(root, name), []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -107,15 +107,15 @@ func TestWorktreeProbeArchivesCurrentFilesWithoutTrackedDeletions(t *testing.T) 
 
 func TestCheckRequiresPinnedTools(t *testing.T) {
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"check.sh", "env.sh", "tool-versions.env"} {
+	for _, name := range []string{"check.sh", "env.sh", "tools.sh", "tool-versions.env"} {
 		b, err := os.ReadFile(filepath.Join("../../scripts", name))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, "scripts", name), b, 0700); err != nil {
+		if err := os.WriteFile(filepath.Join(root, "scripts", name), b, 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -131,7 +131,7 @@ func TestCheckRequiresPinnedTools(t *testing.T) {
 	run("lint", "Missing staticcheck")
 	run("vuln", "Missing govulncheck")
 	run("unknown", "Unknown check")
-	if err := os.MkdirAll(filepath.Join(root, ".cache/tools"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".cache/tools"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	// An executable with unrelated build metadata must not stand in for the pin.
@@ -150,22 +150,22 @@ func TestFuzzCheckRejectsMissingTarget(t *testing.T) {
 		"tools/repo-check/main.go": "package main\nfunc main() {}\n",
 	} {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(content), 0600); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
-	for _, name := range []string{"check.sh", "env.sh", "tool-versions.env"} {
+	for _, name := range []string{"check.sh", "env.sh", "tools.sh", "tool-versions.env"} {
 		raw, err := os.ReadFile(filepath.Join("../../scripts", name))
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := os.MkdirAll(filepath.Join(root, "scripts"), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Join(root, "scripts"), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(filepath.Join(root, "scripts", name), raw, 0700); err != nil {
+		if err := os.WriteFile(filepath.Join(root, "scripts", name), raw, 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}

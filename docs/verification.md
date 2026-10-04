@@ -8,13 +8,14 @@ native macOS bottle compatibility.
 
 | Command | Checks or output | Network |
 | --- | --- | --- |
-| `./scripts/verify.sh` / `task verify` | Formatting, shell syntax, hygiene, architecture, dependency inventory, tidy diff, module cache integrity, vet, shuffled tests | None required |
-| `./scripts/setup-tools.sh` / `task tools` | Install pinned Staticcheck and govulncheck under `.cache/tools` | Go proxy and checksum database |
+| `./scripts/verify.sh` / `task verify` | gofmt simplification, test-helper attribution, shell syntax, hygiene, architecture, dependency inventory, tidy diff, module cache integrity, vet, shuffled tests | None required |
+| `./scripts/setup-tools.sh` / `task tools` | Install pinned Staticcheck, gofumpt, shfmt and govulncheck under `.cache/tools` | Go proxy and checksum database |
 | `./scripts/check.sh all` / `task check` | Baseline plus every check below, using pinned Go | Advisory database |
 | `./scripts/check.sh race` / `task test-race` | Race detection, shuffled uncached tests | None required |
 | `./scripts/check.sh cover` / `task test-cover` | Cross-package coverage at `.cache/coverage.out` | None required |
 | `./scripts/check.sh fuzz` / `task fuzz` | Active named-target fuzzing, refusing missing targets; `FUZZTIME` defaults to 10s per target | None required |
-| `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck default checks | None required |
+| `./scripts/check.sh lint` / `task lint` | Pinned Staticcheck with additional readability checks, plus Go/shell formatting checks | None required |
+| `./scripts/format.sh write` / `task format` | Apply pinned gofumpt and shfmt to Go sources, scripts and hooks | None required |
 | `./scripts/check.sh vuln` / `task vuln` | govulncheck on source, tests, checker and product binaries | Advisory database |
 | `./scripts/check.sh build` / `task build` | Diagnostic-only development binaries in `bin/` | None required |
 | `./scripts/build-product.sh darwin/arm64` | Two forced builds from committed source; compare complete archives and binaries | None required |
@@ -41,6 +42,47 @@ not instrument separately built subprocesses or opt-in native cases. Fuzz seeds
 run in ordinary tests; active fuzzing covers only exercised properties. Preserve
 discovered regressions as reviewed corpus cases. A successful test or empty
 advisory response cannot prove absence of vulnerabilities.
+
+## Automated readability checks
+
+- Baseline verification uses `gofmt -s`, rejecting redundant literal types and
+  other gofmt simplifications as well as unformatted code. It needs no separately
+  installed formatter.
+- Full lint additionally checks pinned gofumpt's default rules: standard-library
+  import grouping, declaration separation, consistent multiline literals,
+  redundant grouping and parentheses, comment spacing and explicit octal notation.
+  `format.sh check` reports drift without writing; `format.sh write` repairs it.
+  Both enumerate explicit Go files, including platform/VM-tagged tests and any
+  generated or testdata sources. No `-extra` rules are enabled.
+- The same formatting commands apply pinned shfmt to `scripts/*.sh` and every
+  Git hook, forcing POSIX parsing and matching existing two-space indentation,
+  indented cases and spaced redirections (`-ln posix -i 2 -ci -sr`). They separate
+  crowded shell branches and normalize layout without executing scripts.
+  Shell simplification (`-s`) is deliberately not enabled; embedded command/JSON
+  strings, comments, and YAML shell blocks are not recursively formatted.
+- `scripts/tools.sh` retains Staticcheck's default checks and adds `ST1003`
+  (identifier conventions and initialisms), `ST1016` (consistent receiver names),
+  and `ST1023` (redundant declaration types). Ordinary lint and tagged readiness
+  lint use the same selection. Existing simplification and unused-code checks
+  remain enabled; no check exclusions or file exemptions are introduced.
+- `repo-check test-helpers` parses every `_test.go` file regardless of build tags.
+  Named functions/methods whose first parameter is a directly qualified
+  `testing.TB`, `*testing.T`, `*testing.B` or `*testing.F` must have one named handle
+  and begin with that handle's `Helper()` call. Renamed testing imports work.
+  Actual Test/Benchmark/Fuzz entrypoints and anonymous callbacks are not helpers.
+  This syntax gate does not resolve type aliases or infer helper roles from calls.
+
+Hooks run the baseline; CI/full checks additionally require pinned development
+tools to be explicitly prepared. Formatter/linter integration tests use isolated
+repositories and already-installed tools, skipping tool-dependent cases when
+those tools are absent rather than downloading them.
+
+These checks prevent mechanical regressions, not all readability problems.
+Semantic naming, units and boundary meanings, accurate comments, meaningful
+field/condition grouping, single-purpose decomposition, repeated cross-function
+work, test isolation, useful failure context and refusal for the intended reason
+still require review and behavior tests. No identifier-length, function-length,
+complexity score or repeated clean-review quota substitutes for that judgment.
 
 ## Test ownership and cohort contracts
 

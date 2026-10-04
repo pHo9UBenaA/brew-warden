@@ -37,7 +37,7 @@ func FuzzInFlightRecord(f *testing.F) {
 
 func TestLegacyJournalCannotBeSilentlyMigrated(t *testing.T) {
 	journal := filepath.Join(t.TempDir(), "attempts")
-	if err := os.Mkdir(journal, 0700); err != nil {
+	if err := os.Mkdir(journal, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	engine := Engine{Collector: &Collector{LegacyState: journal}}
@@ -66,7 +66,7 @@ func TestInFlightRejectsCorruptAndUnsafeRecords(t *testing.T) {
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			directory := t.TempDir()
-			if err := os.WriteFile(filepath.Join(directory, "inflight.json"), []byte(tc.data), 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(directory, "inflight.json"), []byte(tc.data), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			if err := clearStoppedInFlight(directory); err == nil || !strings.Contains(err.Error(), "invalid in-flight execution record") {
@@ -95,13 +95,13 @@ func TestInFlightParentExitHelper(t *testing.T) {
 	if err := child.Start(); err != nil {
 		os.Exit(2)
 	}
-	if err := os.Mkdir(filepath.Join(directory, "collection-12345"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(directory, "collection-12345"), 0o700); err != nil {
 		os.Exit(4)
 	}
 	record := inFlightFixture(child.Process.Pid)
 	if os.Getenv("BREWWARDEN_INFLIGHT_PENDING") == "1" {
 		raw := marshalFixture(t, record)
-		if err := writeNew(filepath.Join(directory, "inflight.pending"), raw, 0600); err != nil {
+		if err := writeNew(filepath.Join(directory, "inflight.pending"), raw, 0o600); err != nil {
 			_ = syscall.Kill(-child.Process.Pid, syscall.SIGKILL)
 			os.Exit(3)
 		}
@@ -167,7 +167,7 @@ func TestInFlightDoesNotDeleteReplacedWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	outside := t.TempDir()
 	marker := filepath.Join(outside, "marker")
-	if err := os.WriteFile(marker, []byte("preserve"), 0600); err != nil {
+	if err := os.WriteFile(marker, []byte("preserve"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(outside, filepath.Join(directory, "collection-12345")); err != nil {

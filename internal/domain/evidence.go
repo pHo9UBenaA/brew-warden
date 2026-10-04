@@ -14,8 +14,10 @@ func (d Digest) Valid() bool {
 	return len(d) == 64 && strings.Trim(string(d), "0123456789abcdef") == ""
 }
 
-var formulaName = regexp.MustCompile(`^[a-z0-9][a-z0-9+_.@-]{0,127}$`)
-var versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
+var (
+	formulaName = regexp.MustCompile(`^[a-z0-9][a-z0-9+_.@-]{0,127}$`)
+	versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
+)
 
 func ValidRequest(operation string, targets []string) bool {
 	supportedOperation := operation == "install" || operation == "upgrade"

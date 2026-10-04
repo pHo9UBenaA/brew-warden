@@ -167,7 +167,7 @@ func TestAllBottleRequiresAttestedExactPlatformBytes(t *testing.T) {
 func TestInstalledGHInputAndOutputBounds(t *testing.T) {
 	root := t.TempDir()
 	file, link := filepath.Join(root, "file"), filepath.Join(root, "link")
-	if err := os.WriteFile(file, []byte("data"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("data"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Symlink(file, link); err != nil {
@@ -189,7 +189,7 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 	root := t.TempDir()
 	artifact := artifactFixture()
 	bottle := filepath.Join(root, bottleName(artifact))
-	if err := os.WriteFile(bottle, []byte("cohort-bottle"), 0600); err != nil {
+	if err := os.WriteFile(bottle, []byte("cohort-bottle"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	var err error
@@ -202,13 +202,18 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 		version string
 		allowed bool
 	}{
-		{"2.65.0", false}, {"2.66.0", true}, {"2.70.0", true}, {"2.101.0", true},
-		{"2.102.0", false}, {"3.0.0", false}, {"2.66.0-rc1", false},
+		{"2.65.0", false},
+		{"2.66.0", true},
+		{"2.70.0", true},
+		{"2.101.0", true},
+		{"2.102.0", false},
+		{"3.0.0", false},
+		{"2.66.0-rc1", false},
 	} {
 		t.Run(tc.version, func(t *testing.T) {
 			tool := filepath.Join(t.TempDir(), "gh")
 			script := "#!/bin/sh\nif [ \"$1\" = version ]; then printf '%s\\n' 'gh version " + tc.version + " (fixture)'; exit 0; fi\nprintf '%s' '" + verified + "'\n"
-			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
+			if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			provenance, age, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix())
@@ -227,7 +232,7 @@ func ghCommandFixture(t *testing.T) (domain.Artifact, string, string) {
 	root := t.TempDir()
 	artifact := artifactFixture()
 	bottle := filepath.Join(root, bottleName(artifact))
-	if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
+	if err := os.WriteFile(bottle, []byte("bottle"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	digest, err := hashFile(bottle, 1000)
@@ -266,7 +271,7 @@ func TestPublicGHCommandBoundary(t *testing.T) {
 		{"bottle changed", "printf changed > \"$3\"; printf '%s' '" + verified + "'", "", false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
-			if err := os.WriteFile(bottle, []byte("bottle"), 0600); err != nil {
+			if err := os.WriteFile(bottle, []byte("bottle"), 0o600); err != nil {
 				t.Fatal("cannot restore bottle fixture", err)
 			}
 			versionChecked := filepath.Join(filepath.Dir(tool), "version-checked")
@@ -286,7 +291,7 @@ test "$5" = Homebrew/homebrew-core && test "$6" = --predicate-type &&
 test "$7" = https://slsa.dev/provenance/v1 && test "$8" = --format &&
 test "$9" = json && test "${10}" = --limit && test "${11}" = 100 || exit 5
 ` + tc.script + "\n"
-			if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
+			if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 				t.Fatal(err)
 			}
 			provenance, age, raw, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), a, bottle, now)
@@ -335,7 +340,7 @@ fi
 printf started > "$GH_TEST_VERIFY_STARTED"
 exit 42
 `
-	if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
+	if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	const now = int64(1800000000)
@@ -360,7 +365,7 @@ fi
 printf started > "$GH_TEST_VERIFY_STARTED"
 exec /bin/sleep 30
 `
-	if err := os.WriteFile(tool, []byte(script), 0700); err != nil {
+	if err := os.WriteFile(tool, []byte(script), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Second)

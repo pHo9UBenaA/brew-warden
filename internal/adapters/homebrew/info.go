@@ -136,7 +136,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 	if err != nil {
 		return nil, err
 	}
-	if err := writeNew(filepath.Join(w.root, "metadata.json"), raw, 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "metadata.json"), raw, 0o600); err != nil {
 		return nil, err
 	}
 	return raw, nil

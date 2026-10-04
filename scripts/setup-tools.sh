@@ -14,4 +14,6 @@ export GOBIN="$PWD/.cache/tools" GOMODCACHE="$PWD/.cache/tool-modules"
 mkdir -p "$GOBIN" "$GOMODCACHE"
 go install "golang.org/x/vuln/cmd/govulncheck@$GOVULNCHECK_VERSION"
 go install "honnef.co/go/tools/cmd/staticcheck@$STATICCHECK_VERSION"
+go install "mvdan.cc/gofumpt@$GOFUMPT_VERSION"
+go install "mvdan.cc/sh/v3/cmd/shfmt@$SHFMT_VERSION"
 printf 'Pinned development tools installed in .cache/tools.\n'

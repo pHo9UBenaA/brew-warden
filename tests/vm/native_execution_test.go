@@ -121,7 +121,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		if _, err := os.Lstat("/opt/homebrew/Cellar/oniguruma"); !os.IsNotExist(err) {
 			t.Fatal("link-conflict test requires absent dependency")
 		}
-		file, err := os.OpenFile("/opt/homebrew/bin/jq", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0644)
+		file, err := os.OpenFile("/opt/homebrew/bin/jq", os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o644)
 		if err != nil {
 			t.Fatal(err)
 		}

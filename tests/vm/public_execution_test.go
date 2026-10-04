@@ -164,7 +164,7 @@ func assertPublicFaultPreventsMutation(t *testing.T, ctx context.Context, direct
 		if err != nil || len(files) == 0 {
 			t.Fatalf("want at least one bottle fixture, got %q: error=%v", files, err)
 		}
-		if err := os.WriteFile(files[0], []byte("changed after verification"), 0600); err != nil {
+		if err := os.WriteFile(files[0], []byte("changed after verification"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	case "missing-cache":

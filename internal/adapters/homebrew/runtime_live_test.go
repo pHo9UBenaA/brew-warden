@@ -37,10 +37,10 @@ func TestLiveNativeMetadata(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := filepath.Join(root, metadataCachePath)
-	if err := os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cache), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeNew(cache, metadata, 0600); err != nil {
+	if err := writeNew(cache, metadata, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	result, err := w.metadata(context.Background(), profile, []string{"jq"})
@@ -83,7 +83,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(cache, corrupt, 0600); err != nil {
+	if err := os.WriteFile(cache, corrupt, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	_, err = w.invoke(context.Background(), "invalid-signature", filepath.Join(root, "metadata.sb"), "info", "--json=v2", "--formula", "homebrew/core/jq")
@@ -99,7 +99,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err == nil || readErr != nil || !strings.Contains(strings.ToLower(string(log)), "signature") {
 		t.Fatalf("tampered metadata was not rejected for its signature: %v; diagnostic read: %v: %s", err, readErr, log)
 	}
-	if err := os.WriteFile(cache, metadata, 0600); err != nil {
+	if err := os.WriteFile(cache, metadata, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	cached, err := filepath.Abs("../../../.cache/vm-evidence/acceptance-03/brewwarden-probe.3mwiEaQB/cache/downloads")
@@ -110,7 +110,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.Mkdir(filepath.Join(root, "cache/downloads"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(root, "cache/downloads"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	for _, file := range files {
@@ -125,7 +125,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		if err := writeNew(filepath.Join(root, "cache/downloads", file.Name()), data, 0600); err != nil {
+		if err := writeNew(filepath.Join(root, "cache/downloads", file.Name()), data, 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}

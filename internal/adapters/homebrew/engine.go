@@ -57,7 +57,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 			return ports.Prepared{}, nil, ports.ErrNothingToDo
 		}
 	}
-	if err := os.MkdirAll(e.Collector.Directory, 0700); err != nil {
+	if err := os.MkdirAll(e.Collector.Directory, 0o700); err != nil {
 		return ports.Prepared{}, nil, err
 	}
 	// Refuse an owned active child before running a new Homebrew preflight.

@@ -46,7 +46,7 @@ func TestReviewedReleaseGitSourceMatrix(t *testing.T) {
 				t.Fatalf("real release source cannot be copied and bound: %s %v", digest, err)
 			}
 			modified := filepath.Join(prefix, "Library/Homebrew/unreviewed.rb")
-			if err := os.WriteFile(modified, []byte("# unreviewed executable source\n"), 0600); err != nil {
+			if err := os.WriteFile(modified, []byte("# unreviewed executable source\n"), 0o600); err != nil {
 				t.Fatal(err)
 			}
 			if _, err := reviewedBrewSource(context.Background(), prefix); err == nil {

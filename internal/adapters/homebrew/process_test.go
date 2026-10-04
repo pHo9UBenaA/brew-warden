@@ -60,7 +60,7 @@ func TestWorkspaceSandboxAllowsDiagnosticsButProtectsFrozenInputs(t *testing.T) 
 		t.Fatal(err)
 	}
 	input := filepath.Join(root, "frozen.json")
-	if err := os.WriteFile(input, []byte("verified"), 0600); err != nil {
+	if err := os.WriteFile(input, []byte("verified"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	w := workspace{root: root}

@@ -12,10 +12,12 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-const maxResponse = 8 * 1024 * 1024
-const identityPrefix = "https://github.com/Homebrew/homebrew-core/.github/workflows/"
-const issuer = "https://token.actions.githubusercontent.com"
-const repository = "https://github.com/Homebrew/homebrew-core"
+const (
+	maxResponse    = 8 * 1024 * 1024
+	identityPrefix = "https://github.com/Homebrew/homebrew-core/.github/workflows/"
+	issuer         = "https://token.actions.githubusercontent.com"
+	repository     = "https://github.com/Homebrew/homebrew-core"
+)
 
 func bottleName(a domain.Artifact) string {
 	version := a.Version

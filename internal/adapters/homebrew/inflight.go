@@ -90,7 +90,7 @@ func saveInFlight(directory string, record inFlight) error {
 	if err != nil {
 		return err
 	}
-	if err := writeNew(pending, append(data, '\n'), 0600); err != nil {
+	if err := writeNew(pending, append(data, '\n'), 0o600); err != nil {
 		return err
 	}
 	if err := os.Rename(pending, file); err != nil {

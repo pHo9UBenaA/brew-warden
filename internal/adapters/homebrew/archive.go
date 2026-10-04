@@ -54,7 +54,7 @@ func validateBottleArchive(data []byte, candidate formulaMetadata) error {
 				return errors.New("unsupported bottle shared-prefix entry")
 			}
 		}
-		if header.Mode&07000 != 0 || header.Mode&^07777 != 0 {
+		if header.Mode&0o7000 != 0 || header.Mode&^0o7777 != 0 {
 			return errors.New("unsupported bottle permissions")
 		}
 		entries[name] = header.Typeflag

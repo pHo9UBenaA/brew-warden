@@ -13,6 +13,13 @@ handling. Run `./scripts/verify.sh` during edits and `./scripts/check.sh all`
 before requesting review; report unavailable checks accurately. See
 [verification](docs/verification.md) for coverage and known gaps.
 
+Run `./scripts/setup-tools.sh` explicitly to prepare pinned development tools,
+then `./scripts/format.sh write` (or `task format`) to format Go sources, scripts
+and hooks.
+Verification never rewrites or stages source. See the
+[automated readability checks](docs/verification.md#automated-readability-checks)
+for enforced rules and the judgments still requiring review.
+
 Keep current documentation focused on actionable contracts. Store historical
 research and decision rationale under `docs/archive/`, without adding routine
 README or agent-context links. Do not add tests solely for prose changes.

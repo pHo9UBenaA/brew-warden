@@ -29,7 +29,7 @@ func (w workspace) fetchBottles(ctx context.Context, profile string, candidates 
 	if err != nil {
 		return nil, err
 	}
-	if err := writeNew(filepath.Join(w.root, "fetch.stdout"), output, 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "fetch.stdout"), output, 0o600); err != nil {
 		return nil, err
 	}
 	paths, err := w.invoke(ctx, "cache-paths", profile, append([]string{"--cache", "--formula", "--bottle-tag=arm64_tahoe"}, names...)...)
@@ -40,7 +40,7 @@ func (w workspace) fetchBottles(ctx context.Context, profile string, candidates 
 	if err != nil {
 		return nil, err
 	}
-	if err := writeNew(filepath.Join(w.root, "fetch.json"), data, 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "fetch.json"), data, 0o600); err != nil {
 		return nil, err
 	}
 	return data, nil

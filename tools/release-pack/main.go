@@ -50,10 +50,10 @@ func run(args []string) error {
 		items = append(items, item{Name: name, Data: raw, Mode: mode})
 		return nil
 	}
-	if err := add("bwd", binary, 0755); err != nil {
+	if err := add("bwd", binary, 0o755); err != nil {
 		return err
 	}
-	items = append(items, item{Name: "brewwarden", Link: "bwd", Mode: 0755})
+	items = append(items, item{Name: "brewwarden", Link: "bwd", Mode: 0o755})
 	docs, err := filepath.Glob("docs/*.md")
 	if err != nil {
 		return err
@@ -65,24 +65,24 @@ func run(args []string) error {
 	docs = append(docs, adapterDocs...)
 	docs = append(docs, "CONTRIBUTING.md", "scripts/macos-vm.md")
 	for _, file := range docs {
-		if err := add(filepath.ToSlash(file), file, 0644); err != nil {
+		if err := add(filepath.ToSlash(file), file, 0o644); err != nil {
 			return err
 		}
 	}
 
-	if err := add("LICENSE", "LICENSE", 0644); err != nil {
+	if err := add("LICENSE", "LICENSE", 0o644); err != nil {
 		return err
 	}
-	if err := add("README.md", "README.md", 0644); err != nil {
+	if err := add("README.md", "README.md", 0o644); err != nil {
 		return err
 	}
-	if err := add("licenses/Go-LICENSE", goLicense, 0644); err != nil {
+	if err := add("licenses/Go-LICENSE", goLicense, 0o644); err != nil {
 		return err
 	}
 	// Installed Homebrew is checked at collection and again before execution;
 	// the distribution contains no runtime files or generated inventory.
 	notice := "BrewWarden dependencies\n\nSource revision: " + revision + "\n\nHomebrew and GitHub CLI are installed separately and are not bundled.\n"
-	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0644})
+	items = append(items, item{Name: "THIRD_PARTY_NOTICES.txt", Data: []byte(notice), Mode: 0o644})
 	return archive(output, items)
 }
 
@@ -97,9 +97,9 @@ func archive(output string, items []item) error {
 			sums += hash(entry.Data) + "  " + entry.Name + "\n"
 		}
 	}
-	items = append(items, item{Name: "SHA256SUMS", Data: []byte(sums), Mode: 0644})
+	items = append(items, item{Name: "SHA256SUMS", Data: []byte(sums), Mode: 0o644})
 	sort.Slice(items, func(i, j int) bool { return items[i].Name < items[j].Name })
-	file, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0600)
+	file, err := os.OpenFile(output, os.O_WRONLY|os.O_CREATE|os.O_EXCL, 0o600)
 	if err != nil {
 		return err
 	}

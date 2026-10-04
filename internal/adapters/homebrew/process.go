@@ -36,7 +36,7 @@ func (w workspace) environment() []string {
 
 func (w workspace) initialize() error {
 	for _, name := range []string{"home", "tmp", "cache", "logs", "inputs", "observations", "states"} {
-		if err := os.Mkdir(filepath.Join(w.root, name), 0700); err != nil {
+		if err := os.Mkdir(filepath.Join(w.root, name), 0o700); err != nil {
 			return err
 		}
 	}
@@ -66,7 +66,7 @@ func (w workspace) sandbox(name string, permissions sandboxPermissions, immutabl
 		profile += "(deny file-write* (subpath " + quote(file) + "))\n"
 	}
 	destination := filepath.Join(w.root, name+".sb")
-	if err := writeNew(destination, []byte(profile), 0600); err != nil {
+	if err := writeNew(destination, []byte(profile), 0o600); err != nil {
 		return "", err
 	}
 	return destination, nil
@@ -110,7 +110,7 @@ func (w workspace) invokeCommand(ctx context.Context, label string, command *exe
 		}
 	}
 	// Diagnostics exist only for this pending workspace, not execution history.
-	writeErr := writeNew(filepath.Join(w.root, label+".stderr"), stderr.Bytes(), 0600)
+	writeErr := writeNew(filepath.Join(w.root, label+".stderr"), stderr.Bytes(), 0o600)
 	if writeErr != nil {
 		failure = errors.Join(failure, errors.New("could not save private command diagnostics"))
 	}

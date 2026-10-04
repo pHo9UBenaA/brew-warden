@@ -29,7 +29,7 @@ fail() {
 
 valid_name() {
   case "$1" in
-    ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
+    '' | [!A-Za-z0-9]* | *[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
   esac
 }
 
@@ -44,7 +44,7 @@ guest() {
 
 guest_auth() {
   guest "$1" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" \
-    PATH="$guest_path" "$guest_gh" auth status >/dev/null 2>&1
+    PATH="$guest_path" "$guest_gh" auth status > /dev/null 2>&1
 }
 
 guest_brew() {
@@ -149,9 +149,9 @@ prepare() {
   tart_run exec -i "$vm" /usr/bin/tar -xf - -C /opt/homebrew < "$evidence/reviewed-brew.tar"
   guest "$vm" /usr/bin/env -i HOME="$guest_home" PATH="$guest_path" "$guest_bwd" doctor \
     > "$evidence/doctor.log" 2>&1 || {
-      /bin/cat "$evidence/doctor.log"
-      fail 'Installed Homebrew tree did not match reviewed runtime'
-    }
+    /bin/cat "$evidence/doctor.log"
+    fail 'Installed Homebrew tree did not match reviewed runtime'
+  }
   /bin/cat "$evidence/doctor.log"
   printf 'Prepare complete. Run: %s auth %s\n' "$0" "$vm"
   printf 'Do not reboot this modified clone: its guest agent still refers to the original prefix.\n'
@@ -247,37 +247,44 @@ run_case() {
     native)
       [ "$#" -le 1 ] || usage
       run_test TestLiveNativeExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
-        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_FAULT="${1:-}" "$guest_test" -test.run '^TestLiveNativeExecution$' -test.v -test.timeout=20m ;;
+        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_FAULT="${1:-}" "$guest_test" -test.run '^TestLiveNativeExecution$' -test.v -test.timeout=20m
+      ;;
     general)
       [ "$#" -eq 1 ] || usage
       run_test TestLiveGeneralBottleExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
-        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_GENERAL_TARGETS="$1" "$guest_test" -test.run '^TestLiveGeneralBottleExecution$' -test.v -test.timeout=20m ;;
+        BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_GENERAL_TARGETS="$1" "$guest_test" -test.run '^TestLiveGeneralBottleExecution$' -test.v -test.timeout=20m
+      ;;
     public)
       [ "$#" -ge 1 ] && [ "$#" -le 2 ] || usage
       run_test TestLivePublicCommandExecution "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_PUBLIC_TARGETS="$1" BREWWARDEN_VM_PUBLIC_FAULT="${2:-}" \
-        "$guest_test" -test.run '^TestLivePublicCommandExecution$' -test.v -test.timeout=20m ;;
+        "$guest_test" -test.run '^TestLivePublicCommandExecution$' -test.v -test.timeout=20m
+      ;;
     survey)
       [ "$#" -eq 1 ] || usage
       run_test TestLivePublicCoverageSurvey "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
-        BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_SURVEY_TARGETS="$1" "$guest_test" -test.run '^TestLivePublicCoverageSurvey$' -test.v -test.timeout=40m ;;
+        BREWWARDEN_VM_PUBLIC_RUNTIME="$guest_root/product" BREWWARDEN_VM_SURVEY_TARGETS="$1" "$guest_test" -test.run '^TestLivePublicCoverageSurvey$' -test.v -test.timeout=40m
+      ;;
     upgrade)
       [ "$#" -eq 1 ] || usage
       run_test TestLiveExplicitUpgradeChangesSelectedVersion "$vm" /usr/bin/env -i \
         HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_RUNTIME="$guest_root/product" BREWWARDEN_VM_UPGRADE_TARGET="$1" \
-        "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m ;;
+        "$guest_test" -test.run '^TestLiveExplicitUpgradeChangesSelectedVersion$' -test.v -test.timeout=20m
+      ;;
     ownership)
       [ "$#" -eq 0 ] || usage
       run_test TestLiveDistributionPromotesExplicitInstallOwnership "$vm" /usr/bin/env -i \
         HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_DISTRIBUTION_BINARY="$guest_bwd" \
-        "$guest_test" -test.run '^TestLiveDistributionPromotesExplicitInstallOwnership$' -test.v -test.timeout=20m ;;
+        "$guest_test" -test.run '^TestLiveDistributionPromotesExplicitInstallOwnership$' -test.v -test.timeout=20m
+      ;;
     crash)
       [ "$#" -eq 0 ] || usage
       run_test TestLiveDistributionParentCrash "$vm" /usr/bin/env -i HOME="$guest_home" GH_CONFIG_DIR="$guest_home/.config/gh" PATH="$guest_path" TMPDIR=/private/tmp \
         BREWWARDEN_VM_DISTRIBUTION_BINARY="$guest_bwd" BREWWARDEN_VM_GH_CONFIG_DIR="$guest_home/.config/gh" \
-        "$guest_test" -test.run '^TestLiveDistributionParentCrash$' -test.v -test.timeout=20m ;;
+        "$guest_test" -test.run '^TestLiveDistributionParentCrash$' -test.v -test.timeout=20m
+      ;;
     *) usage ;;
   esac
 }
@@ -303,10 +310,12 @@ fixture() {
   case "$kind" in
     absent-jq)
       remove_if_installed "$vm" jq
-      remove_if_installed "$vm" oniguruma ;;
+      remove_if_installed "$vm" oniguruma
+      ;;
     absent-xz)
       remove_if_installed "$vm" zstd
-      remove_if_installed "$vm" xz ;;
+      remove_if_installed "$vm" xz
+      ;;
     repair-jq) guest_brew "$vm" link --formula jq ;;
     older-xz)
       guest "$vm" /bin/sh -c '
@@ -314,7 +323,8 @@ fixture() {
           test -f /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3/INSTALL_RECEIPT.json
       ' || fail 'Older xz fixture unavailable; first make xz absent'
       guest "$vm" /bin/sh -c '/bin/mkdir -p /opt/homebrew/Cellar/xz && /bin/cp -pR /opt/brewwarden-original-homebrew/Cellar/xz/5.8.3 /opt/homebrew/Cellar/xz/5.8.3'
-      guest_brew "$vm" link --formula xz ;;
+      guest_brew "$vm" link --formula xz
+      ;;
     *) usage ;;
   esac
 }
@@ -406,7 +416,7 @@ finish() {
       test ! -e /private/tmp/bw-acceptance/home/.config/gh/hosts.yml ||
         test -f /private/tmp/bw-acceptance/home/.config/gh/hosts.yml
     fi
-  ' >/dev/null 2>&1 || cleaned=0
+  ' > /dev/null 2>&1 || cleaned=0
   guest "$vm" /bin/sh -c '
     rm -rf /private/tmp/bw-acceptance/home/.config/gh \
       /private/tmp/bw-acceptance/home/.local/state/gh \
@@ -429,7 +439,8 @@ case "$command" in
     valid_name "$1"
     require_guest "$1"
     guest_auth "$1" || fail 'Guest gh is not authenticated'
-    printf 'Guest gh authentication available.\n' ;;
+    printf 'Guest gh authentication available.\n'
+    ;;
   suite) suite "$@" ;;
   run) run_case "$@" ;;
   fixture) fixture "$@" ;;

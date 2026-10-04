@@ -56,15 +56,15 @@ func TestInstalledObservationRejectsSubstitutionAtExistingDigestPath(t *testing.
 			}
 			switch kind {
 			case "changed bytes":
-				err = os.WriteFile(path, []byte("substituted observation"), 0600)
+				err = os.WriteFile(path, []byte("substituted observation"), 0o600)
 			case "symlink":
 				target := filepath.Join(t.TempDir(), "original.json")
-				if err := os.WriteFile(target, original, 0600); err != nil {
+				if err := os.WriteFile(target, original, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				err = os.Symlink(target, path)
 			case "directory":
-				err = os.Mkdir(path, 0700)
+				err = os.Mkdir(path, 0o700)
 			}
 			if err != nil {
 				t.Fatal("cannot replace observation fixture", err)

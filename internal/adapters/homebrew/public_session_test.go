@@ -65,7 +65,7 @@ func TestPublicOperationLockExcludesConcurrentMutation(t *testing.T) {
 func TestPublicSessionCloseRemovesCurrentWorkspace(t *testing.T) {
 	directory := t.TempDir()
 	root := filepath.Join(directory, "collection-12345")
-	if err := os.Mkdir(root, 0700); err != nil {
+	if err := os.Mkdir(root, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	lock, err := acquireOperationLock(directory)
@@ -87,7 +87,7 @@ func TestInstalledLinkObservesPartialPourAndRejectsMismatchedRecords(t *testing.
 		t.Fatal(err)
 	}
 	for _, path := range []string{"Cellar/jq/1.8.2", "Cellar/jq/old", "opt", "var/homebrew/linked"} {
-		if err := os.MkdirAll(filepath.Join(prefix, path), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Join(prefix, path), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -126,7 +126,7 @@ func TestInstalledLinkObservesPartialPourAndRejectsMismatchedRecords(t *testing.
 	if err := os.Remove(record); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(record, []byte("not a Homebrew link"), 0600); err != nil {
+	if err := os.WriteFile(record, []byte("not a Homebrew link"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := installedLink(prefix, "jq", false); err == nil {
@@ -211,17 +211,17 @@ func TestPublicOperationLockRejectsUnsafeFiles(t *testing.T) {
 			path := filepath.Join(directory, "execution.lock")
 			if kind == "symlink" {
 				target := filepath.Join(directory, "unrelated")
-				if err := os.WriteFile(target, []byte("preserve"), 0600); err != nil {
+				if err := os.WriteFile(target, []byte("preserve"), 0o600); err != nil {
 					t.Fatal(err)
 				}
 				if err := os.Symlink(target, path); err != nil {
 					t.Fatal(err)
 				}
 			} else {
-				if err := os.WriteFile(path, nil, 0600); err != nil {
+				if err := os.WriteFile(path, nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
-				if err := os.Chmod(path, 0644); err != nil {
+				if err := os.Chmod(path, 0o644); err != nil {
 					t.Fatal(err)
 				}
 			}

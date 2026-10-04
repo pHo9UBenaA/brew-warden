@@ -3,6 +3,7 @@
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
+. ./scripts/tools.sh
 umask 077
 export GOCACHE="$PWD/.cache/go-build" GOVULNDB=https://vuln.go.dev
 # Do not let a caller substitute a different VM driver into the readiness gate.
@@ -22,7 +23,7 @@ fail() {
 
 valid_name() {
   case "$1" in
-    ''|[!A-Za-z0-9]*|*[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
+    '' | [!A-Za-z0-9]* | *[!A-Za-z0-9._-]*) fail 'VM name must be a simple local Tart name' ;;
   esac
 }
 
@@ -73,7 +74,7 @@ start() {
   # source/binary vulnerability scans. Never let caller-selected FUZZTIME skip fuzzing.
   run_logged check-all /usr/bin/env FUZZTIME=10s ./scripts/check.sh all
   run_logged vm-vet /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go vet -tags=vmacceptance ./tests/vm
-  run_logged vm-lint "$PWD/.cache/tools/staticcheck" -tags=vmacceptance ./tests/vm
+  run_logged vm-lint run_staticcheck -tags=vmacceptance ./tests/vm
   run_logged vm-vuln "$PWD/.cache/tools/govulncheck" -tags=vmacceptance -test ./tests/vm
   run_logged vm-compile /usr/bin/env GOOS=darwin GOARCH=arm64 CGO_ENABLED=0 go test -c -tags=vmacceptance -o "$root/acceptance.test" ./tests/vm
   run_logged distribution ./scripts/build-product.sh darwin/arm64
@@ -162,7 +163,7 @@ complete() {
     [ "$(read_line "$root/state")" = awaiting-device-approval ] ||
     fail 'No pending readiness run for this VM; start with a fresh clone'
   # Do not stop a still-pending device login: human approval is required.
-  ./scripts/macos-vm-acceptance.sh auth-status "$vm" >/dev/null || fail 'Approve the guest device code first; no readiness checks were skipped'
+  ./scripts/macos-vm-acceptance.sh auth-status "$vm" > /dev/null || fail 'Approve the guest device code first; no readiness checks were skipped'
   trap 'finish_on_exit $?' 0
   trap 'exit 130' INT
   trap 'exit 143' TERM

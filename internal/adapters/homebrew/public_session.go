@@ -309,11 +309,11 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 }
 
 func acquireOperationLock(directory string) (*os.File, error) {
-	file, err := os.OpenFile(filepath.Join(directory, "execution.lock"), os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0600)
+	file, err := os.OpenFile(filepath.Join(directory, "execution.lock"), os.O_RDWR|os.O_CREATE|syscall.O_NOFOLLOW, 0o600)
 	if err != nil {
 		return nil, err
 	}
-	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0077 != 0 {
+	if info, err := file.Stat(); err != nil || !info.Mode().IsRegular() || info.Mode().Perm()&0o077 != 0 {
 		file.Close()
 		return nil, errors.New("execution lock must be a private regular file")
 	}

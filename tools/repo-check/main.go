@@ -8,7 +8,7 @@ import (
 
 func main() {
 	if len(os.Args) < 2 {
-		fatal(fmt.Errorf("usage: repo-check architecture | hygiene | commit-msg <file> | commits <tip> [base]"))
+		fatal(fmt.Errorf("usage: repo-check architecture | hygiene | test-helpers | commit-msg <file> | commits <tip> [base]"))
 	}
 	var err error
 	switch os.Args[1] {
@@ -16,6 +16,8 @@ func main() {
 		err = architecture(".")
 	case "hygiene":
 		err = hygiene(".")
+	case "test-helpers":
+		err = testHelpers(".")
 	case "commit-msg":
 		if len(os.Args) != 3 {
 			err = fmt.Errorf("commit-msg requires one message file")

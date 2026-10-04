@@ -28,8 +28,11 @@ tasks:
   fuzz:
     desc: Fuzz commit messages, configuration, evidence and policy (FUZZTIME defaults to 10s)
     cmds: ['./scripts/check.sh fuzz']
+  format:
+    desc: Apply pinned gofumpt and shfmt to repository sources
+    cmds: ['./scripts/format.sh write']
   lint:
-    desc: Run pinned Staticcheck
+    desc: Run pinned Staticcheck and check Go/shell formatting
     cmds: ['./scripts/check.sh lint']
   vuln:
     desc: Scan source, tests, checker and CLI binaries (network)

@@ -115,19 +115,19 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	p := planFixture()
 	state := []byte("observed installed state")
 	p.BeforeState = digestBytes(state)
-	if err := os.Mkdir(filepath.Join(root, "states"), 0700); err != nil {
+	if err := os.Mkdir(filepath.Join(root, "states"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeNew(filepath.Join(root, "states", string(p.BeforeState)+".json"), state, 0600); err != nil {
+	if err := writeNew(filepath.Join(root, "states", string(p.BeforeState)+".json"), state, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	data := []byte("authenticated candidate bytes")
 	p.Inputs = []frozenInput{{Path: "bottle", SHA256: digestBytes(data)}}
-	if err := writeNew(filepath.Join(root, "bottle"), data, 0600); err != nil {
+	if err := writeNew(filepath.Join(root, "bottle"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	raw := marshalFixture(t, p)
-	if err := writeNew(filepath.Join(root, "plan.json"), raw, 0600); err != nil {
+	if err := writeNew(filepath.Join(root, "plan.json"), raw, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	prepared, err := p.prepared(digestBytes(raw))
@@ -138,16 +138,16 @@ func TestSavedPlanAndFrozenInputRevalidation(t *testing.T) {
 	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "bottle"), []byte("substitution"), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "bottle"), []byte("substitution"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err == nil {
 		t.Fatal("changed input accepted")
 	}
-	if err := os.WriteFile(filepath.Join(root, "bottle"), data, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "bottle"), data, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "plan.json"), append(raw, ' '), 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "plan.json"), append(raw, ' '), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := workspace.readPrepared(prepared.Assessment.Binding.Plan); err == nil {

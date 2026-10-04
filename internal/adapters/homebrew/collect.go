@@ -58,7 +58,7 @@ func (c *Collector) Collect(ctx context.Context, request ports.Request, now int6
 		return nil, errors.New("collection directory must be absolute")
 	}
 	info, err := os.Lstat(c.Directory)
-	if err != nil || !info.IsDir() || info.Mode().Perm()&0077 != 0 {
+	if err != nil || !info.IsDir() || info.Mode().Perm()&0o077 != 0 {
 		return nil, errors.New("collection directory must be private")
 	}
 	parent, err := filepath.EvalSymlinks(c.Directory)
@@ -123,7 +123,7 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
-	if err := writeNew(filepath.Join(w.root, "inputs.json"), inputBytes, 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "inputs.json"), inputBytes, 0o600); err != nil {
 		return err
 	}
 	downloaded, err := w.fetchBottles(ctx, profile, candidates)
@@ -252,7 +252,7 @@ func (w workspace) copyDownloads(raw []byte, candidates []formulaMetadata) error
 		if err := validateBottleArchive(data, candidates[i]); err != nil {
 			return err
 		}
-		if err := writeNew(filepath.Join(w.root, "inputs", bottleName(candidates[i])), data, 0600); err != nil {
+		if err := writeNew(filepath.Join(w.root, "inputs", bottleName(candidates[i])), data, 0o600); err != nil {
 			return err
 		}
 	}

@@ -99,8 +99,10 @@ func TestPublicAdvisoryTransport(t *testing.T) {
 		maxBytes  int64
 		ok        bool
 	}{
-		{"complete", 200, "0", "{}", 2, true}, {"oversized", 200, "0", "{}x", 2, false},
-		{"unavailable", 503, "0", "{}", 2, false}, {"stale", 200, "86401", "{}", 2, false},
+		{"complete", 200, "0", "{}", 2, true},
+		{"oversized", 200, "0", "{}x", 2, false},
+		{"unavailable", 503, "0", "{}", 2, false},
+		{"stale", 200, "86401", "{}", 2, false},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			client := &http.Client{Transport: advisoryTransport(func(r *http.Request) (*http.Response, error) {

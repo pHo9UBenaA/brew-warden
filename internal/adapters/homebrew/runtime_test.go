@@ -16,23 +16,23 @@ import (
 func runtimeFixture(t *testing.T) (Runtime, string, string) {
 	t.Helper()
 	prefix := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(prefix, "bin"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.MkdirAll(filepath.Join(prefix, "Library/Homebrew"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(prefix, "Library/Homebrew"), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	brew := []byte("#!/bin/sh\nexit 0\n")
 	library := []byte("ruby fixture\n")
-	if err := os.WriteFile(filepath.Join(prefix, "bin/brew"), brew, 0755); err != nil {
+	if err := os.WriteFile(filepath.Join(prefix, "bin/brew"), brew, 0o755); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/fixture.rb"), library, 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/fixture.rb"), library, 0o644); err != nil {
 		t.Fatal(err)
 	}
 	manifest := runtimeManifest{Schema: 2, BrewRevision: brewRevision, Files: []runtimeEntry{
-		{Path: "brew/Library/Homebrew/fixture.rb", Mode: 0644, SHA256: digestBytes(library)},
-		{Path: "brew/bin/brew", Mode: 0755, SHA256: digestBytes(brew)},
+		{Path: "brew/Library/Homebrew/fixture.rb", Mode: 0o644, SHA256: digestBytes(library)},
+		{Path: "brew/bin/brew", Mode: 0o755, SHA256: digestBytes(brew)},
 	}}
 	raw, err := json.Marshal(manifest)
 	if err != nil {
@@ -57,9 +57,9 @@ func TestRuntimeCopiesAndBindsRelativeLinks(t *testing.T) {
 			// Both links fit the lexical path rules. Even a matching manifest
 			// must not admit a dangling target after the copy completes.
 			manifest := runtimeManifest{Schema: 2, BrewRevision: brewRevision, Files: []runtimeEntry{
-				{Path: "brew/Library/Homebrew/current.rb", Mode: 0644, Link: test.target},
-				{Path: "brew/Library/Homebrew/fixture.rb", Mode: 0644, SHA256: digestBytes([]byte("ruby fixture\n"))},
-				{Path: "brew/bin/brew", Mode: 0755, SHA256: digestBytes([]byte("#!/bin/sh\nexit 0\n"))},
+				{Path: "brew/Library/Homebrew/current.rb", Mode: 0o644, Link: test.target},
+				{Path: "brew/Library/Homebrew/fixture.rb", Mode: 0o644, SHA256: digestBytes([]byte("ruby fixture\n"))},
+				{Path: "brew/bin/brew", Mode: 0o755, SHA256: digestBytes([]byte("#!/bin/sh\nexit 0\n"))},
 			}}
 			runtime.ExpectedSHA256 = digestBytes(append(marshalFixture(t, manifest), '\n'))
 			actual, err := runtime.materializeFrom(context.Background(), destination, prefix)
@@ -145,7 +145,7 @@ func TestInstalledRuntimeIsCopiedAndBoundToExactVersion(t *testing.T) {
 	if err != nil || string(copied) != "ruby fixture\n" {
 		t.Fatalf("want copied library %q, got %q: error=%v", "ruby fixture\n", copied, err)
 	}
-	if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/fixture.rb"), []byte("changed"), 0644); err != nil {
+	if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/fixture.rb"), []byte("changed"), 0o644); err != nil {
 		t.Fatal(err)
 	}
 	if _, err := r.materializeFrom(context.Background(), filepath.Join(t.TempDir(), "changed"), prefix); err == nil {
@@ -174,7 +174,7 @@ func TestLiveInstalledRuntimeFingerprint(t *testing.T) {
 func TestInstalledRuntimeDoesNotTrustAVersionBannerOrUnreviewedGitCommit(t *testing.T) {
 	_, prefix, destination := runtimeFixture(t)
 	brew := filepath.Join(prefix, "bin/brew")
-	if err := os.WriteFile(brew, []byte("#!/bin/sh\necho 'Homebrew 7.0.6'\n"), 0755); err != nil {
+	if err := os.WriteFile(brew, []byte("#!/bin/sh\necho 'Homebrew 7.0.6'\n"), 0o755); err != nil {
 		t.Fatal(err)
 	}
 	commands := [][]string{
@@ -201,7 +201,7 @@ func TestInstalledRuntimeRejectsUnreviewedInputs(t *testing.T) {
 		change func(*testing.T, string)
 	}{
 		{"extra library code", func(t *testing.T, prefix string) {
-			if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/injected.rb"), []byte("unexpected"), 0644); err != nil {
+			if err := os.WriteFile(filepath.Join(prefix, "Library/Homebrew/injected.rb"), []byte("unexpected"), 0o644); err != nil {
 				t.Fatal(err)
 			}
 		}},

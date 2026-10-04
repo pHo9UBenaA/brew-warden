@@ -19,7 +19,7 @@ func TestPackagedDocumentationLinksResolve(t *testing.T) {
 	binary := filepath.Join(root, "bwd")
 	license := filepath.Join(root, "Go-LICENSE")
 	for _, file := range []string{binary, license} {
-		if err := os.WriteFile(file, []byte("fixture"), 0600); err != nil {
+		if err := os.WriteFile(file, []byte("fixture"), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -73,9 +73,9 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 	root := t.TempDir()
 	first, second := filepath.Join(root, "a.tar.gz"), filepath.Join(root, "b.tar.gz")
 	files := []item{
-		{Name: "bwd", Data: []byte("executable"), Mode: 0755},
-		{Name: "brewwarden", Link: "bwd", Mode: 0755},
-		{Name: "licenses/example", Data: []byte("notice"), Mode: 0644},
+		{Name: "bwd", Data: []byte("executable"), Mode: 0o755},
+		{Name: "brewwarden", Link: "bwd", Mode: 0o755},
+		{Name: "licenses/example", Data: []byte("notice"), Mode: 0o644},
 	}
 	if err := archive(first, files); err != nil {
 		t.Fatal(err)

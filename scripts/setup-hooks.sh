@@ -1,7 +1,7 @@
 #!/bin/sh
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
-git rev-parse --git-dir >/dev/null
+git rev-parse --git-dir > /dev/null
 existing=$(git config --get core.hooksPath || true)
 if [ -n "$existing" ] && [ "$existing" != .githooks ]; then
   printf 'Refusing to replace core.hooksPath=%s. Review and configure it explicitly.\n' "$existing" >&2

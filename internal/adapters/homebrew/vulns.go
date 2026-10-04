@@ -186,10 +186,10 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	if out.overflow || stderr.overflow {
 		return fail(errors.New("homebrew advisory output exceeded limit"))
 	}
-	if err := writeNew(filepath.Join(w.root, "advisory-scan.stderr"), stderr.Bytes(), 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "advisory-scan.stderr"), stderr.Bytes(), 0o600); err != nil {
 		return fail(err)
 	}
-	if err := writeNew(filepath.Join(w.root, "advisory-scan.stdout"), out.Bytes(), 0600); err != nil {
+	if err := writeNew(filepath.Join(w.root, "advisory-scan.stdout"), out.Bytes(), 0o600); err != nil {
 		return fail(err)
 	}
 	report, err := parsePublicVulns(out.Bytes(), exitCode, candidates)

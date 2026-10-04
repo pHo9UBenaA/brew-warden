@@ -12,19 +12,19 @@ import (
 func vmScriptFixture(t *testing.T) (string, string) {
 	t.Helper()
 	root := t.TempDir()
-	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	for _, name := range []string{"env.sh", "macos-vm-acceptance.sh"} {
+	for _, name := range []string{"env.sh", "tools.sh", "tool-versions.env", "macos-vm-acceptance.sh"} {
 		raw, err := os.ReadFile(filepath.Join("../../scripts", name))
 		if err != nil {
 			t.Fatal(err)
 		}
 		path := filepath.Join(root, "scripts", name)
-		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, raw, 0700); err != nil {
+		if err := os.WriteFile(path, raw, 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -85,10 +85,10 @@ esac
 `,
 	} {
 		path := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(path), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(path, []byte(content), 0700); err != nil {
+		if err := os.WriteFile(path, []byte(content), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}
@@ -137,10 +137,10 @@ func TestVMPrepareStopsOwnedCloneAfterSetupFailure(t *testing.T) {
 
 func TestVMPrepareNeverStopsCloneItDidNotCreate(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-clone"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-clone"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	_, err := runVMScriptFixture(t, root, tart, "prepare", "base", "preexisting", filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
@@ -154,10 +154,10 @@ func TestVMPrepareNeverStopsCloneItDidNotCreate(t *testing.T) {
 
 func TestVMPrepareReportsUnconfirmedCleanup(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Join(root, ".cache", "tart"), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-stop"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-stop"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runVMScriptFixture(t, root, tart, "prepare", "base", "new-vm", filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
@@ -175,18 +175,18 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, "scripts", "product-ready.sh"), raw, 0700); err != nil {
+	if err := os.WriteFile(filepath.Join(root, "scripts", "product-ready.sh"), raw, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	trustedTart := filepath.Join(root, ".cache", "vm-tools", "tart-2.37.0", "tart.app", "Contents", "MacOS", "tart")
-	if err := os.MkdirAll(filepath.Dir(trustedTart), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(trustedTart), 0o700); err != nil {
 		t.Fatal(err)
 	}
 	binary, err := os.ReadFile(tart)
 	if err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(trustedTart, binary, 0700); err != nil {
+	if err := os.WriteFile(trustedTart, binary, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	run := func(operation, vm string) (string, error) {
@@ -201,13 +201,13 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 		t.Fatalf("cancel accepted an unowned VM: %v: %s", err, out)
 	}
 	state := filepath.Join(root, ".cache", "product-ready.pending", "state")
-	if err := os.MkdirAll(filepath.Dir(state), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(state), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(state, []byte("awaiting-device-approval\n"), 0600); err != nil {
+	if err := os.WriteFile(state, []byte("awaiting-device-approval\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err = run("complete", "pending")
@@ -229,7 +229,7 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 
 func TestVMFinishRemovesGuestCredentialsAndStops(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm")
@@ -251,7 +251,7 @@ func TestVMFinishStopsAfterGuestCredentialCleanupFails(t *testing.T) {
 		t.Run(failure, func(t *testing.T) {
 			root, tart := vmScriptFixture(t)
 			for _, marker := range []string{"guest-reachable", failure} {
-				if err := os.WriteFile(filepath.Join(root, ".cache/tart", marker), nil, 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart", marker), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
@@ -285,15 +285,15 @@ func TestVMFinishAcceptsUnauthenticatedGuest(t *testing.T) {
 					t.Fatal(err)
 				}
 			} else {
-				if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest/home/.config/gh/hosts.yml"), nil, 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest/home/.config/gh/hosts.yml"), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 				// No credential exists to log out; that command would fail.
-				if err := os.WriteFile(filepath.Join(root, ".cache/tart/deny-logout"), nil, 0600); err != nil {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart/deny-logout"), nil, 0o600); err != nil {
 					t.Fatal(err)
 				}
 			}
-			if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0600); err != nil {
+			if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0o600); err != nil {
 				t.Fatal(err)
 			}
 			if out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm"); err != nil {
@@ -316,7 +316,7 @@ func TestVMFinishStopsWhenGuestCredentialsCannotBeRemoved(t *testing.T) {
 
 func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runVMScriptFixture(t, root, tart, "auth", "new-vm")
@@ -327,7 +327,7 @@ func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
 
 func TestVMAuthStatusRefusesUnauthenticatedGuest(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0600); err != nil {
+	if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	out, err := runVMScriptFixture(t, root, tart, "auth-status", "new-vm")

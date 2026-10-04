@@ -16,8 +16,10 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-const advisoryFeedURL = "https://formulae.brew.sh/api/advisories.json"
-const maxAdvisoryFeed = 64 * 1024 * 1024
+const (
+	advisoryFeedURL = "https://formulae.brew.sh/api/advisories.json"
+	maxAdvisoryFeed = 64 * 1024 * 1024
+)
 
 type advisoryIndex struct {
 	Records map[string][]json.RawMessage `json:"advisories"`

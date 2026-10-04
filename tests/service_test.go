@@ -63,7 +63,9 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 		{"brew", "install", "--cask", "jq"},
 		{"--age-exception", "jq=\x1b[31m", "brew", "install", "jq"},
 		{"--age-exception", "jq=urgent", "--age-exception", "jq=again", "brew", "install", "jq"},
-		{"history"}, {"status"}, {"reconcile"},
+		{"history"},
+		{"status"},
+		{"reconcile"},
 	} {
 		planner := &servicePlanner{}
 		s := application.Service{Planner: planner, Clock: &executionClock{now: 1000}}

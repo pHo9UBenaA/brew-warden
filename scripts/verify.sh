@@ -5,15 +5,16 @@ cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 # Check formatting in every existing source tree.
 for tree in tools internal cmd tests; do
   if [ -d "$tree" ]; then
-    formatted=$(gofmt -l "$tree")
+    formatted=$(gofmt -s -l "$tree")
     if [ -n "$formatted" ]; then
-      printf 'Run gofmt on:\n%s\n' "$formatted" >&2
+      printf 'Run gofmt -s -w on:\n%s\n' "$formatted" >&2
       exit 1
     fi
   fi
 done
 go run ./tools/repo-check hygiene
 go run ./tools/repo-check architecture
+go run ./tools/repo-check test-helpers
 modules=$(go list -m all)
 if [ "$modules" != "github.com/pHo9UBenaA/brew-warden" ]; then
   printf 'Unexpected module dependencies:\n%s\n' "$modules" >&2

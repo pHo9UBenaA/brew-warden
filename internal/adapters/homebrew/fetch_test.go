@@ -20,7 +20,7 @@ func TestCLICacheResultsRequireEverySelectedBottle(t *testing.T) {
 	original := bottleFixture(t)
 	candidate.BottleSHA256 = digestBytes(original)
 	file := filepath.Join(root, "cache", strings.Repeat("a", 64)+"--"+bottleName(candidate))
-	if err := writeNew(file, original, 0600); err != nil {
+	if err := writeNew(file, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	for name, output := range map[string]string{
@@ -42,20 +42,20 @@ func TestCLICacheResultsRequireEverySelectedBottle(t *testing.T) {
 		t.Fatal(err)
 	}
 	// Even a correct cache-path response cannot attest to unchanged bytes.
-	if err := os.WriteFile(file, []byte("substitution"), 0600); err != nil {
+	if err := os.WriteFile(file, []byte("substitution"), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.copyDownloads(raw, []formulaMetadata{candidate}); err == nil {
 		t.Fatal("changed CLI-selected bottle accepted")
 	}
-	if err := os.WriteFile(file, original, 0600); err != nil {
+	if err := os.WriteFile(file, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := w.copyDownloads(raw, []formulaMetadata{candidate}); err != nil {
 		t.Fatal(err)
 	}
 	outside := filepath.Join(t.TempDir(), "outside")
-	if err := os.WriteFile(outside, original, 0600); err != nil {
+	if err := os.WriteFile(outside, original, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if err := os.Remove(file); err != nil {

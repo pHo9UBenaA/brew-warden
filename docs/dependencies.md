@@ -26,6 +26,27 @@ The public module identity is `github.com/pHo9UBenaA/brew-warden`.
 - Development tools are separate from product dependencies. Pin additional tools
   explicitly; tests must not implicitly download tools or modules.
 
+## Development formatters
+
+The pinned `mvdan.cc/gofumpt` and `mvdan.cc/sh/v3/cmd/shfmt` executables are
+development-only dependencies, installed explicitly by `scripts/setup-tools.sh`;
+their versions are owned by `scripts/tool-versions.env`. Gofumpt is used instead
+of a custom formatting checker for import groups, declaration spacing and literal
+layout that gofmt alone does not enforce. Its default simplifications are
+compatible with gofmt; optional extra rules are not enabled. Shfmt supplies
+maintained POSIX shell parsing and layout for scripts and hooks; shell
+simplification is not enabled. Product modules, runtime commands and baseline
+verification do not depend on either.
+
+Gofumpt links `golang.org/x/mod`, `golang.org/x/sync` and `golang.org/x/tools`.
+Shfmt links `github.com/google/renameio/v2`, `github.com/rogpeppe/go-internal`,
+`golang.org/x/sys`, `golang.org/x/term` and `mvdan.cc/editorconfig`. These tool
+modules are isolated under `.cache/tool-modules`; `go version -m` on each installed
+executable records their versions and sums.
+They do not enter the product module or relax the dependency gate. Updates must
+review upstream rules and linked modules, then exercise both refusal and repair
+fixtures before applying formatting across the source tree.
+
 ## Input and process boundaries
 
 Use typed evidence and constructors. Zero/unknown states are unassessed, never

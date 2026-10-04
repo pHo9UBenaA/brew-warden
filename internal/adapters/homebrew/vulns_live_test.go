@@ -38,10 +38,10 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 		t.Fatal(err)
 	}
 	cache := filepath.Join(root, metadataCachePath)
-	if err := os.MkdirAll(filepath.Dir(cache), 0700); err != nil {
+	if err := os.MkdirAll(filepath.Dir(cache), 0o700); err != nil {
 		t.Fatal(err)
 	}
-	if err := writeNew(cache, signed, 0600); err != nil {
+	if err := writeNew(cache, signed, 0o600); err != nil {
 		t.Fatal(err)
 	}
 	profile, err := w.sandbox("advisory-probe", sandboxPermissions{AllowNetwork: true}, []string{filepath.Join(root, "runtime/brew/Library"), cache})
@@ -113,11 +113,11 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	// Make the older source visible only in the copied prefix. Homebrew's public
 	// scanner prefers this SBOM even when the requested formula has a newer stable.
 	keg := filepath.Join(root, "runtime/brew/Cellar/jq/1.6")
-	if err := os.MkdirAll(keg, 0700); err != nil {
+	if err := os.MkdirAll(keg, 0o700); err != nil {
 		t.Fatal(err)
 	}
 	sbom := `{"packages":[{"SPDXID":"SPDXRef-Archive-jq-src","downloadLocation":"https://github.com/jqlang/jq/releases/download/jq-1.6/jq-1.6.tar.gz","versionInfo":"1.6"}]}`
-	if err := writeNew(filepath.Join(keg, "sbom.spdx.json"), []byte(sbom), 0600); err != nil {
+	if err := writeNew(filepath.Join(keg, "sbom.spdx.json"), []byte(sbom), 0o600); err != nil {
 		t.Fatal(err)
 	}
 	if _, _, err := w.scanCandidateVulnerabilities(context.Background(), candidates); err == nil {
@@ -145,7 +145,6 @@ func TestLivePublicVulnsCandidateSelection(t *testing.T) {
 	if status == 0 || failed.Findings != nil {
 		t.Fatalf("network failure became a clean result: exit=%d report=%+v", status, failed)
 	}
-
 }
 
 // Exercises the agreed two-source composition with fresh signed metadata rather

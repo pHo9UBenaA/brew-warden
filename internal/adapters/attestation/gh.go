@@ -119,10 +119,12 @@ func (v PublicGH) verifyBottle(ctx context.Context, a domain.Artifact, bottle st
 	if err != nil {
 		return 0, nil, "", err
 	}
-	raw, err := runGH(ctx, v.Path, []string{"attestation", "verify", bottle,
+	raw, err := runGH(ctx, v.Path, []string{
+		"attestation", "verify", bottle,
 		"--repo", "Homebrew/homebrew-core",
 		"--predicate-type", "https://slsa.dev/provenance/v1",
-		"--format", "json", "--limit", strconv.Itoa(attestationResultLimit)})
+		"--format", "json", "--limit", strconv.Itoa(attestationResultLimit),
+	})
 	if err != nil {
 		return 0, nil, "", fmt.Errorf("public attestation verification unavailable: %w", err)
 	}

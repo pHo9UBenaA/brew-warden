@@ -18,8 +18,10 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
-const brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"
-const maxManifest = 8 * 1024 * 1024
+const (
+	brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"
+	maxManifest  = 8 * 1024 * 1024
+)
 
 // Inspected upstream release commits with the public signed-metadata, bottle,
 // scanner-coverage and installer capabilities required by this adapter. A
@@ -174,11 +176,11 @@ func (r Runtime) materializeFrom(ctx context.Context, destination, prefix string
 	if err := ctx.Err(); err != nil {
 		return "", err
 	}
-	if err := os.Mkdir(destination, 0700); err != nil {
+	if err := os.Mkdir(destination, 0o700); err != nil {
 		return "", err
 	}
 	brew := filepath.Join(destination, "brew")
-	if err := os.Mkdir(brew, 0700); err != nil {
+	if err := os.Mkdir(brew, 0o700); err != nil {
 		return "", err
 	}
 	files, err := copyRuntimeFiles(ctx, prefix, destination)
@@ -236,16 +238,16 @@ func copyRuntimeFiles(ctx context.Context, prefix, destination string) ([]runtim
 			}
 			destinationFile := filepath.Join(brew, relative)
 			if item.IsDir() {
-				return os.MkdirAll(destinationFile, 0700)
+				return os.MkdirAll(destinationFile, 0o700)
 			}
-			if err := os.MkdirAll(filepath.Dir(destinationFile), 0700); err != nil {
+			if err := os.MkdirAll(filepath.Dir(destinationFile), 0o700); err != nil {
 				return err
 			}
 			info, err := item.Info()
 			if err != nil {
 				return err
 			}
-			entry := runtimeEntry{Path: filepath.ToSlash(path.Join("brew", filepath.ToSlash(relative))), Mode: 0644}
+			entry := runtimeEntry{Path: filepath.ToSlash(path.Join("brew", filepath.ToSlash(relative))), Mode: 0o644}
 			if info.Mode()&os.ModeSymlink != 0 {
 				entry.Link, err = os.Readlink(file)
 				if err != nil || path.IsAbs(entry.Link) || !safeRelative(path.Clean(path.Join(path.Dir(entry.Path), entry.Link))) {
@@ -262,8 +264,8 @@ func copyRuntimeFiles(ctx context.Context, prefix, destination string) ([]runtim
 				if totalFileBytes > 2*1024*1024*1024 {
 					return errors.New("installed Homebrew runtime exceeds size limit")
 				}
-				if info.Mode().Perm()&0111 != 0 {
-					entry.Mode = 0755
+				if info.Mode().Perm()&0o111 != 0 {
+					entry.Mode = 0o755
 				}
 				data, err := readRegular(file, 128*1024*1024)
 				if err != nil {
@@ -364,7 +366,7 @@ func writeRecord(file string, data []byte) error {
 		return errors.New("record already exists or is inaccessible")
 	}
 	pending := file + ".pending"
-	if err := writeNew(pending, data, 0600); err != nil {
+	if err := writeNew(pending, data, 0o600); err != nil {
 		return err
 	}
 	if err := os.Rename(pending, file); err != nil {

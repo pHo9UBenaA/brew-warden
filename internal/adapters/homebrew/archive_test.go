@@ -19,8 +19,8 @@ func bottleFixtureAtVersion(t *testing.T, version string, extra ...*tar.Header) 
 	archive := tar.NewWriter(compressed)
 	prefix := "jq/" + version
 	headers := append([]*tar.Header{
-		{Name: prefix + "/", Typeflag: tar.TypeDir, Mode: 0755},
-		{Name: prefix + "/bin/jq", Typeflag: tar.TypeReg, Mode: 0555, Size: 3},
+		{Name: prefix + "/", Typeflag: tar.TypeDir, Mode: 0o755},
+		{Name: prefix + "/bin/jq", Typeflag: tar.TypeReg, Mode: 0o555, Size: 3},
 	}, extra...)
 	for _, header := range headers {
 		if err := archive.WriteHeader(header); err != nil {
@@ -55,8 +55,8 @@ func TestBottleExtractionBoundaries(t *testing.T) {
 		{Name: "jq/1.8.2/INSTALL_RECEIPT.json", Typeflag: tar.TypeReg, Size: 1},
 		{Name: "jq/1.8.2/escape", Typeflag: tar.TypeSymlink, Linkname: "../../../etc"},
 		{Name: "jq/1.8.2/escape", Typeflag: tar.TypeSymlink, Linkname: "/etc/passwd"},
-		{Name: "jq/1.8.2/suid", Typeflag: tar.TypeReg, Mode: 04755, Size: 1},
-		{Name: "jq/1.8.2/fifo", Typeflag: tar.TypeFifo, Mode: 0600},
+		{Name: "jq/1.8.2/suid", Typeflag: tar.TypeReg, Mode: 0o4755, Size: 1},
+		{Name: "jq/1.8.2/fifo", Typeflag: tar.TypeFifo, Mode: 0o600},
 		{Name: "jq/1.8.2/hard", Typeflag: tar.TypeLink, Linkname: "jq/1.8.2/bin/jq"},
 		{Name: "jq/1.8.2/bin/jq", Typeflag: tar.TypeReg, Size: 1},
 		{Name: "jq/1.8.2/bin", Typeflag: tar.TypeSymlink, Linkname: "lib"},
@@ -75,9 +75,9 @@ func TestBottleExtractionBoundaries(t *testing.T) {
 func TestBottleDefaultConfigurationIsVerifiedPayload(t *testing.T) {
 	candidate := formulaMetadata{Name: "jq", Version: "1.8.2"}
 	raw := bottleFixture(t,
-		&tar.Header{Name: "jq/1.8.2/.bottle", Typeflag: tar.TypeDir, Mode: 0755},
-		&tar.Header{Name: "jq/1.8.2/.bottle/etc/default.conf", Typeflag: tar.TypeReg, Mode: 0644, Size: 8},
-		&tar.Header{Name: "jq/1.8.2/.bottle/var/state", Typeflag: tar.TypeReg, Mode: 0600, Size: 1},
+		&tar.Header{Name: "jq/1.8.2/.bottle", Typeflag: tar.TypeDir, Mode: 0o755},
+		&tar.Header{Name: "jq/1.8.2/.bottle/etc/default.conf", Typeflag: tar.TypeReg, Mode: 0o644, Size: 8},
+		&tar.Header{Name: "jq/1.8.2/.bottle/var/state", Typeflag: tar.TypeReg, Mode: 0o600, Size: 1},
 	)
 	if err := validateBottleArchive(raw, candidate); err != nil {
 		t.Fatal(err)

@@ -28,10 +28,10 @@ func TestGitHooks(t *testing.T) {
 	write := func(name, body string) {
 		t.Helper()
 		p := filepath.Join(root, name)
-		if err := os.MkdirAll(filepath.Dir(p), 0700); err != nil {
+		if err := os.MkdirAll(filepath.Dir(p), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(p, []byte(body), 0700); err != nil {
+		if err := os.WriteFile(p, []byte(body), 0o700); err != nil {
 			t.Fatal(err)
 		}
 	}

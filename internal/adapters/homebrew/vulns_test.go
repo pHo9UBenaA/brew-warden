@@ -62,16 +62,16 @@ func TestCandidateScanRejectsInstalledOrLinkedPrefixBeforeLaunch(t *testing.T) {
 		t.Run(mode, func(t *testing.T) {
 			root := t.TempDir()
 			prefix := filepath.Join(root, "runtime/brew")
-			if err := os.MkdirAll(prefix, 0700); err != nil {
+			if err := os.MkdirAll(prefix, 0o700); err != nil {
 				t.Fatal(err)
 			}
 			switch mode {
 			case "keg":
-				if err := os.MkdirAll(filepath.Join(prefix, "Cellar/jq/1.6"), 0700); err != nil {
+				if err := os.MkdirAll(filepath.Join(prefix, "Cellar/jq/1.6"), 0o700); err != nil {
 					t.Fatal(err)
 				}
 			case "opt":
-				if err := os.MkdirAll(filepath.Join(prefix, "opt/jq"), 0700); err != nil {
+				if err := os.MkdirAll(filepath.Join(prefix, "opt/jq"), 0o700); err != nil {
 					t.Fatal(err)
 				}
 			case "symlink":
