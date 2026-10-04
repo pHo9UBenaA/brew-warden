@@ -11,12 +11,12 @@ func sourceTreeFixture(t *testing.T, files map[string]string) string {
 	t.Helper()
 	root := t.TempDir()
 	files["go.mod"] = "module example.test/tool\n\ngo 1.24.0\n"
-	for p, s := range files {
-		target := filepath.Join(root, p)
+	for relativePath, source := range files {
+		target := filepath.Join(root, relativePath)
 		if err := os.MkdirAll(filepath.Dir(target), 0o700); err != nil {
 			t.Fatal(err)
 		}
-		if err := os.WriteFile(target, []byte(s), 0o600); err != nil {
+		if err := os.WriteFile(target, []byte(source), 0o600); err != nil {
 			t.Fatal(err)
 		}
 	}

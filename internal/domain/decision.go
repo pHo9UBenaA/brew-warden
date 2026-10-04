@@ -4,6 +4,7 @@ import "slices"
 
 type Outcome uint8
 
+// Assessed outcomes are ordered by restriction: Evaluate retains the strongest.
 const (
 	UnassessedOutcome Outcome = iota
 	Allow

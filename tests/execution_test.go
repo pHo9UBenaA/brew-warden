@@ -99,34 +99,54 @@ func TestExecutionCannotReportSuccessWhenOwnedProcessStateIsUnresolved(t *testin
 }
 
 func TestFreshExecutionFailureGatesNeverLaunch(t *testing.T) {
-	for _, reason := range []string{"plan changed", "state changed", "expired", "emergency signature", "stale vulnerability", "cancel during revalidation", "clock advances"} {
-		t.Run(reason, func(t *testing.T) {
-			p := preparedExecution(t)
-			clock := &executionClock{p.Assessment.Now}
-			s := &executionSession{prepared: preparedExecution(t)}
+	type attempt struct {
+		original ports.Prepared
+		session  *executionSession
+		clock    *executionClock
+		cancel   context.CancelFunc
+	}
+	for _, test := range []struct {
+		name      string
+		change    func(*attempt)
+		wantError string
+	}{
+		{"plan changed", func(a *attempt) {
+			a.session.prepared.Assessment.Binding.Plan = domain.Digest(strings.Repeat("d", 64))
+		}, "execution plan changed or expired"},
+		{"state changed", func(a *attempt) {
+			a.session.prepared.BeforeState = domain.Digest(strings.Repeat("d", 64))
+		}, "execution plan changed or expired"},
+		{"expired", func(a *attempt) { a.clock.now += 121 }, "execution plan changed or expired"},
+		{"emergency signature", func(a *attempt) {
+			waiveYoung(&a.session.prepared.Assessment)
+			evidenceFor(&a.session.prepared.Assessment.Nodes[0], domain.Provenance).Status = domain.Failed
+			a.session.prepared.ExceptionID = domain.Digest(strings.Repeat("e", 64))
+			a.original.ExceptionID = a.session.prepared.ExceptionID
+		}, "execution held by policy"},
+		{"stale vulnerability", func(a *attempt) {
+			evidenceFor(&a.session.prepared.Assessment.Nodes[1], domain.Vulnerabilities).ExpiresAt = a.clock.now
+		}, "execution held by policy"},
+		{"cancel during revalidation", func(a *attempt) { a.session.afterValidate = a.cancel }, "context canceled"},
+		{"clock advances", func(a *attempt) {
+			a.session.afterValidate = func() { a.clock.now += 121 }
+		}, "execution plan changed or expired"},
+	} {
+		t.Run(test.name, func(t *testing.T) {
 			ctx, cancel := context.WithCancel(context.Background())
 			defer cancel()
-			switch reason {
-			case "plan changed":
-				s.prepared.Assessment.Binding.Plan = domain.Digest(strings.Repeat("d", 64))
-			case "state changed":
-				s.prepared.BeforeState = domain.Digest(strings.Repeat("d", 64))
-			case "expired":
-				clock.now += 121
-			case "emergency signature":
-				waiveYoung(&s.prepared.Assessment)
-				evidenceFor(&s.prepared.Assessment.Nodes[0], domain.Provenance).Status = domain.Failed
-				s.prepared.ExceptionID = domain.Digest(strings.Repeat("e", 64))
-				p.ExceptionID = s.prepared.ExceptionID
-			case "stale vulnerability":
-				evidenceFor(&s.prepared.Assessment.Nodes[1], domain.Vulnerabilities).ExpiresAt = clock.now
-			case "cancel during revalidation":
-				s.afterValidate = cancel
-			case "clock advances":
-				s.afterValidate = func() { clock.now += 121 }
+			fixture := &attempt{
+				original: preparedExecution(t),
+				session:  &executionSession{prepared: preparedExecution(t)},
+				cancel:   cancel,
 			}
-			if _, err := application.Execute(ctx, p, s, clock); err == nil || s.ran || !s.closed {
-				t.Fatalf("failure gate must refuse launch and release session: ran=%t closed=%t error=%v", s.ran, s.closed, err)
+			fixture.clock = &executionClock{fixture.original.Assessment.Now}
+			test.change(fixture)
+			_, err := application.Execute(ctx, fixture.original, fixture.session, fixture.clock)
+			if err == nil || !strings.Contains(err.Error(), test.wantError) {
+				t.Fatalf("want refusal containing %q, got %v", test.wantError, err)
+			}
+			if fixture.session.ran || !fixture.session.closed {
+				t.Fatalf("failure gate must refuse launch and release session: ran=%t closed=%t", fixture.session.ran, fixture.session.closed)
 			}
 		})
 	}

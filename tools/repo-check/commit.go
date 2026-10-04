@@ -24,7 +24,7 @@ func validateMessage(message string) error {
 	if err := textHygiene([]byte(message)); err != nil {
 		return err
 	}
-	if len(lines) == 0 || !subjectPattern.MatchString(lines[0]) || strings.TrimSpace(lines[0]) != lines[0] {
+	if !subjectPattern.MatchString(lines[0]) || strings.TrimSpace(lines[0]) != lines[0] {
 		return fmt.Errorf("expected a Conventional Commit: type(scope): description")
 	}
 	if utf8.RuneCountInString(lines[0]) > 100 {
@@ -56,8 +56,8 @@ func checkCommits(args []string) error {
 		return fmt.Errorf("commits requires a tip and optional base")
 	}
 	sha := regexp.MustCompile(`^[0-9a-fA-F]{40}([0-9a-fA-F]{24})?$`)
-	for _, a := range args {
-		if !sha.MatchString(a) {
+	for _, objectID := range args {
+		if !sha.MatchString(objectID) {
 			return fmt.Errorf("commit ranges require full object IDs")
 		}
 	}

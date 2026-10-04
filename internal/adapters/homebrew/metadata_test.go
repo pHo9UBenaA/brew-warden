@@ -80,7 +80,7 @@ func TestBottleCellarMustMatchExecutionPrefix(t *testing.T) {
 		_, err := parseMetadata(raw, []string{"jq"})
 		want := cellar == ":any" || cellar == ":any_skip_relocation" || cellar == "/opt/homebrew/Cellar"
 		if (err == nil) != want {
-			t.Fatalf("cellar %q: %v", cellar, err)
+			t.Fatalf("cellar %q: want supported=%t, got error=%v", cellar, want, err)
 		}
 	}
 }

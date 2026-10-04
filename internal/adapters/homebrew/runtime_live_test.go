@@ -102,13 +102,14 @@ func TestLiveNativeMetadata(t *testing.T) {
 	if err := os.WriteFile(cache, metadata, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	cached, err := filepath.Abs("../../../.cache/vm-evidence/acceptance-03/brewwarden-probe.3mwiEaQB/cache/downloads")
+	// Offline fetch replay uses the cache recorded in the acceptance-03 guest.
+	cachedDownloads, err := filepath.Abs("../../../.cache/vm-evidence/acceptance-03/brewwarden-probe.3mwiEaQB/cache/downloads")
 	if err != nil {
 		t.Fatal(err)
 	}
-	files, err := os.ReadDir(cached)
+	files, err := os.ReadDir(cachedDownloads)
 	if err != nil {
-		t.Fatal(err)
+		t.Fatalf("cannot read recorded guest downloads at %s: %v", cachedDownloads, err)
 	}
 	if err := os.Mkdir(filepath.Join(root, "cache/downloads"), 0o700); err != nil {
 		t.Fatal(err)
@@ -121,7 +122,7 @@ func TestLiveNativeMetadata(t *testing.T) {
 		if !info.Mode().IsRegular() {
 			continue
 		}
-		data, err := os.ReadFile(filepath.Join(cached, file.Name()))
+		data, err := os.ReadFile(filepath.Join(cachedDownloads, file.Name()))
 		if err != nil {
 			t.Fatal(err)
 		}

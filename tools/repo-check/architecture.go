@@ -102,12 +102,15 @@ func permits(from, to string) bool {
 	return strings.HasPrefix(from, "adapter:") && (to == "ports" || to == "domain")
 }
 
-func coreStandard(layer, imp string) bool {
-	pure := " bytes cmp errors math math/bits regexp slices sort strconv strings unicode unicode/utf8 "
-	if strings.Contains(pure, " "+imp+" ") {
+func coreStandard(layer, importPath string) bool {
+	switch importPath {
+	case "bytes", "cmp", "errors", "math", "math/bits", "regexp", "slices", "sort", "strconv", "strings", "unicode", "unicode/utf8":
 		return true
+	case "context", "io":
+		return layer == "ports" || layer == "application"
+	default:
+		return false
 	}
-	return (layer == "ports" || layer == "application") && (imp == "context" || imp == "io")
 }
 
 func architecture(root string) error {

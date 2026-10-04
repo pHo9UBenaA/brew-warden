@@ -17,8 +17,7 @@ func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 	if err := os.Mkdir(dir, 0o700); err != nil {
 		t.Fatal(err)
 	}
-	// On Linux the first invocation creates XDG_CONFIG_HOME/brewwarden.
-	// Keep state separate so it cannot become the second binary's output path.
+	// Keep configuration paths separate from both binaries' output paths.
 	home := filepath.Join(root, "home")
 	config := filepath.Join(root, "config")
 	marker := filepath.Join(dir, "brew-invoked")
@@ -47,7 +46,7 @@ func TestEntrypointsNeverLaunchBrew(t *testing.T) {
 				t.Fatalf("%s %v: expected exit 1, got %v", name, args, err)
 			}
 			if stdout.Len() != 0 || !strings.Contains(stderr.String(), "runtime_unavailable:") {
-				t.Fatalf("unexpected output: %q %q", &stdout, &stderr)
+				t.Fatalf("%s %q: want no stdout and runtime_unavailable on stderr, got stdout=%q stderr=%q", name, args, &stdout, &stderr)
 			}
 		}
 	}

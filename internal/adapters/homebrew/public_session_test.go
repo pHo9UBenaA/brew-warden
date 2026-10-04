@@ -106,14 +106,23 @@ func TestInstalledLinkObservesPartialPourAndRejectsMismatchedRecords(t *testing.
 		t.Fatal(err)
 	}
 	// An opt-only normal formula is incomplete; an opt-only keg-only formula is complete.
-	assertLink(false, true)
-	assertLink(true, false)
+	assertLink(
+		/* kegOnly = */ false,
+		/* wantIncomplete = */ true,
+	)
+	assertLink(
+		/* kegOnly = */ true,
+		/* wantIncomplete = */ false,
+	)
 	record := filepath.Join(prefix, "var/homebrew/linked/jq")
 	if err := os.Symlink("../../../Cellar/jq/1.8.2", record); err != nil {
 		t.Fatal(err)
 	}
 	// The matching linked-keg record completes a normal formula's link step.
-	assertLink(false, false)
+	assertLink(
+		/* kegOnly = */ false,
+		/* wantIncomplete = */ false,
+	)
 	if err := os.Remove(record); err != nil {
 		t.Fatal(err)
 	}

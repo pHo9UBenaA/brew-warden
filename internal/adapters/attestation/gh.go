@@ -101,8 +101,8 @@ func (v PublicGH) Check(ctx context.Context) error {
 
 // verifyBottle retains the checked version alongside the verified response;
 // attributing evidence must not launch a second, independent version probe.
-func (v PublicGH) verifyBottle(ctx context.Context, a domain.Artifact, bottle string, now int64) (int64, []byte, string, error) {
-	if ctx == nil || !a.Valid() || !filepath.IsAbs(v.Path) || !filepath.IsAbs(bottle) || filepath.Base(bottle) != bottleName(a) || now <= 0 || now > 1<<62 {
+func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bottle string, now int64) (int64, []byte, string, error) {
+	if ctx == nil || !artifact.Valid() || !filepath.IsAbs(v.Path) || !filepath.IsAbs(bottle) || filepath.Base(bottle) != bottleName(artifact) || now <= 0 || now > 1<<62 {
 		return 0, nil, "", errors.New("invalid public attestation inputs")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
@@ -112,7 +112,7 @@ func (v PublicGH) verifyBottle(ctx context.Context, a domain.Artifact, bottle st
 		return 0, nil, "", errors.New("installed gh unavailable")
 	}
 	bottleDigest, err := hashFile(bottle, 2*1024*1024*1024)
-	if err != nil || bottleDigest != a.SHA256 {
+	if err != nil || bottleDigest != artifact.SHA256 {
 		return 0, nil, "", errors.New("bottle integrity mismatch")
 	}
 	version, err := v.checkedVersion(ctx)
@@ -138,7 +138,7 @@ func (v PublicGH) verifyBottle(ctx context.Context, a domain.Artifact, bottle st
 			return 0, nil, "", errors.New("attestation input changed during verification")
 		}
 	}
-	oldest, err := oldestVerifiedTimestamp(raw, a, now)
+	oldest, err := oldestVerifiedTimestamp(raw, artifact, now)
 	if err != nil {
 		return 0, nil, "", err
 	}
@@ -181,7 +181,7 @@ func runGH(ctx context.Context, path string, args []string) ([]byte, error) {
 // Parse all returned results, not just the first or the newest. Every accepted
 // timestamp must be tied to a verified matching statement. A saturated result
 // set cannot establish the oldest timestamp, even when all results are valid.
-func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, error) {
+func oldestVerifiedTimestamp(data []byte, artifact domain.Artifact, now int64) (int64, error) {
 	if len(data) == 0 || len(data) > maxResponse {
 		return 0, errors.New("invalid public attestation output size")
 	}
@@ -201,7 +201,7 @@ func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, 
 		if err := decodeObject(result.Verification, &verification, "signature", "statement", "verifiedTimestamps"); err != nil || len(verification.Timestamps) == 0 {
 			return 0, errors.New("missing verified attestation timestamps")
 		}
-		matched, err := verifiedResultSubject(verification, a)
+		matched, err := verifiedResultMatchesSubjectAndSigner(verification, artifact)
 		if err != nil || !matched {
 			return 0, errors.New("public attestation subject or signer mismatch")
 		}
@@ -214,13 +214,11 @@ func oldestVerifiedTimestamp(data []byte, a domain.Artifact, now int64) (int64, 
 			if err := decodeObject(value, &timestamp, "type", "uri", "timestamp"); err != nil || timestamp.Type != "Tlog" || timestamp.URI != "https://rekor.sigstore.dev" {
 				return 0, errors.New("unsupported verified timestamp")
 			}
-			t, err := time.Parse(time.RFC3339Nano, timestamp.Time)
-			if err != nil || t.Unix() <= 0 || t.After(time.Unix(now, 0)) {
+			verifiedTime, err := time.Parse(time.RFC3339Nano, timestamp.Time)
+			if err != nil || verifiedTime.Unix() <= 0 || verifiedTime.After(time.Unix(now, 0)) {
 				return 0, errors.New("invalid verified attestation time")
 			}
-			if t.Unix() < oldest {
-				oldest = t.Unix()
-			}
+			oldest = min(oldest, verifiedTime.Unix())
 		}
 	}
 	return oldest, nil
@@ -246,13 +244,13 @@ func decodeJSONArray(data []byte, out *[]json.RawMessage) error {
 
 // VerifyEvidence supplies two attributed claims from the same verified bytes;
 // neither process success nor an unsigned publication date can satisfy age.
-func (v PublicGH) VerifyEvidence(ctx context.Context, a domain.Artifact, bottle string, now int64) (domain.Evidence, domain.Evidence, []byte, error) {
-	oldest, raw, version, err := v.verifyBottle(ctx, a, bottle, now)
+func (v PublicGH) VerifyEvidence(ctx context.Context, artifact domain.Artifact, bottle string, now int64) (domain.Evidence, domain.Evidence, []byte, error) {
+	oldest, raw, version, err := v.verifyBottle(ctx, artifact, bottle, now)
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}
 	base := domain.Evidence{
-		Subject: a, Status: domain.Verified, Provider: domain.Supplement,
+		Subject: artifact, Status: domain.Verified, Provider: domain.Supplement,
 		Source: repository, ProviderVersion: "gh/" + version,
 		RawSHA256: EvidenceDigest(raw), ObservedAt: now, ExpiresAt: now + 3600,
 	}

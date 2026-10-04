@@ -68,12 +68,12 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 		if wanted[name] {
 			continue
 		}
-		c, ok := known[name]
-		if !ok || name == candidate.Name {
+		dependency, exists := known[name]
+		if !exists || name == candidate.Name {
 			return errors.New("invalid selected dependency closure")
 		}
 		wanted[name] = true
-		queue = append(queue, c.Dependencies...)
+		queue = append(queue, dependency.Dependencies...)
 	}
 	seen := map[string]bool{}
 	for _, dependency := range tab.Dependencies {

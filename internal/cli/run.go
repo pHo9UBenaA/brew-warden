@@ -13,7 +13,7 @@ import (
 
 const executionUnavailable = "runtime_unavailable: this build is diagnostic-only; use a verified distribution."
 
-// Version is set by the reproducible development build; it is not a release claim.
+// Version is set by the distribution build; the default is not a release claim.
 var Version = "development"
 
 func Run(args []string, stdout, stderr io.Writer) int {

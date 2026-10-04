@@ -62,7 +62,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 		return ports.Prepared{}, nil, err
 	}
 	// Refuse an owned active child before running a new Homebrew preflight.
-	// Prepare checks again under its own lock before reserving a new plan.
+	// Collection.Prepare repeats the guard while retaining the execution lock.
 	lock, err := acquireOperationLock(e.Collector.Directory)
 	if err != nil {
 		return ports.Prepared{}, nil, err

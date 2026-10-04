@@ -15,7 +15,7 @@ type ghVerificationResult struct {
 	Timestamps []json.RawMessage `json:"verifiedTimestamps"`
 }
 
-func verifiedResultSubject(verification ghVerificationResult, a domain.Artifact) (bool, error) {
+func verifiedResultMatchesSubjectAndSigner(verification ghVerificationResult, artifact domain.Artifact) (bool, error) {
 	var signature struct {
 		Certificate json.RawMessage `json:"certificate"`
 	}
@@ -51,11 +51,12 @@ func verifiedResultSubject(verification ghVerificationResult, a domain.Artifact)
 	// Homebrew merges byte-identical platform bottles into an `all` bottle after
 	// attestation. Require the exact current-platform name and the same digest.
 	platformName := ""
-	if a.BottleTag == "all" && a.OS == "macos" && a.Arch == "arm64" {
-		platform := a
+	if artifact.BottleTag == "all" && artifact.OS == "macos" && artifact.Arch == "arm64" {
+		platform := artifact
 		platform.BottleTag = "arm64_tahoe"
 		platformName = bottleName(platform)
 	}
+	expectedName := bottleName(artifact)
 	matched := false
 	for _, rawSubject := range statement.Subjects {
 		var subject struct {
@@ -71,12 +72,14 @@ func verifiedResultSubject(verification ghVerificationResult, a domain.Artifact)
 		if err := decodeObject(subject.Digest, &digest, "sha256"); err != nil {
 			return false, err
 		}
-		if subject.Name == bottleName(a) || platformName != "" && subject.Name == platformName {
-			if digest.SHA256 != a.SHA256 {
-				return false, errors.New("provenance digest mismatch")
-			}
-			matched = true
+		matchesSubjectName := subject.Name == expectedName || (platformName != "" && subject.Name == platformName)
+		if !matchesSubjectName {
+			continue
 		}
+		if digest.SHA256 != artifact.SHA256 {
+			return false, errors.New("provenance digest mismatch")
+		}
+		matched = true
 	}
 	return matched, nil
 }

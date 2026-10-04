@@ -218,7 +218,7 @@ func TestPublicGHVersionCohortUsesSameVerifiedResult(t *testing.T) {
 			}
 			provenance, age, _, err := (PublicGH{Path: tool}).VerifyEvidence(context.Background(), artifact, bottle, time.Date(2026, 9, 23, 0, 0, 0, 0, time.UTC).Unix())
 			if (err == nil) != tc.allowed {
-				t.Fatalf("gh %s eligibility mismatch: %v", tc.version, err)
+				t.Fatalf("gh %s: want allowed=%t, got error=%v", tc.version, tc.allowed, err)
 			}
 			if tc.allowed && (age.ProviderVersion != "gh/"+tc.version || provenance.ProviderVersion != age.ProviderVersion || age.Publication != domain.VerifiedAttestation) {
 				t.Fatalf("verified claims lost verifier identity: %#v %#v", provenance, age)

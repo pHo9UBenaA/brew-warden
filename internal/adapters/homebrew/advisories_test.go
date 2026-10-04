@@ -19,6 +19,8 @@ func TestAdvisoryInventoryAndOmittedStatus(t *testing.T) {
 	}
 	for _, raw := range []string{
 		replaceFixtureText(t, feed, `"count":1`, `"count":2`),
+		replaceFixtureText(t, feed, `"count":1,`, ""),
+		replaceFixtureText(t, feed, `,"schema_version":"1.7.3"`, ""),
 		replaceFixtureText(t, feed, `"advisories":{`, `"advisories":null,"ignored":{`),
 		replaceFixtureText(t, feed, `"count":1`, `"count":1,"count":1`),
 		replaceFixtureText(t, feed, `"jq":[{"id":"BREW-example"}]`, `"jq":null`),
@@ -73,7 +75,7 @@ func TestAdvisoryCombination(t *testing.T) {
 		{"absent record", brewAdvisoryStatus{}, domain.Affected},
 		{"unrelated fix", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2020-0000"}}}}, domain.Affected},
 		{"matched patch", brewAdvisoryStatus{Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}}}, domain.NoKnownApplicableFindings},
-		{"homebrew open despite patched OSV", brewAdvisoryStatus{
+		{"homebrew open overrides matching patch", brewAdvisoryStatus{
 			Open:    []brewAdvisoryEntry{{ID: "BREW-example"}},
 			Patched: []brewAdvisoryEntry{{Upstream: []string{"CVE-2024-23337"}}},
 		}, domain.Affected},

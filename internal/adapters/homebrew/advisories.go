@@ -24,8 +24,8 @@ const (
 type advisoryIndex struct {
 	Records map[string][]json.RawMessage `json:"advisories"`
 	Meta    struct {
-		Count  int    `json:"count"`
-		Schema string `json:"schema_version"`
+		Count  int    `json:"count" required:"true"`
+		Schema string `json:"schema_version" required:"true"`
 	} `json:"meta"`
 }
 
@@ -97,17 +97,12 @@ func parseAdvisoryIndex(raw []byte) (advisoryIndex, error) {
 	if err := json.Unmarshal(raw, &fields); err != nil {
 		return index, errors.New("invalid advisory envelope")
 	}
-	var meta struct {
-		Count  int    `json:"count" required:"true"`
-		Schema string `json:"schema_version" required:"true"`
-	}
-	if err := decodeSchema(fields["meta"], &meta, true); err != nil {
+	if err := decodeSchema(fields["meta"], &index.Meta, true); err != nil {
 		return index, err
 	}
-	if err := json.Unmarshal(fields["advisories"], &index.Records); err != nil || index.Records == nil || meta.Schema != "1.7.3" || meta.Count < 0 || meta.Count > 100000 {
+	if err := json.Unmarshal(fields["advisories"], &index.Records); err != nil || index.Records == nil || index.Meta.Schema != "1.7.3" || index.Meta.Count < 0 || index.Meta.Count > 100000 {
 		return index, errors.New("unsupported advisory feed schema")
 	}
-	index.Meta.Count, index.Meta.Schema = meta.Count, meta.Schema
 
 	count := 0
 	for name, records := range index.Records {
@@ -178,13 +173,13 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 	if len(brew.Open) != 0 {
 		return domain.Affected
 	}
-	var native publicFinding
+	var candidateFinding publicFinding
 	for _, finding := range osv.Findings {
 		if finding.Formula == candidate.Name {
-			native = finding
+			candidateFinding = finding
 		}
 	}
-	for _, open := range native.Open {
+	for _, open := range candidateFinding.Open {
 		ids := append([]string{open.ID}, open.Aliases...)
 		fixed := slices.ContainsFunc(brew.Patched, func(patch brewAdvisoryEntry) bool {
 			return slices.ContainsFunc(patch.Upstream, func(id string) bool { return slices.Contains(ids, id) })
@@ -193,7 +188,7 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 			return domain.Affected
 		}
 	}
-	// A native patch is already evaluated by the pinned scanner against the
+	// A native patch is already evaluated by the reviewed scanner against the
 	// candidate recipe; a contradictory open Homebrew record was handled above.
 	return domain.NoKnownApplicableFindings
 }
@@ -234,7 +229,7 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		if err != nil {
 			return nil, err
 		}
-		applies := combineAdvisories(candidate, report, status)
+		applicability := combineAdvisories(candidate, report, status)
 		observation, err := json.Marshal(struct {
 			Schema            int
 			Candidate         domain.Artifact
@@ -253,7 +248,7 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 			Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database",
 			ProviderVersion: "brew/" + reviewedBrewRevisions[revision],
 			RawSHA256:       digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600,
-			Applicability: applies,
+			Applicability: applicability,
 		})
 		if err != nil {
 			return nil, err

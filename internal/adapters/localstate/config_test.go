@@ -25,7 +25,7 @@ func TestParseConfigDefaultsAndExplicitZeroAge(t *testing.T) {
 	}
 	p, err := ParseConfig(strings.NewReader(`{"schemaVersion":1,"age":{"minimumHours":0}}`))
 	if err != nil || !p.Valid() || p.MinimumAgeSeconds() != 0 {
-		t.Fatalf("explicit zero: %+v %v", p, err)
+		t.Fatalf("explicit zero: want valid policy with minimum age 0 seconds, got %+v: error=%v", p, err)
 	}
 }
 

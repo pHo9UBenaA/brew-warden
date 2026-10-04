@@ -560,7 +560,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
 }
 
-// Select the first pending action whose dependencies have already completed.
+// Select the first pending action with no dependency action still pending.
 // Node order remains deterministic; an empty result means no progress is possible.
 func nextReadyAction(nodes []domain.Node, remaining map[string]plannedAction) plannedAction {
 	for _, node := range nodes {
