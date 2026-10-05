@@ -57,7 +57,10 @@ esac
 		"fake-tart": `#!/bin/sh
 printf '%s:%s\n' "$1" "${2:-}" >> "$TART_HOME/actions"
 case "$1" in
-  clone) test ! -e "$TART_HOME/deny-clone" ;;
+  clone)
+    test ! -e "$TART_HOME/deny-clone" || exit 17
+    mkdir -p "$TART_HOME/vms/$2"
+    : > "$TART_HOME/vms/$2/disk.img" ;;
   set) exit 17 ;;
   exec)
     if test -e "$TART_HOME/guest-reachable"; then
@@ -80,6 +83,7 @@ case "$1" in
     fi
     exit 29 ;;
   stop) test ! -e "$TART_HOME/deny-stop" ;;
+  delete) test ! -e "$TART_HOME/deny-delete" || exit 31; rm -rf "$TART_HOME/vms/$2" ;;
   *) exit 21 ;;
 esac
 `,
@@ -121,6 +125,150 @@ func vmActions(t *testing.T, root string) string {
 		t.Fatal(err)
 	}
 	return string(b)
+}
+
+// Reach the point where prepare has cloned and recorded its own VM but the
+// guest is still unreachable, which is where a real run stops on first use.
+func recordOwnedClone(t *testing.T, root, tart, base, vm string) {
+	t.Helper()
+	out, err := runVMScriptFixture(t, root, tart, "prepare", base, vm,
+		filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+	if err == nil {
+		t.Fatalf("expected prepare to fail without a reachable guest: %s", out)
+	}
+	if _, err := os.Stat(filepath.Join(root, ".cache", "vm-clones", vm)); err != nil {
+		t.Fatalf("prepare did not record the clone it created: %v", err)
+	}
+}
+
+func markReachableGuest(t *testing.T, root string) {
+	t.Helper()
+	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func vmDiskImage(t *testing.T, root, vm string) string {
+	t.Helper()
+	return filepath.Join(root, ".cache", "tart", "vms", vm, "disk.img")
+}
+
+func seedDiskImage(t *testing.T, root, vm string) {
+	t.Helper()
+	path := vmDiskImage(t, root, vm)
+	if err := os.MkdirAll(filepath.Dir(path), 0o700); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.WriteFile(path, nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestVMFinishDeletesOnlyItsOwnClone(t *testing.T) {
+	root, tart := vmScriptFixture(t)
+	recordOwnedClone(t, root, tart, "base", "owned")
+	markReachableGuest(t, root)
+	seedDiskImage(t, root, "owned")
+	if _, err := os.Lstat(filepath.Join(root, ".cache", "tart", "vms", "base")); err != nil {
+		t.Fatalf("base VM fixture missing: %v", err)
+	}
+	out, err := runVMScriptFixture(t, root, tart, "finish", "owned")
+	if err != nil || !strings.Contains(out, "Deleted owned clone owned") {
+		t.Fatalf("confirmed cleanup did not reclaim its own clone: %v: %s", err, out)
+	}
+	actions := vmActions(t, root)
+	if !strings.Contains(actions, "stop:owned\ndelete:owned\n") {
+		t.Fatalf("owned clone was not stopped then deleted: %s", actions)
+	}
+	if strings.Contains(actions, "delete:base\n") {
+		t.Fatalf("cleanup deleted the base VM: %s", actions)
+	}
+	if _, err := os.Lstat(vmDiskImage(t, root, "owned")); !os.IsNotExist(err) {
+		t.Fatalf("owned clone disk remains after deletion: %v", err)
+	}
+	if _, err := os.Lstat(filepath.Join(root, ".cache", "vm-clones", "owned")); !os.IsNotExist(err) {
+		t.Fatalf("deleted clone is still registered as owned: %v", err)
+	}
+}
+
+func TestVMFinishRetainsItsCloneWhenCredentialCleanupIsUnconfirmed(t *testing.T) {
+	for _, failure := range []string{"deny-rm", "legacy-storage"} {
+		t.Run(failure, func(t *testing.T) {
+			root, tart := vmScriptFixture(t)
+			recordOwnedClone(t, root, tart, "base", "owned")
+			markReachableGuest(t, root)
+			if failure == "deny-rm" {
+				if err := os.WriteFile(filepath.Join(root, ".cache/tart/deny-rm"), nil, 0o600); err != nil {
+					t.Fatal(err)
+				}
+			} else if err := os.Remove(filepath.Join(root, ".cache/tart/guest/credential-storage")); err != nil {
+				t.Fatal(err)
+			}
+			out, err := runVMScriptFixture(t, root, tart, "finish", "owned")
+			if err == nil || !strings.Contains(out, "retained for manual Keychain cleanup") {
+				t.Fatalf("unconfirmed cleanup was certified or the guest was not retained: %v: %s", err, out)
+			}
+			if actions := vmActions(t, root); strings.Contains(actions, "delete:") {
+				t.Fatalf("clone with unconfirmed credentials was deleted: %s", actions)
+			}
+			if _, err := os.Lstat(filepath.Join(root, ".cache", "vm-clones", "owned")); err != nil {
+				t.Fatalf("retained clone lost its ownership record: %v", err)
+			}
+		})
+	}
+}
+
+func TestVMFinishStopsButKeepsAVMItDidNotCreate(t *testing.T) {
+	root, tart := vmScriptFixture(t)
+	markReachableGuest(t, root)
+	seedDiskImage(t, root, "foreign")
+	out, err := runVMScriptFixture(t, root, tart, "finish", "foreign")
+	if err != nil || !strings.Contains(out, "this runner did not create it") {
+		t.Fatalf("unowned VM handling is unclear: %v: %s", err, out)
+	}
+	actions := vmActions(t, root)
+	if !strings.Contains(actions, "stop:foreign\n") || strings.Contains(actions, "delete:foreign\n") {
+		t.Fatalf("unowned VM was not stopped and kept: %s", actions)
+	}
+}
+
+func TestVMDiscardDeletesOnlyTheNamedVM(t *testing.T) {
+	root, tart := vmScriptFixture(t)
+	for _, vm := range []string{"drop", "keep"} {
+		seedDiskImage(t, root, vm)
+	}
+	out, err := runVMScriptFixture(t, root, tart, "discard", "drop")
+	if err != nil || !strings.Contains(out, "VM drop deleted") {
+		t.Fatalf("discard did not delete the named VM: %v: %s", err, out)
+	}
+	actions := vmActions(t, root)
+	if !strings.Contains(actions, "stop:drop\ndelete:drop\n") {
+		t.Fatalf("discard did not stop then delete the named VM: %s", actions)
+	}
+	if strings.Contains(actions, "delete:keep\n") {
+		t.Fatalf("discard touched an unrelated VM: %s", actions)
+	}
+	if _, err := os.Lstat(vmDiskImage(t, root, "drop")); !os.IsNotExist(err) {
+		t.Fatalf("discarded VM remains: %v", err)
+	}
+	if _, err := os.Lstat(vmDiskImage(t, root, "keep")); err != nil {
+		t.Fatalf("discard removed an unrelated VM: %v", err)
+	}
+}
+
+func TestVMDiscardReportsAnUndeletedVM(t *testing.T) {
+	root, tart := vmScriptFixture(t)
+	seedDiskImage(t, root, "stubborn")
+	if err := os.WriteFile(filepath.Join(root, ".cache/tart/deny-delete"), nil, 0o600); err != nil {
+		t.Fatal(err)
+	}
+	out, err := runVMScriptFixture(t, root, tart, "discard", "stubborn")
+	if err == nil || !strings.Contains(out, "Could not delete VM stubborn") {
+		t.Fatalf("failed deletion was reported as success: %v: %s", err, out)
+	}
+	if _, err := os.Lstat(vmDiskImage(t, root, "stubborn")); err != nil {
+		t.Fatalf("failed deletion removed the VM anyway: %v", err)
+	}
 }
 
 func TestVMPrepareStopsOwnedCloneAfterSetupFailure(t *testing.T) {

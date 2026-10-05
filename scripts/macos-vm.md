@@ -26,11 +26,16 @@ Allow additional space for extraction, copy-on-write changes and evidence.
 For every Tart invocation set an empty environment with a dedicated `HOME` and
 `TART_HOME` under the workspace cache, `TART_NO_AUTO_PRUNE=1`, and system-only
 `PATH=/usr/bin:/bin`. This keeps credentials, state and pruning separate from any
-user-managed Tart installation. Keep the downloaded base stopped; clone it for
+user-managed Tart installation. Because Tart never prunes on its own, `prepare`
+records each clone it creates under `.cache/vm-clones/` and `finish` deletes that
+clone once guest credential cleanup is confirmed; nothing else is deleted
+automatically. Keep the downloaded base stopped; clone it for
 each independent test. Configure the clone with 4 CPUs and 4096 MB memory.
 Run it with `--no-graphics --no-audio --no-clipboard`, without directory sharing
 or attached host disks. Default NAT permits evidence acquisition; the probe's
 own sandbox separately denies network access during native installation.
+Each clone costs roughly 33 GB of real disk, so a retained one is the usual
+cause of a workspace cache that keeps growing.
 
 ## Local-only acceptance runner
 
@@ -81,13 +86,32 @@ option and logout limitations were inspected in gh 2.101.0 `pkg/cmd/auth/login`
 and `internal/config` at `0cf1092493af067646fc5f3db9421c6a6ec9c938`.
 Standard device login asks for `repo`, `read:org`, and `gist` scopes. `finish`
 terminates pending guest-owned device login, logs out when a config exists,
-removes private config/log files and always attempts to stop the VM. A failed
-logout, file removal or unknown/legacy storage contract reports cleanup
-unconfirmed and prevents readiness; it does not delete the retained VM.
+removes private config/log files, always attempts to stop the VM, and then
+deletes the clone `prepare` recorded. A failed logout, file removal or
+unknown/legacy storage contract reports cleanup unconfirmed and prevents
+readiness; that guest keeps its disk, because file deletion alone cannot certify
+Keychain cleanup and the retained clone is the only evidence available.
 Legacy guests that used default credential storage need manual Keychain cleanup.
 Also revoke the temporary GitHub CLI OAuth authorization afterward.
 Evidence under ignored `.cache/` is disposable, not the sole record of results.
 Never upload VM output containing credentials or copy host credentials into it.
+
+## Reclaim retained VMs
+
+`finish` deletes only the clones `prepare` recorded, so a stopped base image or
+any VM you made yourself survives every run. Reclaim those explicitly, one named
+VM at a time:
+
+```sh
+./scripts/macos-vm-acceptance.sh discard brewwarden-local-01
+```
+
+`discard` stops and then deletes exactly the named VM, and unregisters it. It
+removes guest state together with the disk without running the credential
+cleanup in `finish`, so use it only after `finish` or your own Keychain cleanup.
+It never touches another VM. A clone retained after unconfirmed cleanup, a
+finished run whose clone was kept for inspection, and clones from before this
+cleanup existed are all reclaimed this way.
 
 ## Focused native cases
 
@@ -189,6 +213,7 @@ Run the suite or the focused cases above, then verify archive checksums and
 exercise packaged doctor, install, upgrade, parent-death, active-child
 exclusion and fresh retry. Fixtures must be confined to the disposable guest.
 Copy logs and observations back with `tart exec ... tar -cf -`, preserving
-failures as well as successes. Stop the clone when finished; do not delete the base or unrelated
-VMs. Historical probe code remains recoverable from Git history, not as a second
-maintained Ruby execution path.
+failures as well as successes. Run `finish` when finished so the clone is deleted;
+`discard VM` reclaims a VM kept for inspection. Do not delete the base or
+unrelated VMs. Historical probe code remains recoverable from Git history, not as
+a second maintained Ruby execution path.

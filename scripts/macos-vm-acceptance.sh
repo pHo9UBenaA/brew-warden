@@ -1,5 +1,6 @@
 #!/bin/sh
 # Local-only Tart acceptance. Never mounts host directories or forwards host credentials.
+# Each clone this runner creates is deleted once guest credential cleanup is confirmed.
 set -eu
 cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 . ./scripts/env.sh
@@ -7,6 +8,8 @@ cd "$(CDPATH= cd -- "$(dirname -- "$0")/.." && pwd)"
 tart=${BREWWARDEN_VM_TART:-"$PWD/.cache/vm-tools/tart-2.37.0/tart.app/Contents/MacOS/tart"}
 tart_home="$PWD/.cache/tart"
 tart_user_home="$PWD/.cache/vm-tools/home"
+# Clones are recorded here so cleanup reclaims only what this runner created.
+clone_registry="$PWD/.cache/vm-clones"
 guest_root=/private/tmp/bw-acceptance
 guest_home="$guest_root/home"
 guest_gh="$guest_root/gh/gh"
@@ -17,6 +20,7 @@ guest_path="$guest_root/gh:/opt/homebrew/bin:/usr/bin:/bin:/usr/sbin:/sbin"
 usage() {
   printf 'Usage: %s prepare BASE NEW_VM REVIEWED_BREW_TREE GH_BINARY PRODUCT_ARCHIVE\n' "$0" >&2
   printf '       %s auth|auth-status|suite|finish VM\n' "$0" >&2
+  printf '       %s discard VM\n' "$0" >&2
   printf '       %s run VM doctor|native|general|public|survey|upgrade|ownership|crash|command [CASE_ARGS...]\n' "$0" >&2
   printf '       %s fixture VM absent-jq|absent-xz|older-xz|repair-jq\n' "$0" >&2
   exit 2
@@ -36,6 +40,11 @@ valid_name() {
 tart_run() {
   env -i HOME="$tart_user_home" TART_HOME="$tart_home" TART_NO_AUTO_PRUNE=1 \
     PATH=/usr/bin:/bin "$tart" "$@"
+}
+
+record_clone() {
+  mkdir -p "$clone_registry"
+  : > "$clone_registry/$1"
 }
 
 guest() {
@@ -113,6 +122,7 @@ prepare() {
   trap 'exit 143' TERM
   tart_run clone "$base" "$vm"
   clone_owned=1
+  record_clone "$vm"
   tart_run set "$vm" --cpu 4 --memory 4096
   nohup env -i HOME="$tart_user_home" TART_HOME="$tart_home" TART_NO_AUTO_PRUNE=1 \
     PATH=/usr/bin:/bin "$tart" run --no-graphics --no-audio --no-clipboard "$vm" \
@@ -424,8 +434,41 @@ finish() {
       /private/tmp/bw-acceptance/home/device.pid
   ' || cleaned=0
   tart_run stop "$vm" || fail 'Guest stop failed; credential cleanup and VM state unconfirmed'
-  [ "$cleaned" -eq 1 ] || fail 'Guest credential cleanup unconfirmed; VM stopped. Revoke the OAuth grant and inspect the retained guest'
+  # An unconfirmed guest keeps its disk: this script cannot certify Keychain
+  # cleanup, and the retained guest is the only evidence an operator can use.
+  [ "$cleaned" -eq 1 ] || fail 'Guest credential cleanup unconfirmed; VM stopped and retained for manual Keychain cleanup. Revoke the OAuth grant and inspect the retained guest'
   printf 'Guest credentials removed and VM stopped. If device login was approved, also revoke its GitHub CLI OAuth grant in your account settings.\n'
+  release_owned_clone "$vm"
+}
+
+release_owned_clone() {
+  # Guest credentials are already confirmed gone, so an undeleted clone is
+  # wasted disk rather than an unverified readiness claim. Never delete the
+  # base image or an unrelated VM here.
+  if [ ! -e "$clone_registry/$1" ]; then
+    printf 'Retained stopped VM %s; this runner did not create it. Reclaim it with: %s discard %s\n' "$1" "$0" "$1"
+    return 0
+  fi
+  if tart_run delete "$1"; then
+    rm -f "$clone_registry/$1"
+    printf 'Deleted owned clone %s to reclaim its disk image.\n' "$1"
+    return 0
+  fi
+  printf 'Could not delete owned clone %s; reclaim it with: %s discard %s\n' "$1" "$0" "$1" >&2
+}
+
+discard() {
+  [ "$#" -eq 1 ] || usage
+  vm=$1
+  valid_name "$vm"
+  [ -x "$tart" ] || fail 'Reviewed Tart executable unavailable'
+  printf 'Discarding named VM %s; guest state inside it is removed with the disk.\n' "$vm"
+  # A still-running VM cannot be deleted, so the delete below reports a stop
+  # failure that this message would otherwise hide.
+  tart_run stop "$vm" 2> /dev/null || printf 'VM %s was not running; deleting it as-is.\n' "$vm"
+  tart_run delete "$vm" || fail "Could not delete VM $vm"
+  rm -f "$clone_registry/$vm"
+  printf 'VM %s deleted.\n' "$vm"
 }
 
 [ "$#" -ge 1 ] || usage
@@ -445,5 +488,6 @@ case "$command" in
   run) run_case "$@" ;;
   fixture) fixture "$@" ;;
   finish) finish "$@" ;;
+  discard) discard "$@" ;;
   *) usage ;;
 esac
