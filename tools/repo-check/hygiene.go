@@ -33,6 +33,14 @@ func hygiene(root string) error {
 		if entry.Type()&os.ModeSymlink != 0 {
 			return fmt.Errorf("repository symlink requires explicit review: %s", rel)
 		}
+		// Finder rewrites this untracked binary metadata file in the working
+		// tree within seconds of browsing the directory, which made hygiene
+		// fail on any machine with the repository open. It is the documented
+		// binary extension: .gitignore keeps it out of the repository, so it
+		// carries no committed content and cannot smuggle executable bytes.
+		if entry.Name() == ".DS_Store" {
+			return nil
+		}
 		b, err := os.ReadFile(filepath.Join(root, rel))
 		if err != nil {
 			return err

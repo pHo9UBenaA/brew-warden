@@ -1,6 +1,11 @@
 # Ignore unlisted root entries, including their contents.
 /*
 
+# Finder metadata is never repository content. Without this rule an open Finder
+# window would re-create .DS_Store inside tracked trees every few seconds.
+/.DS_Store
+**/.DS_Store
+
 # Public root files.
 !/.gitignore
 !/.editorconfig

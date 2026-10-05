@@ -36,7 +36,10 @@ is a compatibility floor, while full checks use the pinned toolchain.
 [Architecture](architecture.md) defines import gates. Hygiene rejects invalid
 UTF-8, control characters, trailing whitespace, missing final newlines and
 symlinks. CJK rejection is a translation guard, not proof of English prose;
-binary fixtures need a policy extension. Hook tests use isolated Git repositories
+binary fixtures need a policy extension. `.DS_Store` is the one extension:
+Finder rewrites it inside tracked trees within seconds of browsing the
+directory, `.gitignore` keeps it out of the repository, and a symlink with that
+name still requires review. Hook tests use isolated Git repositories
 and replace only the recursive verification invocation. Normal coverage does
 not instrument separately built subprocesses or opt-in native cases. Fuzz seeds
 run in ordinary tests; active fuzzing covers only exercised properties. Preserve
