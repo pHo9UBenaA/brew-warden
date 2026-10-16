@@ -118,6 +118,12 @@ func runVMScriptFixture(t *testing.T, root, tart string, args ...string) (string
 	return string(out), err
 }
 
+func runVMPrepare(t *testing.T, root, tart, base, vm string) (string, error) {
+	t.Helper()
+	return runVMScriptFixture(t, root, tart, "prepare", base, vm,
+		filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+}
+
 func vmActions(t *testing.T, root string) string {
 	t.Helper()
 	b, err := os.ReadFile(filepath.Join(root, ".cache", "tart", "actions"))
@@ -131,8 +137,7 @@ func vmActions(t *testing.T, root string) string {
 // guest is still unreachable, which is where a real run stops on first use.
 func recordOwnedClone(t *testing.T, root, tart, base, vm string) {
 	t.Helper()
-	out, err := runVMScriptFixture(t, root, tart, "prepare", base, vm,
-		filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+	out, err := runVMPrepare(t, root, tart, base, vm)
 	if err == nil {
 		t.Fatalf("expected prepare to fail without a reachable guest: %s", out)
 	}
@@ -273,7 +278,7 @@ func TestVMDiscardReportsAnUndeletedVM(t *testing.T) {
 
 func TestVMPrepareStopsOwnedCloneAfterSetupFailure(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	out, err := runVMScriptFixture(t, root, tart, "prepare", "base", "new-vm", filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+	out, err := runVMPrepare(t, root, tart, "base", "new-vm")
 	if err == nil || !strings.Contains(out, "VM setup failed") {
 		t.Fatalf("expected setup failure and cleanup diagnostic: %v: %s", err, out)
 	}
@@ -291,7 +296,7 @@ func TestVMPrepareNeverStopsCloneItDidNotCreate(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-clone"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	_, err := runVMScriptFixture(t, root, tart, "prepare", "base", "preexisting", filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+	_, err := runVMPrepare(t, root, tart, "base", "preexisting")
 	if err == nil {
 		t.Fatal("failed clone was accepted")
 	}
@@ -308,7 +313,7 @@ func TestVMPrepareReportsUnconfirmedCleanup(t *testing.T) {
 	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "deny-stop"), nil, 0o600); err != nil {
 		t.Fatal(err)
 	}
-	out, err := runVMScriptFixture(t, root, tart, "prepare", "base", "new-vm", filepath.Join(root, "reviewed"), filepath.Join(root, "gh"), filepath.Join(root, "archive.tar.gz"))
+	out, err := runVMPrepare(t, root, tart, "base", "new-vm")
 	if err == nil || !strings.Contains(out, "cleanup unconfirmed") {
 		t.Fatalf("lost setup failure or concealed incomplete cleanup: %v: %s", err, out)
 	}
