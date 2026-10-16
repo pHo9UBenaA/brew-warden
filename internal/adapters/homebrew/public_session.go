@@ -503,6 +503,16 @@ func (s *publicSession) Revalidate(ctx context.Context) (ports.Prepared, error) 
 	return fresh, nil
 }
 
+// executionAllowed recomputes the assessment at the current second and reports
+// whether the plan is within its issuance window and policy still permits
+// execution. The caller supplies the error message for its own stage.
+func (s *publicSession) executionAllowed(fresh *ports.Prepared) bool {
+	fresh.Assessment.Now = time.Now().Unix()
+	return fresh.Assessment.Now >= s.plan.IssuedAt &&
+		fresh.Assessment.Now < s.plan.ExpiresAt &&
+		domain.Evaluate(fresh.Assessment).Outcome == domain.Allow
+}
+
 func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.ExecutionResult, error) {
 	if s.consumed || binding != s.prepared.Assessment.Binding {
 		return ports.ExecutionResult{}, errors.New("session binding mismatch or replay")
@@ -512,8 +522,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	if err != nil {
 		return ports.ExecutionResult{}, err
 	}
-	fresh.Assessment.Now = time.Now().Unix()
-	if fresh.Assessment.Now < s.plan.IssuedAt || fresh.Assessment.Now >= fresh.ExpiresAt || domain.Evaluate(fresh.Assessment).Outcome != domain.Allow {
+	if !s.executionAllowed(&fresh) {
 		return ports.ExecutionResult{}, errors.New("execution policy or plan expired")
 	}
 	s.prepared = fresh
@@ -533,8 +542,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		if selected.Name == "" {
 			return ports.ExecutionResult{}, errors.New("cyclic execution plan")
 		}
-		fresh.Assessment.Now = time.Now().Unix()
-		if fresh.Assessment.Now < s.plan.IssuedAt || fresh.Assessment.Now >= s.plan.ExpiresAt || domain.Evaluate(fresh.Assessment).Outcome != domain.Allow {
+		if !s.executionAllowed(&fresh) {
 			return ports.ExecutionResult{}, errors.New("execution plan expired")
 		}
 		if err := s.w.checkPublicRuntime(ctx, s.plan.Environment.BrewRevision); err != nil {
