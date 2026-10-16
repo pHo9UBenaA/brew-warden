@@ -118,9 +118,21 @@ func architecture(root string) error {
 	if err != nil {
 		return err
 	}
+	files, dirs, err := scanSources(root)
+	if err != nil {
+		return err
+	}
+	graph, err := checkImports(files, module, dirs)
+	if err != nil {
+		return err
+	}
+	return detectImportCycle(graph)
+}
+
+func scanSources(root string) ([]source, map[string]bool, error) {
 	var files []source
 	dirs := map[string]bool{}
-	err = walkSources(root, func(rel string, entry fs.DirEntry) error {
+	err := walkSources(root, func(rel string, entry fs.DirEntry) error {
 		if entry.IsDir() {
 			if entry.Name() == "vendor" {
 				return fmt.Errorf("vendor directory is not allowed: %s", rel)
@@ -169,14 +181,15 @@ func architecture(root string) error {
 		}
 		return nil
 	})
-	if err != nil {
-		return err
-	}
+	return files, dirs, err
+}
+
+func checkImports(files []source, module string, dirs map[string]bool) (map[string][]string, error) {
 	graph := map[string][]string{}
 	for _, file := range files {
 		for _, importPath := range file.imports {
 			if importPath == "C" || importPath == "unsafe" || importPath == "plugin" {
-				return fmt.Errorf("prohibited import %s in %s", importPath, file.path)
+				return nil, fmt.Errorf("prohibited import %s in %s", importPath, file.path)
 			}
 			if strings.HasPrefix(importPath, module+"/") || importPath == module {
 				target := strings.TrimPrefix(importPath, module+"/")
@@ -184,10 +197,10 @@ func architecture(root string) error {
 					target = "."
 				}
 				if !dirs[target] {
-					return fmt.Errorf("unresolved local import %s in %s", importPath, file.path)
+					return nil, fmt.Errorf("unresolved local import %s in %s", importPath, file.path)
 				}
 				if !permits(file.layer, layerOf(target)) {
-					return fmt.Errorf("forbidden %s dependency on %s in %s", file.layer, layerOf(target), file.path)
+					return nil, fmt.Errorf("forbidden %s dependency on %s in %s", file.layer, layerOf(target), file.path)
 				}
 				if !file.externalTest {
 					graph[file.dir] = append(graph[file.dir], target)
@@ -196,14 +209,18 @@ func architecture(root string) error {
 			}
 			importedPackage, err := build.Default.Import(importPath, "", build.FindOnly)
 			if err != nil || !importedPackage.Goroot {
-				return fmt.Errorf("nonstandard or unresolved import %s in %s", importPath, file.path)
+				return nil, fmt.Errorf("nonstandard or unresolved import %s in %s", importPath, file.path)
 			}
 			core := file.layer == "domain" || file.layer == "ports" || file.layer == "application"
 			if core && !coreStandard(file.layer, importPath) && !(strings.HasSuffix(file.path, "_test.go") && importPath == "testing") {
-				return fmt.Errorf("forbidden core builtin %s in %s", importPath, file.path)
+				return nil, fmt.Errorf("forbidden core builtin %s in %s", importPath, file.path)
 			}
 		}
 	}
+	return graph, nil
+}
+
+func detectImportCycle(graph map[string][]string) error {
 	const (
 		visiting = iota + 1
 		visited
