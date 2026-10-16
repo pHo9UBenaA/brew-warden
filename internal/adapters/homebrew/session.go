@@ -168,20 +168,20 @@ func (w workspace) freezeInputs() ([]frozenInput, error) {
 }
 
 func (w workspace) readPrepared(expected domain.Digest) (ports.Prepared, error) {
-	raw, err := readRegular(filepath.Join(w.root, "plan.json"), maxManifest)
-	if err != nil || digestBytes(raw) != expected {
+	planBytes, err := readRegular(filepath.Join(w.root, "plan.json"), maxManifest)
+	if err != nil || digestBytes(planBytes) != expected {
 		return ports.Prepared{}, errors.New("saved plan changed")
 	}
 	var plan executionPlan
-	if err := decodeStrict(raw, &plan); err != nil {
+	if err := decodeStrict(planBytes, &plan); err != nil {
 		return ports.Prepared{}, err
 	}
 	for _, file := range plan.Inputs {
 		if !safeRelative(file.Path) || !file.SHA256.Valid() {
 			return ports.Prepared{}, errors.New("invalid frozen input")
 		}
-		raw, err := readRegular(filepath.Join(w.root, file.Path), 128*1024*1024)
-		if err != nil || digestBytes(raw) != file.SHA256 {
+		content, err := readRegular(filepath.Join(w.root, file.Path), 128*1024*1024)
+		if err != nil || digestBytes(content) != file.SHA256 {
 			return ports.Prepared{}, errors.New("frozen input changed")
 		}
 	}
@@ -189,5 +189,5 @@ func (w workspace) readPrepared(expected domain.Digest) (ports.Prepared, error) 
 	if err != nil || digestBytes(snapshot) != plan.BeforeState {
 		return ports.Prepared{}, errors.New("saved before-state unavailable")
 	}
-	return plan.prepared(digestBytes(raw))
+	return plan.prepared(digestBytes(planBytes))
 }

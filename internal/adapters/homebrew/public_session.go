@@ -569,8 +569,8 @@ func nextReadyAction(nodes []domain.Node, remaining map[string]plannedAction) pl
 			continue
 		}
 		blocked := slices.ContainsFunc(node.Dependencies, func(dependency domain.Artifact) bool {
-			_, pending := remaining[dependency.Name]
-			return pending
+			_, dependencyPending := remaining[dependency.Name]
+			return dependencyPending
 		})
 		if !blocked {
 			return action

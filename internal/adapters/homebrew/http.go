@@ -33,11 +33,11 @@ func unambiguousJSON(d *json.Decoder, depth int) error {
 	case json.Delim('{'):
 		seen := map[string]bool{}
 		for d.More() {
-			token, err := d.Token()
+			fieldToken, err := d.Token()
 			if err != nil {
 				return err
 			}
-			key, ok := token.(string)
+			key, ok := fieldToken.(string)
 			normalized := strings.ToLower(key)
 			if !ok || seen[normalized] {
 				return errors.New("ambiguous advisory field")
