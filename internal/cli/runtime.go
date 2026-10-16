@@ -85,6 +85,10 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 	if len(rest) == 1 && rest[0] == "doctor" && len(overrides) == 0 {
 		return runDoctor(ctx, out, errOut, service.Diagnostics, policy)
 	}
+	return runBrew(ctx, out, errOut, service, policy, overrides, rest)
+}
+
+func runBrew(ctx context.Context, out, errOut io.Writer, service *application.Service, policy domain.Policy, overrides []ports.AgeOverride, rest []string) int {
 	if len(rest) < 2 || rest[0] != "brew" || !domain.ValidRequest(rest[1], rest[2:]) {
 		_, _ = fmt.Fprintln(errOut, "invocation_invalid: unsupported operation or Homebrew options.")
 		return 1
