@@ -360,9 +360,7 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 	if err := os.WriteFile(state, []byte("awaiting-device-approval\n"), 0o600); err != nil {
 		t.Fatal(err)
 	}
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	markReachableGuest(t, root)
 	out, err = run("complete", "pending")
 	if err == nil || !strings.Contains(out, "Guest gh is not authenticated") {
 		t.Fatalf("unapproved guest passed the readiness gate: %v: %s", err, out)
@@ -382,9 +380,7 @@ func TestProductReadyRefusesMissingApprovalAndCancelsOnlyItsPendingVM(t *testing
 
 func TestVMFinishRemovesGuestCredentialsAndStops(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	markReachableGuest(t, root)
 	out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm")
 	if err != nil || !strings.Contains(out, "Guest credentials removed and VM stopped") {
 		t.Fatalf("normal cleanup failed: %v: %s", err, out)
@@ -403,10 +399,9 @@ func TestVMFinishStopsAfterGuestCredentialCleanupFails(t *testing.T) {
 	for _, failure := range []string{"deny-rm", "deny-logout", "legacy-storage"} {
 		t.Run(failure, func(t *testing.T) {
 			root, tart := vmScriptFixture(t)
-			for _, marker := range []string{"guest-reachable", failure} {
-				if err := os.WriteFile(filepath.Join(root, ".cache/tart", marker), nil, 0o600); err != nil {
-					t.Fatal(err)
-				}
+			markReachableGuest(t, root)
+			if err := os.WriteFile(filepath.Join(root, ".cache/tart", failure), nil, 0o600); err != nil {
+				t.Fatal(err)
 			}
 			if failure == "legacy-storage" {
 				if err := os.Remove(filepath.Join(root, ".cache/tart/guest/credential-storage")); err != nil {
@@ -446,9 +441,7 @@ func TestVMFinishAcceptsUnauthenticatedGuest(t *testing.T) {
 					t.Fatal(err)
 				}
 			}
-			if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0o600); err != nil {
-				t.Fatal(err)
-			}
+			markReachableGuest(t, root)
 			if out, err := runVMScriptFixture(t, root, tart, "finish", "new-vm"); err != nil {
 				t.Fatalf("unauthenticated guest cleanup: %s: %v", out, err)
 			}
@@ -469,9 +462,7 @@ func TestVMFinishStopsWhenGuestCredentialsCannotBeRemoved(t *testing.T) {
 
 func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache", "tart", "guest-reachable"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	markReachableGuest(t, root)
 	out, err := runVMScriptFixture(t, root, tart, "auth", "new-vm")
 	if err != nil || !strings.Contains(out, "ABCD-1234") || !strings.Contains(out, "https://github.com/login/device") || strings.Contains(out, "secret-marker") {
 		t.Fatalf("older gh device login code was hidden: %v: %s", err, out)
@@ -480,9 +471,7 @@ func TestVMAuthDisplaysEarlierGHDeviceCodeWording(t *testing.T) {
 
 func TestVMAuthStatusRefusesUnauthenticatedGuest(t *testing.T) {
 	root, tart := vmScriptFixture(t)
-	if err := os.WriteFile(filepath.Join(root, ".cache/tart/guest-reachable"), nil, 0o600); err != nil {
-		t.Fatal(err)
-	}
+	markReachableGuest(t, root)
 	out, err := runVMScriptFixture(t, root, tart, "auth-status", "new-vm")
 	if err == nil || !strings.Contains(out, "Guest gh is not authenticated") {
 		t.Fatalf("unauthenticated guest was accepted: %v: %s", err, out)
