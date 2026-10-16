@@ -69,6 +69,11 @@ type Assessment struct {
 	Exception *AgeException
 }
 
+// releaseTooYoungCode is the only reason code an age exception may waive. It is
+// produced by requiredEvidenceReason and matched below, so both must agree on
+// this spelling for the exception to apply.
+const releaseTooYoungCode = "release_too_young"
+
 // Evaluate requires the full reachable graph, exactly one current evidence item
 // per claim and artifact, and explicit time. It performs no I/O.
 func Evaluate(assessment Assessment) Decision {
@@ -127,7 +132,7 @@ func Evaluate(assessment Assessment) Decision {
 			if code == "" {
 				continue
 			}
-			if claim == Publication && code == "release_too_young" && waivers[node.Artifact] {
+			if claim == Publication && code == releaseTooYoungCode && waivers[node.Artifact] {
 				decision.Waived = append(decision.Waived, node.Artifact)
 			} else {
 				addReason(Hold, code, node.Artifact, claim)
@@ -156,7 +161,7 @@ func requiredEvidenceReason(items []Evidence, claim Claim, policy Policy, now in
 			return "publication_unknown_or_conflicting"
 		}
 		if now-evidence.PublishedAt < policy.MinimumAgeSeconds() {
-			return "release_too_young"
+			return releaseTooYoungCode
 		}
 	}
 	return ""
