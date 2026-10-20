@@ -85,7 +85,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 		return nil, errors.New("invalid metadata request")
 	}
 	cache := filepath.Join(w.root, metadataCachePath)
-	profile := acquireProfile
+	inspectionProfile := acquireProfile
 	queue := append([]string{}, targets...)
 	seen := map[string]bool{}
 	doc := metadataDocument{Schema: 1, Platform: "arm64_tahoe", Formulae: []formulaMetadata{}}
@@ -111,7 +111,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 		for _, name := range names {
 			args = append(args, "homebrew/core/"+name)
 		}
-		raw, err := w.invoke(ctx, fmt.Sprintf("info-%d", len(doc.Formulae)), profile, args...)
+		raw, err := w.invoke(ctx, fmt.Sprintf("info-%d", len(doc.Formulae)), inspectionProfile, args...)
 		if err != nil {
 			return nil, err
 		}
@@ -121,7 +121,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 			if _, err := readRegular(cache, 80*1024*1024); err != nil {
 				return nil, err
 			}
-			profile, err = w.sandbox("metadata", sandboxPermissions{}, []string{cache, filepath.Join(w.root, "runtime/brew/Library")})
+			inspectionProfile, err = w.sandbox("metadata", sandboxPermissions{}, []string{cache, filepath.Join(w.root, "runtime/brew/Library")})
 			if err != nil {
 				return nil, err
 			}

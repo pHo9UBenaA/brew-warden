@@ -43,7 +43,10 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, error) {
 	}
 	index := map[string]formulaMetadata{}
 	for _, formula := range document.Formulae {
-		if !domain.ValidFormulaName(formula.Name) || index[formula.Name].Name != "" || formula.Revision < 0 || formula.Rebuild < 0 {
+		if !domain.ValidFormulaName(formula.Name) || formula.Revision < 0 || formula.Rebuild < 0 {
+			return nil, errors.New("invalid formula metadata identity")
+		}
+		if _, duplicate := index[formula.Name]; duplicate {
 			return nil, errors.New("invalid formula metadata identity")
 		}
 		if formula.Dependencies == nil || len(formula.Dependencies) > 128 {

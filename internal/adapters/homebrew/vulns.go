@@ -44,7 +44,10 @@ func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (p
 	}
 	expectedVersions := map[string]string{}
 	for _, candidate := range candidates {
-		if !candidate.artifact().Valid() || expectedVersions[candidate.Name] != "" {
+		if !candidate.artifact().Valid() {
+			return report, errors.New("invalid advisory candidate")
+		}
+		if _, duplicate := expectedVersions[candidate.Name]; duplicate {
 			return report, errors.New("invalid advisory candidate")
 		}
 		expectedVersions[candidate.Name] = candidate.Version
@@ -57,7 +60,7 @@ func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (p
 			return publicVulnsReport{}, errors.New("invalid skipped advisory inventory")
 		}
 		for _, name := range report.Skipped {
-			if expectedVersions[name] == "" {
+			if _, known := expectedVersions[name]; !known {
 				return publicVulnsReport{}, errors.New("unknown skipped advisory subject")
 			}
 		}
@@ -66,9 +69,9 @@ func parsePublicVulns(raw []byte, exitCode int, candidates []formulaMetadata) (p
 	seenFormulae := map[string]bool{}
 	hasOpen := false
 	for _, finding := range report.Findings {
-		expectedVersion := expectedVersions[finding.Formula]
+		expectedVersion, known := expectedVersions[finding.Formula]
 		hasFindings := len(finding.Open)+len(finding.Patched) > 0
-		if expectedVersion == "" || expectedVersion != finding.Version || seenFormulae[finding.Formula] || !hasFindings {
+		if !known || expectedVersion != finding.Version || seenFormulae[finding.Formula] || !hasFindings {
 			return publicVulnsReport{}, errors.New("homebrew advisory subject mismatch")
 		}
 		seenFormulae[finding.Formula] = true
