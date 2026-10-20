@@ -217,7 +217,7 @@ func installedReceiptDigest(candidate domain.Artifact, version string) (domain.D
 // Homebrew 7.0.4's Keg#linked? uses var/homebrew/linked, while Keg#optlinked?
 // uses opt. Neither link authenticates the installed payload; both establish
 // whether Homebrew actually completed its own shared-prefix link step.
-func installedLink(prefix, name string, kegOnly bool) (*string, bool, error) {
+func installedLink(prefix, name string, kegOnly bool) (activeVersion *string, linkIncomplete bool, err error) {
 	if !domain.ValidFormulaName(name) {
 		return nil, false, errors.New("invalid installed link identity")
 	}
@@ -240,21 +240,21 @@ func installedLink(prefix, name string, kegOnly bool) (*string, bool, error) {
 		version := filepath.Base(resolved)
 		return &version, nil
 	}
-	active, err := observe(filepath.Join(prefix, "opt", name))
+	activeVersion, err = observe(filepath.Join(prefix, "opt", name))
 	if err != nil {
 		return nil, false, err
 	}
-	linked, err := observe(filepath.Join(prefix, "var", "homebrew", "linked", name))
+	linkedVersion, err := observe(filepath.Join(prefix, "var", "homebrew", "linked", name))
 	if err != nil {
 		return nil, false, err
 	}
-	if linked != nil && (active == nil || *linked != *active) {
+	if linkedVersion != nil && (activeVersion == nil || *linkedVersion != *activeVersion) {
 		return nil, false, errors.New("installed Homebrew linked-keg record differs from opt link")
 	}
 	// Observe the actual partial state after a failed pour. Preparation and
 	// post-execution success checks refuse it, but the changed state remains
 	// available to classify a nonzero exit as partial rather than unknown.
-	return active, !kegOnly && active != nil && linked == nil, nil
+	return activeVersion, !kegOnly && activeVersion != nil && linkedVersion == nil, nil
 }
 
 func publicActions(states []installedFormula, nodes []domain.Node, request collectionInputs) ([]plannedAction, error) {
