@@ -52,20 +52,12 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		}
 		return 1
 	}
-	location, age, overrides, rest := options.location, options.minimumAge, options.overrides, options.rest
-	policy := domain.DefaultPolicy()
-	if source != nil {
-		policy, err = source.LoadConfig(location)
-	} else if location != "" {
-		err = fmt.Errorf("configuration source unavailable")
-	}
-	if err == nil && age != nil {
-		policy, err = domain.NewPolicy(*age)
-	}
-	if err != nil || !policy.Valid() {
+	policy, err := resolvePolicy(source, options.location, options.minimumAge)
+	if err != nil {
 		_, _ = fmt.Fprintln(errOut, "configuration_invalid: cannot load a valid policy.")
 		return 1
 	}
+	overrides, rest := options.overrides, options.rest
 	if service == nil {
 		if len(rest) == 1 && rest[0] == "doctor" {
 			_, _ = fmt.Fprintf(errOut,
@@ -81,6 +73,26 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		return runDoctor(ctx, out, errOut, service.Diagnostics, policy)
 	}
 	return runBrew(ctx, out, errOut, service, policy, overrides, rest)
+}
+
+func resolvePolicy(source ports.ConfigSource, location string, ageOverride *int64) (domain.Policy, error) {
+	policy := domain.DefaultPolicy()
+	var err error
+	if source != nil {
+		policy, err = source.LoadConfig(location)
+	} else if location != "" {
+		err = errors.New("configuration source unavailable")
+	}
+	if err == nil && ageOverride != nil {
+		policy, err = domain.NewPolicy(*ageOverride)
+	}
+	if err != nil {
+		return domain.Policy{}, err
+	}
+	if !policy.Valid() {
+		return domain.Policy{}, errors.New("invalid policy")
+	}
+	return policy, nil
 }
 
 func runBrew(ctx context.Context, out, errOut io.Writer, service *application.Service, policy domain.Policy, overrides []ports.AgeOverride, rest []string) int {
