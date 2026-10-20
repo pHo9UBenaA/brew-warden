@@ -170,61 +170,86 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 // assembled and its OCI dependency metadata has been checked.
 func (c *Collector) collectCandidateEvidence(ctx context.Context, collection *Collection, candidate formulaMetadata, candidates []formulaMetadata, metadataClaim []byte) (domain.Node, error) {
 	w := workspace{collection.root}
-	node := domain.Node{Artifact: candidate.artifact(), Dependencies: []domain.Artifact{}}
-	for _, name := range candidate.Dependencies {
-		for _, dependency := range candidates {
-			if name == dependency.Name {
-				node.Dependencies = append(node.Dependencies, dependency.artifact())
-			}
-		}
-	}
-
+	node := domain.Node{Artifact: candidate.artifact(), Dependencies: candidateDependencies(candidate, candidates)}
 	for _, claim := range []domain.Claim{domain.Metadata, domain.Checksum} {
-		raw := metadataClaim
-		if claim == domain.Checksum {
-			raw, _ = json.Marshal(struct{ Bottle domain.Digest }{candidate.BottleSHA256})
-		}
-		evidence, err := domain.NewEvidence(domain.Evidence{
-			Claim: claim, Subject: node.Artifact, Status: domain.Verified,
-			Provider: domain.Homebrew, Source: "Homebrew signed formula API",
-			ProviderVersion: "brew/" + reviewedBrewRevisions[collection.runtimeRevision],
-			RawSHA256:       digestBytes(raw), ObservedAt: collection.observedAt,
-			ExpiresAt: collection.observedAt + 3600,
-		})
+		evidence, err := w.signedFormulaEvidence(
+			claim, node.Artifact, metadataClaim, candidate, collection.observedAt, collection.runtimeRevision,
+		)
 		if err != nil {
-			return domain.Node{}, err
-		}
-		if err := w.observation(evidence, raw); err != nil {
 			return domain.Node{}, err
 		}
 		node.Evidence = append(node.Evidence, evidence)
 	}
 
 	bottle := filepath.Join(w.root, "inputs", bottleName(candidate))
-	provenance, age, raw, err := c.BottleVerifier.VerifyEvidence(ctx, node.Artifact, bottle, collection.observedAt)
+	provenance, publication, raw, err := c.BottleVerifier.VerifyEvidence(ctx, node.Artifact, bottle, collection.observedAt)
 	if err != nil {
 		return domain.Node{}, fmt.Errorf("attestation for %s unavailable: %w", candidate.Name, err)
 	}
+	attestation, err := w.verifiedAttestationEvidence(node.Artifact, provenance, publication, raw, collection.observedAt)
+	if err != nil {
+		return domain.Node{}, err
+	}
+	node.Evidence = append(node.Evidence, attestation...)
+	return node, nil
+}
+
+func candidateDependencies(candidate formulaMetadata, candidates []formulaMetadata) []domain.Artifact {
+	dependencies := []domain.Artifact{}
+	for _, name := range candidate.Dependencies {
+		for _, dependency := range candidates {
+			if name == dependency.Name {
+				dependencies = append(dependencies, dependency.artifact())
+			}
+		}
+	}
+	return dependencies
+}
+
+func (w workspace) signedFormulaEvidence(claim domain.Claim, artifact domain.Artifact, metadataClaim []byte, candidate formulaMetadata, observedAt int64, revision string) (domain.Evidence, error) {
+	raw := metadataClaim
+	if claim == domain.Checksum {
+		raw, _ = json.Marshal(struct{ Bottle domain.Digest }{candidate.BottleSHA256})
+	}
+	evidence, err := domain.NewEvidence(domain.Evidence{
+		Claim: claim, Subject: artifact, Status: domain.Verified,
+		Provider: domain.Homebrew, Source: "Homebrew signed formula API",
+		ProviderVersion: "brew/" + reviewedBrewRevisions[revision],
+		RawSHA256:       digestBytes(raw), ObservedAt: observedAt,
+		ExpiresAt: observedAt + 3600,
+	})
+	if err != nil {
+		return domain.Evidence{}, err
+	}
+	if err := w.observation(evidence, raw); err != nil {
+		return domain.Evidence{}, err
+	}
+	return evidence, nil
+}
+
+func (w workspace) verifiedAttestationEvidence(artifact domain.Artifact, provenance, publication domain.Evidence, raw []byte, observedAt int64) ([]domain.Evidence, error) {
 	// VerifyEvidence returns provenance and publication from one response; keep
 	// each claim bound to its position so a swapped pair is rejected.
-	for _, expected := range []struct {
+	claims := []struct {
 		claim    domain.Claim
 		evidence domain.Evidence
 	}{
 		{claim: domain.Provenance, evidence: provenance},
-		{claim: domain.Publication, evidence: age},
-	} {
+		{claim: domain.Publication, evidence: publication},
+	}
+	result := make([]domain.Evidence, 0, len(claims))
+	for _, expected := range claims {
 		evidence := expected.evidence
-		if err := checkClaim(evidence, node.Artifact, expected.claim, collection.observedAt); err != nil ||
+		if err := checkClaim(evidence, artifact, expected.claim, observedAt); err != nil ||
 			evidence.Status != domain.Verified || evidence.RawSHA256 != digestBytes(raw) {
-			return domain.Node{}, errors.New("candidate attestation evidence is incomplete or unbound")
+			return nil, errors.New("candidate attestation evidence is incomplete or unbound")
 		}
 		if err := w.observation(evidence, raw); err != nil {
-			return domain.Node{}, err
+			return nil, err
 		}
-		node.Evidence = append(node.Evidence, evidence)
+		result = append(result, evidence)
 	}
-	return node, nil
+	return result, nil
 }
 
 func checkClaim(evidence domain.Evidence, artifact domain.Artifact, claim domain.Claim, now int64) error {
