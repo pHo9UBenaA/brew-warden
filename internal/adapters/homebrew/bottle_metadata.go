@@ -10,23 +10,42 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
+type bottleIndex struct {
+	Schema    int              `json:"schemaVersion" required:"true"`
+	Manifests []bottleManifest `json:"manifests" required:"true"`
+}
+
+type bottleManifest struct {
+	Annotations bottleAnnotations `json:"annotations"`
+}
+
+type bottleAnnotations struct {
+	Digest string `json:"sh.brew.bottle.digest"`
+	Ref    string `json:"org.opencontainers.image.ref.name"`
+	Tab    string `json:"sh.brew.tab"`
+}
+
+type bottleTab struct {
+	Dependencies []installedDependency `json:"runtime_dependencies" required:"true"`
+	Arch         string                `json:"arch"`
+}
+
 // Homebrew's public fetch caches the OCI index used by install. Bind the selected
 // tab to the authenticated bottle digest and reconcile its full dependency names
 // with the signed API closure. Homebrew owns minimum-version comparison at install.
 func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []formulaMetadata) error {
-	var index struct {
-		Schema    int `json:"schemaVersion" required:"true"`
-		Manifests []struct {
-			Annotations struct {
-				Digest string `json:"sh.brew.bottle.digest"`
-				Ref    string `json:"org.opencontainers.image.ref.name"`
-				Tab    string `json:"sh.brew.tab"`
-			} `json:"annotations"`
-		} `json:"manifests" required:"true"`
-	}
+	var index bottleIndex
 	if err := decodeSchema(raw, &index, true); err != nil || index.Schema != 2 || len(index.Manifests) == 0 || len(index.Manifests) > 128 {
 		return errors.New("invalid bottle OCI index")
 	}
+	tab, err := selectedBottleTab(index, candidate)
+	if err != nil {
+		return err
+	}
+	return validateBottleTab(tab, candidate, candidates)
+}
+
+func selectedBottleTab(index bottleIndex, candidate formulaMetadata) (string, error) {
 	ref := kegVersion(candidate.Version, candidate.Revision) + "." + candidate.BottleTag
 	if candidate.Rebuild > 0 {
 		ref += "." + strconv.Itoa(candidate.Rebuild)
@@ -38,18 +57,19 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 			continue
 		}
 		if selected != "" || annotations.Tab == "" {
-			return errors.New("ambiguous bottle OCI selection")
+			return "", errors.New("ambiguous bottle OCI selection")
 		}
 		selected = annotations.Tab
 	}
 	if selected == "" {
-		return errors.New("OCI index does not identify selected bottle")
+		return "", errors.New("OCI index does not identify selected bottle")
 	}
-	var tab struct {
-		Dependencies []installedDependency `json:"runtime_dependencies" required:"true"`
-		Arch         string                `json:"arch"`
-	}
-	if err := decodeSchema([]byte(selected), &tab, true); err != nil {
+	return selected, nil
+}
+
+func validateBottleTab(raw string, candidate formulaMetadata, candidates []formulaMetadata) error {
+	var tab bottleTab
+	if err := decodeSchema([]byte(raw), &tab, true); err != nil {
 		return errors.New("invalid bottle dependency metadata")
 	}
 	supportedArchitecture := candidate.BottleTag == "all" || tab.Arch == "arm64"
