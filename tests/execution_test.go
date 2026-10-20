@@ -118,7 +118,7 @@ func TestFreshExecutionFailureGatesNeverLaunch(t *testing.T) {
 		}, "execution plan changed or expired"},
 		{"expired", func(a *attempt) { a.clock.now += 121 }, "execution plan changed or expired"},
 		{"emergency signature", func(a *attempt) {
-			waiveYoung(&a.session.prepared.Assessment)
+			makeBottlesYoungAndWaiveAge(&a.session.prepared.Assessment)
 			evidenceFor(&a.session.prepared.Assessment.Nodes[0], domain.Provenance).Status = domain.Failed
 			a.session.prepared.ExceptionID = domain.Digest(strings.Repeat("e", 64))
 			a.original.ExceptionID = a.session.prepared.ExceptionID

@@ -49,7 +49,7 @@ func evidenceFor(node *domain.Node, claim domain.Claim) *domain.Evidence {
 	panic(fmt.Sprintf("assessment fixture for %s is missing required claim %d", node.Artifact.Name, claim))
 }
 
-func waiveYoung(a *domain.Assessment) {
+func makeBottlesYoungAndWaiveAge(a *domain.Assessment) {
 	a.Exception = &domain.AgeException{Binding: a.Binding, IssuedAt: a.Now - 1, ExpiresAt: a.Now + 60}
 	for i := range a.Nodes {
 		evidenceFor(&a.Nodes[i], domain.Publication).PublishedAt = a.Now - 120
@@ -106,41 +106,42 @@ func TestEvidenceDecisions(t *testing.T) {
 		{"zero evidence", func(a *domain.Assessment) { *evidenceFor(&a.Nodes[0], domain.Metadata) = domain.Evidence{} }, domain.Hold},
 		{"unknown status", func(a *domain.Assessment) { evidenceFor(&a.Nodes[0], domain.Provenance).Status = 99 }, domain.Hold},
 		{"missing provider attribution", func(a *domain.Assessment) { evidenceFor(&a.Nodes[0], domain.Provenance).Source = "" }, domain.Hold},
-		{"explicit bounded age waiver", waiveYoung, domain.Allow},
+		{"explicit bounded age waiver", makeBottlesYoungAndWaiveAge, domain.Allow},
+		// Emergency age waivers never relax integrity, trust, advisories, or binding.
 		{"emergency invalid signature", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			evidenceFor(&a.Nodes[0], domain.Provenance).Status = domain.Failed
 		}, domain.Deny},
 		{"emergency integrity unavailable", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			evidenceFor(&a.Nodes[0], domain.Checksum).Status = domain.Unavailable
 		}, domain.Hold},
 		{"emergency vulnerability", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			evidenceFor(&a.Nodes[1], domain.Vulnerabilities).Applicability = domain.Affected
 		}, domain.Deny},
 		{"emergency missing attestation time", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			evidenceFor(&a.Nodes[0], domain.Publication).Status = domain.Unavailable
 		}, domain.Hold},
 		{"dependency not waived", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			a.Exception.Waivers = a.Exception.Waivers[:1]
 		}, domain.Hold},
 		{"expired waiver", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			a.Exception.ExpiresAt = a.Now
 		}, domain.Hold},
 		{"policy changed", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			a.Binding.Policy = domain.Digest(strings.Repeat("b", 64))
 		}, domain.Hold},
 		{"dependency graph changed", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			a.Binding.Graph = domain.Digest(strings.Repeat("b", 64))
 		}, domain.Hold},
 		{"attempt changed", func(a *domain.Assessment) {
-			waiveYoung(a)
+			makeBottlesYoungAndWaiveAge(a)
 			a.Binding.Attempt = domain.Digest(strings.Repeat("b", 64))
 		}, domain.Hold},
 	}
@@ -184,7 +185,7 @@ func TestAgeHoldsOneSecondBelowMinimum(t *testing.T) {
 
 func TestAgeExceptionReportsAllWaivedArtifacts(t *testing.T) {
 	assessment := eligibleAssessment(t)
-	waiveYoung(&assessment)
+	makeBottlesYoungAndWaiveAge(&assessment)
 	if got := domain.Evaluate(assessment); got.Outcome != domain.Allow || len(got.Waived) != 2 {
 		t.Fatalf("missing waiver accounting: %+v", got)
 	}

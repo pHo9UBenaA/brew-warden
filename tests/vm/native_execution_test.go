@@ -96,30 +96,39 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	fault := os.Getenv("BREWWARDEN_VM_FAULT")
-	switch fault {
-	case "", "age", "age-exception", "changed-input", "exception-changed-input", "link-conflict":
-	default:
+	type faultCase struct {
+		waiveAge     bool
+		addWaivers   bool
+		changeInput  bool
+		linkConflict bool
+		held         bool
+	}
+	faults := map[string]faultCase{
+		"":                        {},
+		"age":                     {waiveAge: true, held: true},
+		"age-exception":           {waiveAge: true, addWaivers: true},
+		"changed-input":           {changeInput: true, held: true},
+		"exception-changed-input": {waiveAge: true, addWaivers: true, changeInput: true, held: true},
+		"link-conflict":           {linkConflict: true},
+	}
+	chosen, known := faults[fault]
+	if !known {
 		t.Fatalf("unsupported VM fault: %q", fault)
 	}
-	waiveAge := fault == "age" || fault == "age-exception" || fault == "exception-changed-input"
-	addWaivers := fault == "age-exception" || fault == "exception-changed-input"
-	changeInput := fault == "changed-input" || fault == "exception-changed-input"
-	linkConflict := fault == "link-conflict"
-	held := changeInput || fault == "age"
 	policy := domain.DefaultPolicy()
 	waivers := []domain.AgeWaiver{}
-	if waiveAge {
+	if chosen.waiveAge {
 		policy, err = domain.NewPolicy(domain.MaximumMinimumAgeSeconds)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if addWaivers {
+		if chosen.addWaivers {
 			for _, node := range collection.Evidence() {
 				waivers = append(waivers, domain.AgeWaiver{Artifact: node.Artifact, Reason: "Explicit VM acceptance exception"})
 			}
 		}
 	}
-	if linkConflict {
+	if chosen.linkConflict {
 		if _, err := os.Lstat("/opt/homebrew/Cellar/jq"); !os.IsNotExist(err) {
 			t.Fatal("link-conflict test requires absent jq")
 		}
@@ -147,7 +156,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	if changeInput {
+	if chosen.changeInput {
 		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "jq--*.tar.gz"))
 		if err != nil || len(files) != 1 {
 			t.Fatal("missing candidate fixture", files, err)
@@ -164,7 +173,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 	}
 	result, err := application.Execute(context.Background(), prepared, session, nativeClock{})
-	if linkConflict {
+	if chosen.linkConflict {
 		if err == nil || result.Outcome != domain.AttemptPartial || !result.ExitKnown || result.ExitCode == 0 {
 			t.Fatal("partial native failure was misclassified", result, err)
 		}
@@ -197,7 +206,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Log("partial installation retained; incomplete link prevents false success on fresh retry")
 		return
 	}
-	if held {
+	if chosen.held {
 		if err == nil {
 			t.Fatal("held request executed", fault)
 		}

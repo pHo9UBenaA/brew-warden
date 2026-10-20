@@ -39,7 +39,7 @@ func TestPlanPresentationFailurePreventsLaunch(t *testing.T) {
 	}
 }
 
-func TestFreshRetryRequiresNewBoundPlan(t *testing.T) {
+func TestFailedAttemptRetryUsesFreshPreparation(t *testing.T) {
 	p := preparedExecution(t)
 	first := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 2, AfterState: p.BeforeState}}
 	planner := &servicePlanner{prepared: p, session: first}

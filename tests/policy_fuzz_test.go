@@ -37,7 +37,7 @@ func FuzzPolicyRequiresCompleteEvidence(f *testing.F) {
 		}
 		waiveAge := data[1]&1 != 0
 		if waiveAge {
-			waiveYoung(&a)
+			makeBottlesYoungAndWaiveAge(&a)
 		}
 		if got := domain.Evaluate(a); got.Outcome != domain.Allow {
 			t.Fatalf("complete chain of %d formulae was not eligible: %+v", nodeCount, got)

@@ -195,14 +195,14 @@ func assertPublicFaultPreventsMutation(t *testing.T, ctx context.Context, direct
 		t.Fatalf("unsupported public execution fault: %q", fault)
 	}
 	if _, err := session.Run(runContext, prepared.Assessment.Binding); err == nil {
-		t.Fatal("fault did not stop execution")
+		t.Fatalf("fault %q did not stop execution", fault)
 	}
 	if _, err := session.Run(ctx, prepared.Assessment.Binding); err == nil {
-		t.Fatal("failed attempt was reusable")
+		t.Fatalf("failed attempt for fault %q was reusable", fault)
 	}
 	after, err := kegSnapshot("/opt/homebrew/Cellar")
 	if err != nil || after != before {
-		t.Fatalf("failed preflight changed installed payload: before=%s after=%s error=%v", before, after, err)
+		t.Fatalf("failed preflight for fault %q changed installed payload: before=%s after=%s error=%v", fault, before, after, err)
 	}
 }
 
