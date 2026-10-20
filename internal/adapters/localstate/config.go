@@ -7,6 +7,10 @@ import (
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
 
+// configDocument mirrors the on-disk configuration. Optional sections are
+// pointers so an omitted section keeps its default, while a present section is
+// fully validated. Pointer fields inside a section distinguish an explicit zero
+// or false from an omitted value.
 type configDocument struct {
 	SchemaVersion int                 `json:"schemaVersion"`
 	Age           *ageConfig          `json:"age"`
@@ -33,6 +37,9 @@ type emergencyConfig struct {
 	WaivableRules []string `json:"waivableRules"`
 }
 
+// ParseConfig validates one bounded configuration document and returns the
+// effective policy. Unknown, mis-cased, duplicate, and null fields are rejected;
+// omitted optional sections fall back to domain defaults.
 func ParseConfig(r io.Reader) (domain.Policy, error) {
 	data, err := io.ReadAll(io.LimitReader(r, maxDocumentBytes+1))
 	if err != nil {
