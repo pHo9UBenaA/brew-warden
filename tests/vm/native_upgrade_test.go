@@ -25,7 +25,7 @@ func TestLiveExplicitUpgradeChangesSelectedVersion(t *testing.T) {
 		t.Skip("requires a disposable VM, private workspace and older installed target")
 	}
 	requireDisposableMac(t)
-	if !domain.ValidRequest("install", []string{target}) {
+	if !domain.ValidRequest("upgrade", []string{target}) {
 		t.Fatal("upgrade requires one valid formula name")
 	}
 	prior, err := filepath.EvalSymlinks(filepath.Join("/opt/homebrew/opt", target))

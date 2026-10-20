@@ -53,10 +53,12 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 	}
 	defer log.Close()
 	engine := homebrew.Engine{Collector: collector, Streams: homebrew.Streams{Out: io.MultiWriter(os.Stdout, log), Err: io.MultiWriter(os.Stderr, log)}}
-	planned := map[string]bool{}
+	// Present runs before execution; record the exact package set the plan may
+	// change so the assertions below can distinguish it from unrelated racks.
+	changedByPlan := map[string]bool{}
 	service := application.Service{Planner: engine, Clock: nativeClock{}, Present: func(p ports.Prepared) error {
 		for _, node := range p.Assessment.Nodes {
-			planned[node.Artifact.Name] = true
+			changedByPlan[node.Artifact.Name] = true
 			t.Log("candidate", node.Artifact.Name, node.Artifact.Version, node.Artifact.SHA256)
 		}
 		return nil
@@ -72,7 +74,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	for _, rack := range racks {
-		if planned[rack.Name()] {
+		if changedByPlan[rack.Name()] {
 			continue
 		}
 		after, err := kegSnapshot(filepath.Join("/opt/homebrew/Cellar", rack.Name()))
@@ -81,7 +83,7 @@ func TestLiveGeneralBottleExecution(t *testing.T) {
 		}
 	}
 	for name := range before {
-		if planned[name] {
+		if changedByPlan[name] {
 			continue
 		}
 		if _, err := os.Stat(filepath.Join("/opt/homebrew/Cellar", name)); err != nil {

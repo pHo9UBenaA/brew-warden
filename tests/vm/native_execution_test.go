@@ -101,20 +101,25 @@ func TestLiveNativeExecution(t *testing.T) {
 	default:
 		t.Fatalf("unsupported VM fault: %q", fault)
 	}
+	waiveAge := fault == "age" || fault == "age-exception" || fault == "exception-changed-input"
+	addWaivers := fault == "age-exception" || fault == "exception-changed-input"
+	changeInput := fault == "changed-input" || fault == "exception-changed-input"
+	linkConflict := fault == "link-conflict"
+	held := changeInput || fault == "age"
 	policy := domain.DefaultPolicy()
 	waivers := []domain.AgeWaiver{}
-	if fault == "age" || fault == "age-exception" || fault == "exception-changed-input" {
+	if waiveAge {
 		policy, err = domain.NewPolicy(domain.MaximumMinimumAgeSeconds)
 		if err != nil {
 			t.Fatal(err)
 		}
-		if fault == "age-exception" || fault == "exception-changed-input" {
+		if addWaivers {
 			for _, node := range collection.Evidence() {
 				waivers = append(waivers, domain.AgeWaiver{Artifact: node.Artifact, Reason: "Explicit VM acceptance exception"})
 			}
 		}
 	}
-	if fault == "link-conflict" {
+	if linkConflict {
 		if _, err := os.Lstat("/opt/homebrew/Cellar/jq"); !os.IsNotExist(err) {
 			t.Fatal("link-conflict test requires absent jq")
 		}
@@ -142,7 +147,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Fatal(err)
 	}
 	defer session.Close()
-	if fault == "changed-input" || fault == "exception-changed-input" {
+	if changeInput {
 		files, err := filepath.Glob(filepath.Join(directory, "collection-*", "inputs", "jq--*.tar.gz"))
 		if err != nil || len(files) != 1 {
 			t.Fatal("missing candidate fixture", files, err)
@@ -159,7 +164,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		}
 	}
 	result, err := application.Execute(context.Background(), prepared, session, nativeClock{})
-	if fault == "link-conflict" {
+	if linkConflict {
 		if err == nil || result.Outcome != domain.AttemptPartial || !result.ExitKnown || result.ExitCode == 0 {
 			t.Fatal("partial native failure was misclassified", result, err)
 		}
@@ -192,7 +197,7 @@ func TestLiveNativeExecution(t *testing.T) {
 		t.Log("partial installation retained; incomplete link prevents false success on fresh retry")
 		return
 	}
-	if fault == "changed-input" || fault == "exception-changed-input" || fault == "age" {
+	if held {
 		if err == nil {
 			t.Fatal("held request executed", fault)
 		}

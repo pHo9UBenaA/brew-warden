@@ -16,13 +16,15 @@ func FuzzPolicyRequiresCompleteEvidence(f *testing.F) {
 	} {
 		f.Add(seed)
 	}
+	// Seed bytes: extra chain nodes (mod 8), age-waiver flag, victim index,
+	// claim offset, and evidence mutation.
 	f.Fuzz(func(t *testing.T, data []byte) {
 		if len(data) < 5 || len(data) > 128 {
 			return
 		}
 		a := eligibleAssessment(t)
-		count := 2 + int(data[0]%8)
-		for i := 2; i < count; i++ {
+		nodeCount := 2 + int(data[0]%8)
+		for i := 2; i < nodeCount; i++ {
 			node := a.Nodes[1]
 			node.Artifact.Name = fmt.Sprintf("runtime-%d", i)
 			node.Dependencies = nil
@@ -33,17 +35,20 @@ func FuzzPolicyRequiresCompleteEvidence(f *testing.F) {
 			a.Nodes[i-1].Dependencies = []domain.Artifact{node.Artifact}
 			a.Nodes = append(a.Nodes, node)
 		}
-		if data[1]&1 != 0 {
+		waiveAge := data[1]&1 != 0
+		if waiveAge {
 			waiveYoung(&a)
 		}
 		if got := domain.Evaluate(a); got.Outcome != domain.Allow {
-			t.Fatalf("complete chain of %d formulae was not eligible: %+v", count, got)
+			t.Fatalf("complete chain of %d formulae was not eligible: %+v", nodeCount, got)
 		}
 		victim := int(data[2]) % len(a.Nodes)
-		claim := domain.Metadata + domain.Claim(data[3]%byte(domain.Vulnerabilities-domain.Metadata+1))
+		claimOffset := data[3] % byte(domain.Vulnerabilities-domain.Metadata+1)
+		claim := domain.Metadata + domain.Claim(claimOffset)
 		node := &a.Nodes[victim]
 		evidence := evidenceFor(node, claim)
-		switch data[4] % 5 {
+		mutation := data[4] % 5
+		switch mutation {
 		case 0:
 			node.Evidence = slices.DeleteFunc(node.Evidence, func(item domain.Evidence) bool { return item.Claim == claim })
 		case 1:
