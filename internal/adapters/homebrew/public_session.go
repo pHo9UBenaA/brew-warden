@@ -560,16 +560,28 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		return ports.ExecutionResult{}, errors.New("execution policy or plan expired")
 	}
 	s.prepared = fresh
-	remaining := map[string]plannedAction{}
-	requestedInstalls := []string{}
-	for _, action := range s.plan.Actions {
-		if action.Operation == "install" && containsArtifactNamed(s.plan.Targets, action.Name) {
+	remaining, requestedInstalls := pendingActions(s.plan)
+	if result, err := s.runPendingActions(ctx, fresh, remaining); err != nil {
+		return result, err
+	}
+	return s.verifyAfterState(ctx, requestedInstalls)
+}
+
+func pendingActions(plan executionPlan) (remaining map[string]plannedAction, requestedInstalls []string) {
+	remaining = map[string]plannedAction{}
+	requestedInstalls = []string{}
+	for _, action := range plan.Actions {
+		if action.Operation == "install" && containsArtifactNamed(plan.Targets, action.Name) {
 			requestedInstalls = append(requestedInstalls, action.Name)
 		}
 		if action.Operation != "keep" {
 			remaining[action.Name] = action
 		}
 	}
+	return remaining, requestedInstalls
+}
+
+func (s *publicSession) runPendingActions(ctx context.Context, fresh ports.Prepared, remaining map[string]plannedAction) (ports.ExecutionResult, error) {
 	for len(remaining) != 0 {
 		selected := nextReadyAction(s.plan.Nodes, remaining)
 		if selected.Name == "" {
@@ -593,6 +605,10 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		}
 		delete(remaining, selected.Name)
 	}
+	return ports.ExecutionResult{}, nil
+}
+
+func (s *publicSession) verifyAfterState(ctx context.Context, requestedInstalls []string) (ports.ExecutionResult, error) {
 	states, after, err := s.w.publicState(ctx, s.profile, s.plan.Nodes)
 	if err != nil {
 		return ports.ExecutionResult{ExitKnown: true, ExitCode: 0}, err
