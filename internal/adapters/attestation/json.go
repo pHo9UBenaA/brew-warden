@@ -27,8 +27,14 @@ func decodeObject(data []byte, out any, keys ...string) error {
 	}
 	for name, value := range fields {
 		for _, key := range keys {
-			if strings.EqualFold(name, key) && (name != key || bytes.Equal(bytes.TrimSpace(value), []byte("null"))) {
-				return errors.New("ambiguous or null provenance field")
+			if !strings.EqualFold(name, key) {
+				continue
+			}
+			if name != key {
+				return errors.New("provenance field casing is ambiguous")
+			}
+			if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
+				return errors.New("provenance field is null")
 			}
 		}
 	}

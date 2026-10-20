@@ -43,6 +43,11 @@ func InstalledGH() (PublicGH, error) {
 // Reaching the requested result limit cannot establish the earliest timestamp.
 const attestationResultLimit = 100
 
+const (
+	maxVerifierBytes = 128 << 20
+	maxBottleBytes   = 2 << 30
+)
+
 var errUnsupportedGHVersion = errors.New("unsupported installed gh version (requires 2.66.0 through 2.101.0)")
 
 // The lower bound is the first inspected gh using sigstore-go 0.7.0, which
@@ -107,11 +112,11 @@ func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bo
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
-	verifierDigest, err := hashFile(v.Path, 128*1024*1024)
+	verifierDigest, err := hashFile(v.Path, maxVerifierBytes)
 	if err != nil {
 		return 0, nil, "", errors.New("installed gh unavailable")
 	}
-	bottleDigest, err := hashFile(bottle, 2*1024*1024*1024)
+	bottleDigest, err := hashFile(bottle, maxBottleBytes)
 	if err != nil || bottleDigest != artifact.SHA256 {
 		return 0, nil, "", errors.New("bottle integrity mismatch")
 	}
@@ -132,7 +137,10 @@ func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bo
 		path     string
 		digest   domain.Digest
 		maxBytes int64
-	}{{v.Path, verifierDigest, 128 * 1024 * 1024}, {bottle, bottleDigest, 2 * 1024 * 1024 * 1024}} {
+	}{
+		{path: v.Path, digest: verifierDigest, maxBytes: maxVerifierBytes},
+		{path: bottle, digest: bottleDigest, maxBytes: maxBottleBytes},
+	} {
 		digest, err := hashFile(input.path, input.maxBytes)
 		if err != nil || digest != input.digest {
 			return 0, nil, "", errors.New("attestation input changed during verification")

@@ -41,10 +41,14 @@ func Execute(ctx context.Context, original ports.Prepared, session ports.Executi
 		return result, errors.New("execution revalidation failed")
 	}
 	now := clock.Now()
-	samePlan := fresh.Assessment.Policy == original.Assessment.Policy &&
+	planUnchanged := fresh.Assessment.Policy == original.Assessment.Policy &&
 		fresh.Assessment.Binding == original.Assessment.Binding &&
 		fresh.BeforeState == original.BeforeState && fresh.ExceptionID == original.ExceptionID
-	if !samePlan || !fresh.BeforeState.Valid() || fresh.ExpiresAt <= now || original.ExpiresAt <= now || fresh.ExpiresAt > original.ExpiresAt {
+	planApplicable := fresh.BeforeState.Valid()
+	freshIsCurrent := fresh.ExpiresAt > now
+	originalIsCurrent := original.ExpiresAt > now
+	windowNotExtended := fresh.ExpiresAt <= original.ExpiresAt
+	if !planUnchanged || !planApplicable || !freshIsCurrent || !originalIsCurrent || !windowNotExtended {
 		return result, errors.New("execution plan changed or expired")
 	}
 	hasException := fresh.Assessment.Exception != nil
