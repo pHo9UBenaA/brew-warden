@@ -9,6 +9,7 @@ import (
 	"path"
 	"path/filepath"
 	"regexp"
+	"slices"
 	"strings"
 	"testing"
 )
@@ -100,7 +101,7 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 	}
 	defer gz.Close()
 	reader := tar.NewReader(gz)
-	seen := map[string]bool{}
+	var names []string
 	for {
 		h, err := reader.Next()
 		if err == io.EOF {
@@ -109,7 +110,7 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 		if err != nil {
 			t.Fatal(err)
 		}
-		seen[h.Name] = true
+		names = append(names, h.Name)
 		if h.Uid != 0 || h.Gid != 0 || h.ModTime.Unix() != 0 {
 			t.Fatal("host metadata leaked", h)
 		}
@@ -125,8 +126,15 @@ func TestArchiveDeterminismAndInventory(t *testing.T) {
 			t.Fatalf("want symlink alias to bwd, got type=%d link=%q", h.Typeflag, h.Linkname)
 		}
 	}
-	if len(seen) != 4 {
-		t.Fatalf("want four packaged entries including SHA256SUMS: entries=%v", seen)
+	wantNames := []string{
+		"brewwarden/SHA256SUMS",
+		"brewwarden/brewwarden",
+		"brewwarden/bwd",
+		"brewwarden/licenses/example",
+	}
+	slices.Sort(names)
+	if !slices.Equal(names, wantNames) {
+		t.Fatalf("archive entries: got %q, want %q", names, wantNames)
 	}
 	if err := archive(first, files); err == nil {
 		t.Fatal("overwrote an existing distribution")
