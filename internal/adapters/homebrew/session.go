@@ -57,9 +57,9 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 		return ports.Prepared{}, errors.New("invalid persisted execution plan")
 	}
 	environment := p.Environment
-	validOSVersion := strings.HasPrefix(environment.OSVersion, "26.") &&
+	validOSVersion := strings.HasPrefix(environment.OSVersion, supportedOSVersionPrefix) &&
 		len(environment.OSVersion) <= 16 && strings.Trim(environment.OSVersion, "0123456789.") == ""
-	reviewedRevision := reviewedBrewRevisions[environment.BrewRevision] != ""
+	_, reviewedRevision := reviewedBrewRevisions[environment.BrewRevision]
 	validEnvironment := environment.Runtime.Valid() && environment.Prefix == "/opt/homebrew" &&
 		reviewedRevision && validOSVersion
 	validInventory := len(p.Nodes) > 0 && len(p.Nodes) <= 128 &&

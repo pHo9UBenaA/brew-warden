@@ -138,7 +138,7 @@ func (e Engine) Check(ctx context.Context) error {
 	command := exec.CommandContext(bounded, "/usr/bin/sw_vers", "-productVersion")
 	command.Env = []string{"PATH=/usr/bin:/bin"}
 	version, err := command.Output()
-	if err != nil || !strings.HasPrefix(string(version), "26.") {
+	if err != nil || !strings.HasPrefix(string(version), supportedOSVersionPrefix) {
 		return errors.New("macOS version is unsupported")
 	}
 	prefix, err := filepath.EvalSymlinks("/opt/homebrew")

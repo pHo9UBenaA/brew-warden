@@ -19,8 +19,9 @@ import (
 )
 
 const (
-	brewRevision = "edb70f031e4170c780799633a1226ff73e1077f4"
-	maxManifest  = 8 * 1024 * 1024
+	brewRevision             = "edb70f031e4170c780799633a1226ff73e1077f4"
+	maxManifest              = 8 * 1024 * 1024
+	supportedOSVersionPrefix = "26."
 )
 
 // Inspected upstream release commits with the public signed-metadata, bottle,
@@ -104,7 +105,7 @@ func reviewedBrewSource(ctx context.Context, prefix string) (string, error) {
 	if err != nil {
 		return "", err
 	}
-	if reviewedBrewRevisions[revision] == "" {
+	if _, reviewed := reviewedBrewRevisions[revision]; !reviewed {
 		return "", errors.New("unsupported Homebrew source revision")
 	}
 	changes, err := runInstalledGit(ctx, prefix, "status", "--porcelain=v1", "--untracked-files=all", "--",

@@ -194,7 +194,8 @@ func combineAdvisories(candidate formulaMetadata, osv publicVulnsReport, brew br
 }
 
 func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Client, candidates []formulaMetadata, now int64, revision string) ([]domain.Evidence, error) {
-	if reviewedBrewRevisions[revision] == "" {
+	brewVersion, reviewed := reviewedBrewRevisions[revision]
+	if !reviewed {
 		return nil, errors.New("unsupported Homebrew advisory source revision")
 	}
 	report, rawScan, err := w.scanCandidateVulnerabilities(ctx, candidates)
@@ -246,7 +247,7 @@ func (w workspace) collectPublicAdvisories(ctx context.Context, client *http.Cli
 		e, err := domain.NewEvidence(domain.Evidence{
 			Claim: domain.Vulnerabilities, Subject: candidate.artifact(), Status: domain.Verified,
 			Provider: domain.Homebrew, Source: "brew vulns + Homebrew Advisory Database",
-			ProviderVersion: "brew/" + reviewedBrewRevisions[revision],
+			ProviderVersion: "brew/" + brewVersion,
 			RawSHA256:       digestBytes(observation), ObservedAt: now, ExpiresAt: now + 3600,
 			Applicability: applicability,
 		})

@@ -360,7 +360,7 @@ func (w workspace) checkPublicRuntime(ctx context.Context, revision string) erro
 	if err := ctx.Err(); err != nil {
 		return err
 	}
-	if reviewedBrewRevisions[revision] == "" {
+	if _, reviewed := reviewedBrewRevisions[revision]; !reviewed {
 		return errors.New("unrecognized Homebrew execution source")
 	}
 	actual, err := reviewedBrewSource(ctx, "/opt/homebrew")
