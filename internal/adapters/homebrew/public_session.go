@@ -69,9 +69,11 @@ func publicBrewCommand(ctx context.Context, w workspace, profile string, args ..
 
 func (w workspace) publicState(ctx context.Context, profile string, nodes []domain.Node) ([]installedFormula, domain.Digest, error) {
 	names := make([]string, 0, len(nodes))
+	nodesByName := make(map[string]domain.Node, len(nodes))
 	args := []string{"info", "--json=v2", "--formula"}
 	for _, node := range nodes {
 		names = append(names, node.Artifact.Name)
+		nodesByName[node.Artifact.Name] = node
 		args = append(args, "homebrew/core/"+node.Artifact.Name)
 	}
 	ctx, cancel := context.WithTimeout(ctx, time.Minute)
@@ -86,7 +88,7 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 	if err != nil {
 		return nil, "", err
 	}
-	if err := matchExecutionMetadata(metadata, names, nodes); err != nil {
+	if err := matchExecutionMetadata(metadata, nodesByName); err != nil {
 		return nil, "", err
 	}
 	var document struct {
@@ -106,8 +108,11 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		if err != nil {
 			return nil, "", err
 		}
-		candidate := nodes[slices.Index(names, formula.Name)].Artifact
-		if err := formula.bindInstalledReceipts(candidate); err != nil {
+		node, exists := nodesByName[formula.Name]
+		if !exists {
+			return nil, "", errors.New("installed formula is outside the verified plan")
+		}
+		if err := formula.bindInstalledReceipts(node.Artifact); err != nil {
 			return nil, "", err
 		}
 	}
@@ -139,19 +144,23 @@ func (w workspace) saveInstalledState(formulae []installedFormula) (domain.Diges
 
 // parseInfo has already established that metadata contains exactly the requested
 // names. Compare each identity and dependency set with the verified plan.
-func matchExecutionMetadata(metadata []formulaMetadata, names []string, nodes []domain.Node) error {
+func matchExecutionMetadata(metadata []formulaMetadata, nodes map[string]domain.Node) error {
 	for _, formula := range metadata {
-		node := nodes[slices.Index(names, formula.Name)]
+		node, exists := nodes[formula.Name]
+		if !exists {
+			return errors.New("execution metadata names an unknown candidate")
+		}
 		if formula.artifact() != node.Artifact {
 			return errors.New("execution metadata differs from verified candidate")
 		}
-		dependencies := make([]string, 0, len(node.Dependencies))
+		plannedDependencies := make([]string, 0, len(node.Dependencies))
 		for _, dependency := range node.Dependencies {
-			dependencies = append(dependencies, dependency.Name)
+			plannedDependencies = append(plannedDependencies, dependency.Name)
 		}
-		slices.Sort(dependencies)
-		slices.Sort(formula.Dependencies)
-		if !slices.Equal(dependencies, formula.Dependencies) {
+		slices.Sort(plannedDependencies)
+		reportedDependencies := slices.Clone(formula.Dependencies)
+		slices.Sort(reportedDependencies)
+		if !slices.Equal(plannedDependencies, reportedDependencies) {
 			return errors.New("execution dependency graph changed")
 		}
 	}
@@ -281,31 +290,34 @@ func installedAction(state installedFormula, candidate domain.Artifact, request 
 	if state.ActiveVersion == nil || *state.ActiveVersion == "" {
 		return "", errors.New("unlinked installed candidate requires manual Homebrew repair")
 	}
-	operation := ""
-	for _, version := range state.Installed {
+	// Validate every receipt claiming the active version before choosing an action;
+	// a duplicate unsupported receipt must not be hidden behind a supported one.
+	var activeVersion *installedVersion
+	for i := range state.Installed {
+		version := &state.Installed[i]
 		if version.Version != *state.ActiveVersion {
 			continue
 		}
 		if len(version.Options) != 0 || !version.Poured || !version.Built {
 			return "", errors.New("installed candidate is not a supported bottle")
 		}
-		// Public receipt flags describe installation state, not payload integrity.
-		if version.Version == candidateKegVersion {
-			operation = "keep"
-			if request.Operation == "install" && slices.Contains(request.Targets, state.Name) && !version.OnRequest {
-				// Public install promotes the receipt without reinstalling payload.
-				operation = "install"
-			}
-		} else if state.Outdated {
-			operation = "upgrade"
-		} else {
-			return "", errors.New("candidate downgrade or unmatched installed version")
-		}
+		activeVersion = version
 	}
-	if operation == "" {
+	if activeVersion == nil {
 		return "", errors.New("active installed version is absent from public info")
 	}
-	return operation, nil
+	// Public receipt flags describe installation state, not payload integrity.
+	if activeVersion.Version != candidateKegVersion {
+		if !state.Outdated {
+			return "", errors.New("candidate downgrade or unmatched installed version")
+		}
+		return "upgrade", nil
+	}
+	if request.Operation == "install" && slices.Contains(request.Targets, state.Name) && !activeVersion.OnRequest {
+		// Public install promotes the receipt without reinstalling payload.
+		return "install", nil
+	}
+	return "keep", nil
 }
 
 func acquireOperationLock(directory string) (*os.File, error) {
@@ -532,7 +544,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	remaining := map[string]plannedAction{}
 	requestedInstalls := []string{}
 	for _, action := range s.plan.Actions {
-		if action.Operation == "install" && slices.ContainsFunc(s.plan.Targets, func(a domain.Artifact) bool { return a.Name == action.Name }) {
+		if action.Operation == "install" && containsArtifactNamed(s.plan.Targets, action.Name) {
 			requestedInstalls = append(requestedInstalls, action.Name)
 		}
 		if action.Operation != "keep" {
@@ -552,7 +564,7 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 			return ports.ExecutionResult{}, err
 		}
 		args := []string{selected.Operation, "--formula", "--force-bottle"}
-		if selected.Operation == "install" && !slices.ContainsFunc(s.plan.Targets, func(a domain.Artifact) bool { return a.Name == selected.Name }) {
+		if selected.Operation == "install" && !containsArtifactNamed(s.plan.Targets, selected.Name) {
 			args = append(args, "--as-dependency")
 		}
 		args = append(args, "homebrew/core/"+selected.Name)
@@ -569,6 +581,12 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	actions, err := publicActions(states, s.plan.Nodes, collectionInputs{Operation: "install", Targets: requestedInstalls})
 	matches := err == nil && !slices.ContainsFunc(actions, func(action plannedAction) bool { return action.Operation != "keep" })
 	return ports.ExecutionResult{ExitKnown: true, ExitCode: 0, AfterState: after, MatchesPlan: matches}, err
+}
+
+func containsArtifactNamed(artifacts []domain.Artifact, name string) bool {
+	return slices.ContainsFunc(artifacts, func(artifact domain.Artifact) bool {
+		return artifact.Name == name
+	})
 }
 
 // Select the first pending action with no dependency action still pending.

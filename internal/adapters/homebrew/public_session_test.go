@@ -28,7 +28,7 @@ func TestExecutionMetadataMatchesArtifactAndDependencySet(t *testing.T) {
 			formula := candidate
 			formula.Dependencies = append([]string{}, candidate.Dependencies...)
 			tc.mutate(&formula)
-			err := matchExecutionMetadata([]formulaMetadata{formula}, []string{candidate.Name}, []domain.Node{node})
+			err := matchExecutionMetadata([]formulaMetadata{formula}, map[string]domain.Node{candidate.Name: node})
 			if tc.want == "" {
 				if err != nil {
 					t.Fatalf("matching execution metadata rejected: %v", err)

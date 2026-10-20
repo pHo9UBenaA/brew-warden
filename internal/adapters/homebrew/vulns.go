@@ -130,18 +130,23 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 		}
 	}
 	names := make([]string, 0, len(candidates))
+	candidatesByName := make(map[string]formulaMetadata, len(candidates))
 	formulae := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
-		if !candidate.artifact().Valid() || !domain.ValidRequest("install", []string{candidate.Name}) || slices.Contains(names, candidate.Name) {
+		if !candidate.artifact().Valid() || !domain.ValidRequest("install", []string{candidate.Name}) {
 			return fail(errors.New("invalid advisory candidate"))
 		}
+		if _, exists := candidatesByName[candidate.Name]; exists {
+			return fail(errors.New("duplicate advisory candidate"))
+		}
+		candidatesByName[candidate.Name] = candidate
 		names = append(names, candidate.Name)
 		formulae = append(formulae, "homebrew/core/"+candidate.Name)
 	}
 	args := append([]string{"vulns", "--json"}, formulae...)
 	for _, candidate := range candidates {
 		for _, dependency := range candidate.Dependencies {
-			if !slices.Contains(names, dependency) {
+			if _, exists := candidatesByName[dependency]; !exists {
 				return fail(errors.New("incomplete advisory dependency closure"))
 			}
 		}
@@ -165,8 +170,8 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 		return fail(err)
 	}
 	for _, formula := range actual {
-		candidate := candidates[slices.Index(names, formula.Name)]
-		if formula.artifact() != candidate.artifact() || !slices.Equal(formula.Dependencies, candidate.Dependencies) {
+		candidate, exists := candidatesByName[formula.Name]
+		if !exists || formula.artifact() != candidate.artifact() || !slices.Equal(formula.Dependencies, candidate.Dependencies) {
 			return fail(errors.New("advisory candidate metadata changed"))
 		}
 	}

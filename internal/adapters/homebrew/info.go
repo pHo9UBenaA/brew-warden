@@ -50,10 +50,14 @@ func parseInfo(raw []byte, names []string) ([]formulaMetadata, error) {
 	if err := decodeSchema(raw, &doc, true); err != nil || len(doc.Casks) != 0 || len(doc.Formulae) != len(names) {
 		return nil, errors.New("incomplete Homebrew info result")
 	}
+	requested := make(map[string]bool, len(names))
+	for _, name := range names {
+		requested[name] = true
+	}
 	selected := map[string]bool{}
 	result := make([]formulaMetadata, 0, len(names))
 	for _, formula := range doc.Formulae {
-		if !slices.Contains(names, formula.Name) || selected[formula.Name] || formula.FullName != formula.Name || formula.Tap != "homebrew/core" {
+		if !requested[formula.Name] || selected[formula.Name] || formula.FullName != formula.Name || formula.Tap != "homebrew/core" {
 			return nil, errors.New("homebrew info identity mismatch")
 		}
 		selected[formula.Name] = true

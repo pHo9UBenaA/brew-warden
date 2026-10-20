@@ -104,25 +104,33 @@ func (v PublicGH) Check(ctx context.Context) error {
 	return err
 }
 
-// verifyBottle retains the checked version alongside the verified response;
-// attributing evidence must not launch a second, independent version probe.
-func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bottle string, now int64) (int64, []byte, string, error) {
+// bottleVerification keeps the verified response together with the verifier
+// version and the earliest verified timestamp derived from that response.
+type bottleVerification struct {
+	oldestPublishedAt int64
+	rawResponse       []byte
+	verifierVersion   string
+}
+
+// verifyBottle returns one verified result. Attributing evidence must not launch
+// a second, independent version probe.
+func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bottle string, now int64) (bottleVerification, error) {
 	if ctx == nil || !artifact.Valid() || !filepath.IsAbs(v.Path) || !filepath.IsAbs(bottle) || filepath.Base(bottle) != bottleName(artifact) || now <= 0 || now > 1<<62 {
-		return 0, nil, "", errors.New("invalid public attestation inputs")
+		return bottleVerification{}, errors.New("invalid public attestation inputs")
 	}
 	ctx, cancel := context.WithTimeout(ctx, 90*time.Second)
 	defer cancel()
 	verifierDigest, err := hashFile(v.Path, maxVerifierBytes)
 	if err != nil {
-		return 0, nil, "", errors.New("installed gh unavailable")
+		return bottleVerification{}, errors.New("installed gh unavailable")
 	}
 	bottleDigest, err := hashFile(bottle, maxBottleBytes)
 	if err != nil || bottleDigest != artifact.SHA256 {
-		return 0, nil, "", errors.New("bottle integrity mismatch")
+		return bottleVerification{}, errors.New("bottle integrity mismatch")
 	}
 	version, err := v.checkedVersion(ctx)
 	if err != nil {
-		return 0, nil, "", err
+		return bottleVerification{}, err
 	}
 	raw, err := runGH(ctx, v.Path, []string{
 		"attestation", "verify", bottle,
@@ -131,7 +139,7 @@ func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bo
 		"--format", "json", "--limit", strconv.Itoa(attestationResultLimit),
 	})
 	if err != nil {
-		return 0, nil, "", fmt.Errorf("public attestation verification unavailable: %w", err)
+		return bottleVerification{}, fmt.Errorf("public attestation verification unavailable: %w", err)
 	}
 	for _, input := range []struct {
 		path     string
@@ -143,14 +151,14 @@ func (v PublicGH) verifyBottle(ctx context.Context, artifact domain.Artifact, bo
 	} {
 		digest, err := hashFile(input.path, input.maxBytes)
 		if err != nil || digest != input.digest {
-			return 0, nil, "", errors.New("attestation input changed during verification")
+			return bottleVerification{}, errors.New("attestation input changed during verification")
 		}
 	}
-	oldest, err := oldestVerifiedTimestamp(raw, artifact, now)
+	oldestPublishedAt, err := oldestVerifiedTimestamp(raw, artifact, now)
 	if err != nil {
-		return 0, nil, "", err
+		return bottleVerification{}, err
 	}
-	return oldest, raw, version, nil
+	return bottleVerification{oldestPublishedAt: oldestPublishedAt, rawResponse: raw, verifierVersion: version}, nil
 }
 
 func runGH(ctx context.Context, path string, args []string) ([]byte, error) {
@@ -253,19 +261,19 @@ func decodeJSONArray(data []byte, out *[]json.RawMessage) error {
 // VerifyEvidence supplies two attributed claims from the same verified bytes;
 // neither process success nor an unsigned publication date can satisfy age.
 func (v PublicGH) VerifyEvidence(ctx context.Context, artifact domain.Artifact, bottle string, now int64) (domain.Evidence, domain.Evidence, []byte, error) {
-	oldest, raw, version, err := v.verifyBottle(ctx, artifact, bottle, now)
+	verified, err := v.verifyBottle(ctx, artifact, bottle, now)
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}
 	base := domain.Evidence{
 		Subject: artifact, Status: domain.Verified, Provider: domain.Supplement,
-		Source: repository, ProviderVersion: "gh/" + version,
-		RawSHA256: EvidenceDigest(raw), ObservedAt: now, ExpiresAt: now + 3600,
+		Source: repository, ProviderVersion: "gh/" + verified.verifierVersion,
+		RawSHA256: EvidenceDigest(verified.rawResponse), ObservedAt: now, ExpiresAt: now + 3600,
 	}
 	provenance := base
 	provenance.Claim = domain.Provenance
 	age := base
-	age.Claim, age.Publication, age.PublishedAt = domain.Publication, domain.VerifiedAttestation, oldest
+	age.Claim, age.Publication, age.PublishedAt = domain.Publication, domain.VerifiedAttestation, verified.oldestPublishedAt
 	provenance, err = domain.NewEvidence(provenance)
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
@@ -274,7 +282,7 @@ func (v PublicGH) VerifyEvidence(ctx context.Context, artifact domain.Artifact, 
 	if err != nil {
 		return domain.Evidence{}, domain.Evidence{}, nil, err
 	}
-	return provenance, age, raw, nil
+	return provenance, age, verified.rawResponse, nil
 }
 
 // EvidenceDigest is the raw response identity for pending-operation diagnostics.

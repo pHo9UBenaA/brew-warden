@@ -60,9 +60,11 @@ func (p executionPlan) prepared(id domain.Digest) (ports.Prepared, error) {
 	validOSVersion := strings.HasPrefix(environment.OSVersion, "26.") &&
 		len(environment.OSVersion) <= 16 && strings.Trim(environment.OSVersion, "0123456789.") == ""
 	reviewedRevision := reviewedBrewRevisions[environment.BrewRevision] != ""
+	validEnvironment := environment.Runtime.Valid() && environment.Prefix == "/opt/homebrew" &&
+		reviewedRevision && validOSVersion
 	validInventory := len(p.Nodes) > 0 && len(p.Nodes) <= 128 &&
 		len(p.Actions) == len(p.Nodes) && len(p.Inputs) > 0 && len(p.Inputs) <= 10000
-	if !environment.Runtime.Valid() || !reviewedRevision || environment.Prefix != "/opt/homebrew" || !validOSVersion || !validInventory {
+	if !validEnvironment || !validInventory {
 		return ports.Prepared{}, errors.New("unsupported persisted execution environment or inventory")
 	}
 	inventory := map[string]domain.Digest{}
