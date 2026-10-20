@@ -261,10 +261,20 @@ func publicActions(states []installedFormula, nodes []domain.Node, request colle
 	if len(states) != len(nodes) {
 		return nil, errors.New("incomplete installed state")
 	}
+	byName := make(map[string]installedFormula, len(states))
+	for _, state := range states {
+		if _, duplicate := byName[state.Name]; duplicate {
+			return nil, errors.New("incomplete installed state")
+		}
+		byName[state.Name] = state
+	}
 	result := make([]plannedAction, 0, len(nodes))
-	for i, node := range nodes {
-		state := states[i]
-		if state.Name != node.Artifact.Name || state.Pinned || len(state.Installed) > 32 {
+	for _, node := range nodes {
+		state, present := byName[node.Artifact.Name]
+		if !present {
+			return nil, errors.New("incomplete installed state")
+		}
+		if state.Pinned || len(state.Installed) > 32 {
 			return nil, errors.New("pinned or ambiguous installed candidate")
 		}
 		if state.LinkIncomplete {
@@ -530,6 +540,8 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	if s.consumed || binding != s.prepared.Assessment.Binding {
 		return ports.ExecutionResult{}, errors.New("session binding mismatch or replay")
 	}
+	// Revalidate immediately before execution. It re-reads the bound plan, so
+	// only observed state and the assessment time may differ from the prepared copy.
 	fresh, err := s.Revalidate(ctx)
 	s.consumed = true
 	if err != nil {
@@ -540,7 +552,6 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		return ports.ExecutionResult{}, errors.New("execution policy or plan expired")
 	}
 	s.prepared = fresh
-	s.plan.Nodes, s.plan.Targets = fresh.Assessment.Nodes, fresh.Assessment.Targets
 	remaining := map[string]plannedAction{}
 	requestedInstalls := []string{}
 	for _, action := range s.plan.Actions {
@@ -620,6 +631,8 @@ func (s *publicSession) runCommand(ctx context.Context, args []string) (ports.Ex
 	base := publicBrewCommand(ctx, s.w, s.profile, args...)
 	// Hold the child before exec until its process session is durably recorded.
 	// All command arguments remain separate; the shell program is a fixed literal.
+	// ExtraFiles assigns fd 3 to the gate and fd 4 to the inherited lock: the
+	// child closes only the gate before exec, keeping the lock across subprocesses.
 	startupGate := `read -r ready <&3 || exit 125
 exec 3<&-
 exec "$@"`

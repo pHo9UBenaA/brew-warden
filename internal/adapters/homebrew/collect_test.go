@@ -11,7 +11,8 @@ import (
 )
 
 type candidateVerifier struct {
-	mutate func(*domain.Evidence)
+	mutate    func(*domain.Evidence)
+	mutateAge func(*domain.Evidence)
 }
 
 func (candidateVerifier) Check(context.Context) error { return nil }
@@ -31,21 +32,26 @@ func (v candidateVerifier) VerifyEvidence(_ context.Context, artifact domain.Art
 	if v.mutate != nil {
 		v.mutate(&provenance)
 	}
+	if v.mutateAge != nil {
+		v.mutateAge(&age)
+	}
 	return provenance, age, raw, nil
 }
 
 func TestCandidateEvidenceRequiresBoundVerifierClaims(t *testing.T) {
 	for _, tc := range []struct {
-		name   string
-		mutate func(*domain.Evidence)
+		name      string
+		mutate    func(*domain.Evidence)
+		mutateAge func(*domain.Evidence)
 	}{
-		{"verified", nil},
-		{"different subject", func(e *domain.Evidence) { e.Subject.Rebuild++ }},
-		{"different observation", func(e *domain.Evidence) { e.ObservedAt-- }},
-		{"excess validity", func(e *domain.Evidence) { e.ExpiresAt++ }},
-		{"unavailable provenance", func(e *domain.Evidence) { e.Status = domain.Unavailable }},
-		{"wrong claim", func(e *domain.Evidence) { e.Claim = domain.Metadata }},
-		{"different response", func(e *domain.Evidence) { e.RawSHA256 = metadataFixture().Formulae[0].BottleSHA256 }},
+		{name: "verified"},
+		{name: "different subject", mutate: func(e *domain.Evidence) { e.Subject.Rebuild++ }},
+		{name: "different observation", mutate: func(e *domain.Evidence) { e.ObservedAt-- }},
+		{name: "excess validity", mutate: func(e *domain.Evidence) { e.ExpiresAt++ }},
+		{name: "unavailable provenance", mutate: func(e *domain.Evidence) { e.Status = domain.Unavailable }},
+		{name: "wrong claim", mutate: func(e *domain.Evidence) { e.Claim = domain.Metadata }},
+		{name: "swapped claims", mutateAge: func(e *domain.Evidence) { e.Claim = domain.Provenance }},
+		{name: "different response", mutate: func(e *domain.Evidence) { e.RawSHA256 = metadataFixture().Formulae[0].BottleSHA256 }},
 	} {
 		t.Run(tc.name, func(t *testing.T) {
 			w := workspace{t.TempDir()}
@@ -53,10 +59,10 @@ func TestCandidateEvidenceRequiresBoundVerifierClaims(t *testing.T) {
 				t.Fatal(err)
 			}
 			collection := &Collection{root: w.root, observedAt: 1000, runtimeRevision: brewRevision}
-			collector := Collector{BottleVerifier: candidateVerifier{mutate: tc.mutate}}
+			collector := Collector{BottleVerifier: candidateVerifier{mutate: tc.mutate, mutateAge: tc.mutateAge}}
 			candidates := metadataFixture().Formulae
 			node, err := collector.collectCandidateEvidence(context.Background(), collection, candidates[0], candidates, []byte("authenticated metadata response"))
-			if tc.mutate != nil {
+			if tc.mutate != nil || tc.mutateAge != nil {
 				if err == nil || len(node.Evidence) != 0 {
 					t.Fatalf("unbound verifier claim produced a candidate: node=%+v error=%v", node, err)
 				}

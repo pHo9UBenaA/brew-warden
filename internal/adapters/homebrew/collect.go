@@ -205,10 +205,18 @@ func (c *Collector) collectCandidateEvidence(ctx context.Context, collection *Co
 	if err != nil {
 		return domain.Node{}, fmt.Errorf("attestation for %s unavailable: %w", candidate.Name, err)
 	}
-	for _, evidence := range []domain.Evidence{provenance, age} {
-		supportedClaim := evidence.Claim == domain.Provenance || evidence.Claim == domain.Publication
-		if err := checkClaim(evidence, node.Artifact, evidence.Claim, collection.observedAt); err != nil ||
-			evidence.Status != domain.Verified || !supportedClaim || evidence.RawSHA256 != digestBytes(raw) {
+	// VerifyEvidence returns provenance and publication from one response; keep
+	// each claim bound to its position so a swapped pair is rejected.
+	for _, expected := range []struct {
+		claim    domain.Claim
+		evidence domain.Evidence
+	}{
+		{claim: domain.Provenance, evidence: provenance},
+		{claim: domain.Publication, evidence: age},
+	} {
+		evidence := expected.evidence
+		if err := checkClaim(evidence, node.Artifact, expected.claim, collection.observedAt); err != nil ||
+			evidence.Status != domain.Verified || evidence.RawSHA256 != digestBytes(raw) {
 			return domain.Node{}, errors.New("candidate attestation evidence is incomplete or unbound")
 		}
 		if err := w.observation(evidence, raw); err != nil {

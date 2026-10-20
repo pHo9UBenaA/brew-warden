@@ -89,6 +89,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 	queue := append([]string{}, targets...)
 	seen := map[string]bool{}
 	doc := metadataDocument{Schema: 1, Platform: "arm64_tahoe", Formulae: []formulaMetadata{}}
+	firstBatch := true
 	for len(queue) != 0 {
 		names := []string{}
 		for _, name := range queue {
@@ -114,7 +115,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 		if err != nil {
 			return nil, err
 		}
-		if len(doc.Formulae) == 0 {
+		if firstBatch {
 			// Homebrew owns acquisition and authentication. Pin the actual signed
 			// snapshot it used before querying further dependency batches.
 			if _, err := readRegular(cache, 80*1024*1024); err != nil {
@@ -124,6 +125,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 			if err != nil {
 				return nil, err
 			}
+			firstBatch = false
 		}
 		batch, err := parseInfo(raw, names)
 		if err != nil {
