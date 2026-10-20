@@ -35,7 +35,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 	}
 	seen := map[string]bool{}
 	for _, override := range overrides {
-		if !domain.ValidRequest("install", []string{override.Name}) || !domain.ValidAgeReason(override.Reason) || seen[override.Name] {
+		if !domain.ValidFormulaName(override.Name) || !domain.ValidAgeReason(override.Reason) || seen[override.Name] {
 			return ports.Prepared{}, nil, errors.New("invalid or duplicate age exception")
 		}
 		seen[override.Name] = true
@@ -49,7 +49,7 @@ func (e Engine) Prepare(ctx context.Context, request ports.Request, policy domai
 			return ports.Prepared{}, nil, errors.New("upgrade inventory exceeds supported closure")
 		}
 		for _, entry := range entries {
-			if !entry.IsDir() || !domain.ValidRequest("install", []string{entry.Name()}) {
+			if !entry.IsDir() || !domain.ValidFormulaName(entry.Name()) {
 				return ports.Prepared{}, nil, errors.New("unsupported installed inventory")
 			}
 			request.Targets = append(request.Targets, entry.Name())

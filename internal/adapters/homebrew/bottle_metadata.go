@@ -77,7 +77,7 @@ func validateBottleMetadata(raw []byte, candidate formulaMetadata, candidates []
 	}
 	seen := map[string]bool{}
 	for _, dependency := range tab.Dependencies {
-		if !wanted[dependency.Name] || seen[dependency.Name] || dependency.Version == "" || dependency.Revision < 0 || !domain.ValidRequest("install", []string{dependency.Name}) {
+		if !wanted[dependency.Name] || seen[dependency.Name] || dependency.Version == "" || dependency.Revision < 0 || !domain.ValidFormulaName(dependency.Name) {
 			return errors.New("bottle dependency graph differs from selected plan")
 		}
 		seen[dependency.Name] = true

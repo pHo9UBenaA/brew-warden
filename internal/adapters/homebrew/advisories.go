@@ -48,7 +48,7 @@ func fetchAdvisoryJSON(ctx context.Context, client *http.Client, address string,
 			return nil, errors.New("invalid public advisory URL")
 		}
 		name := strings.TrimPrefix(address, "https://formulae.brew.sh/api/formula/")
-		if !strings.HasSuffix(name, ".json") || !domain.ValidRequest("install", []string{strings.TrimSuffix(name, ".json")}) {
+		if !strings.HasSuffix(name, ".json") || !domain.ValidFormulaName(strings.TrimSuffix(name, ".json")) {
 			return nil, errors.New("invalid public advisory URL")
 		}
 	}
@@ -106,7 +106,7 @@ func parseAdvisoryIndex(raw []byte) (advisoryIndex, error) {
 
 	count := 0
 	for name, records := range index.Records {
-		if !domain.ValidRequest("install", []string{name}) || records == nil {
+		if !domain.ValidFormulaName(name) || records == nil {
 			return advisoryIndex{}, errors.New("invalid advisory feed inventory")
 		}
 		count += len(records)

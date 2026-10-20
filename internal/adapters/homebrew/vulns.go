@@ -133,7 +133,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	candidatesByName := make(map[string]formulaMetadata, len(candidates))
 	formulae := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
-		if !candidate.artifact().Valid() || !domain.ValidRequest("install", []string{candidate.Name}) {
+		if !candidate.artifact().Valid() || !domain.ValidFormulaName(candidate.Name) {
 			return fail(errors.New("invalid advisory candidate"))
 		}
 		if _, exists := candidatesByName[candidate.Name]; exists {

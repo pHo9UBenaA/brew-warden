@@ -43,7 +43,7 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, error) {
 	}
 	index := map[string]formulaMetadata{}
 	for _, formula := range document.Formulae {
-		if !domain.ValidRequest("install", []string{formula.Name}) || index[formula.Name].Name != "" || formula.Revision < 0 || formula.Rebuild < 0 {
+		if !domain.ValidFormulaName(formula.Name) || index[formula.Name].Name != "" || formula.Revision < 0 || formula.Rebuild < 0 {
 			return nil, errors.New("invalid formula metadata identity")
 		}
 		if formula.Dependencies == nil || len(formula.Dependencies) > 128 {
@@ -51,7 +51,7 @@ func parseMetadata(data []byte, targets []string) ([]formulaMetadata, error) {
 		}
 		seen := map[string]bool{}
 		for _, dependency := range formula.Dependencies {
-			if !domain.ValidRequest("install", []string{dependency}) || seen[dependency] {
+			if !domain.ValidFormulaName(dependency) || seen[dependency] {
 				return nil, errors.New("invalid dependency metadata")
 			}
 			seen[dependency] = true

@@ -19,6 +19,11 @@ var (
 	versionText = regexp.MustCompile(`^[A-Za-z0-9][A-Za-z0-9+_.:-]{0,127}$`)
 )
 
+// ValidFormulaName reports whether name is a supported core formula or dependency name.
+func ValidFormulaName(name string) bool {
+	return formulaName.MatchString(name)
+}
+
 func ValidRequest(operation string, targets []string) bool {
 	supportedOperation := operation == "install" || operation == "upgrade"
 	missingInstallTarget := operation == "install" && len(targets) == 0
@@ -26,7 +31,7 @@ func ValidRequest(operation string, targets []string) bool {
 		return false
 	}
 	for _, target := range targets {
-		if !formulaName.MatchString(target) {
+		if !ValidFormulaName(target) {
 			return false
 		}
 	}

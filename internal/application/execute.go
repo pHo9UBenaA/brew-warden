@@ -44,11 +44,11 @@ func Execute(ctx context.Context, original ports.Prepared, session ports.Executi
 	planUnchanged := fresh.Assessment.Policy == original.Assessment.Policy &&
 		fresh.Assessment.Binding == original.Assessment.Binding &&
 		fresh.BeforeState == original.BeforeState && fresh.ExceptionID == original.ExceptionID
-	planApplicable := fresh.BeforeState.Valid()
+	beforeStateValid := fresh.BeforeState.Valid()
 	freshIsCurrent := fresh.ExpiresAt > now
 	originalIsCurrent := original.ExpiresAt > now
 	windowNotExtended := fresh.ExpiresAt <= original.ExpiresAt
-	if !planUnchanged || !planApplicable || !freshIsCurrent || !originalIsCurrent || !windowNotExtended {
+	if !planUnchanged || !beforeStateValid || !freshIsCurrent || !originalIsCurrent || !windowNotExtended {
 		return result, errors.New("execution plan changed or expired")
 	}
 	hasException := fresh.Assessment.Exception != nil

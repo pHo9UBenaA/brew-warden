@@ -174,7 +174,7 @@ func ageOptions(args []string) ([]string, []ports.AgeOverride, error) {
 		}
 		if args[0] == "--age-exception" {
 			name, reason, ok := strings.Cut(args[1], "=")
-			if !ok || !domain.ValidRequest("install", []string{name}) || !domain.ValidAgeReason(reason) || seen[name] {
+			if !ok || !domain.ValidFormulaName(name) || !domain.ValidAgeReason(reason) || seen[name] {
 				return nil, nil, fmt.Errorf("invalid age exception")
 			}
 			seen[name] = true

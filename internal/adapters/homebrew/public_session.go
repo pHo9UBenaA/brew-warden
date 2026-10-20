@@ -218,7 +218,7 @@ func installedReceiptDigest(candidate domain.Artifact, version string) (domain.D
 // uses opt. Neither link authenticates the installed payload; both establish
 // whether Homebrew actually completed its own shared-prefix link step.
 func installedLink(prefix, name string, kegOnly bool) (*string, bool, error) {
-	if !domain.ValidRequest("install", []string{name}) {
+	if !domain.ValidFormulaName(name) {
 		return nil, false, errors.New("invalid installed link identity")
 	}
 	observe := func(file string) (*string, error) {

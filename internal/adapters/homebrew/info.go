@@ -92,7 +92,7 @@ func (w workspace) metadata(ctx context.Context, acquireProfile string, targets 
 	for len(queue) != 0 {
 		names := []string{}
 		for _, name := range queue {
-			if !domain.ValidRequest("install", []string{name}) {
+			if !domain.ValidFormulaName(name) {
 				return nil, errors.New("invalid metadata dependency")
 			}
 			if !seen[name] {
