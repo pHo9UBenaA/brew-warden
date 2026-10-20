@@ -71,78 +71,92 @@ func validateValue(decoder *json.Decoder, valueType reflect.Type, depth int, all
 	}
 	switch valueType.Kind() {
 	case reflect.Struct:
-		if token != json.Delim('{') {
-			return errors.New("expected JSON object")
-		}
-		fields := map[string]reflect.Type{}
-		var requiredFields []string
-		for i := 0; i < valueType.NumField(); i++ {
-			field := valueType.Field(i)
-			name := schemaFieldName(field)
-			if name != "" && name != "-" {
-				fields[name] = field.Type
-			}
-			untaggedExported := field.Tag.Get("json") == "" && field.PkgPath == ""
-			if field.Tag.Get("required") == "true" || untaggedExported {
-				requiredFields = append(requiredFields, name)
-			}
-		}
-
-		seen := map[string]bool{}
-		for decoder.More() {
-			key, err := decoder.Token()
-			if err != nil {
-				return errors.New("invalid object key")
-			}
-			name, isString := key.(string)
-			fieldType, known := fields[name]
-			if !isString || (!known && !allowUnknownFields) || seen[name] {
-				return errors.New("unknown, mis-cased or duplicate JSON field")
-			}
-			seen[name] = true
-			if !known {
-				for expected := range fields {
-					if strings.EqualFold(name, expected) {
-						return errors.New("mis-cased JSON field")
-					}
-				}
-				var ignored json.RawMessage
-				if err := decoder.Decode(&ignored); err != nil {
-					return err
-				}
-				continue
-			}
-			if err := validateValue(decoder, fieldType, depth+1, allowUnknownFields); err != nil {
-				return err
-			}
-		}
-		end, err := decoder.Token()
-		if err != nil || end != json.Delim('}') {
-			return errors.New("unterminated JSON object")
-		}
-		for _, name := range requiredFields {
-			if !seen[name] {
-				return errors.New("missing required JSON field")
-			}
-		}
+		return validateObject(decoder, valueType, token, depth, allowUnknownFields)
 	case reflect.Slice:
-		if token != json.Delim('[') {
-			return errors.New("expected JSON array")
-		}
-		for decoder.More() {
-			if err := validateValue(decoder, valueType.Elem(), depth+1, allowUnknownFields); err != nil {
-				return err
-			}
-		}
-		end, err := decoder.Token()
-		if err != nil || end != json.Delim(']') {
-			return errors.New("unterminated JSON array")
-		}
+		return validateArray(decoder, valueType, token, depth, allowUnknownFields)
 	default:
 		// Type and numeric range checks are performed by the typed decode.
 		if _, structured := token.(json.Delim); structured {
 			return errors.New("expected scalar JSON value")
 		}
+		return nil
+	}
+}
+
+func validateObject(decoder *json.Decoder, valueType reflect.Type, token json.Token, depth int, allowUnknownFields bool) error {
+	if token != json.Delim('{') {
+		return errors.New("expected JSON object")
+	}
+	fields, requiredFields := schemaFields(valueType)
+	seen := map[string]bool{}
+	for decoder.More() {
+		key, err := decoder.Token()
+		if err != nil {
+			return errors.New("invalid object key")
+		}
+		name, isString := key.(string)
+		fieldType, known := fields[name]
+		if !isString || (!known && !allowUnknownFields) || seen[name] {
+			return errors.New("unknown, mis-cased or duplicate JSON field")
+		}
+		seen[name] = true
+		if !known {
+			for expected := range fields {
+				if strings.EqualFold(name, expected) {
+					return errors.New("mis-cased JSON field")
+				}
+			}
+			var ignored json.RawMessage
+			if err := decoder.Decode(&ignored); err != nil {
+				return err
+			}
+			continue
+		}
+		if err := validateValue(decoder, fieldType, depth+1, allowUnknownFields); err != nil {
+			return err
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim('}') {
+		return errors.New("unterminated JSON object")
+	}
+	for _, name := range requiredFields {
+		if !seen[name] {
+			return errors.New("missing required JSON field")
+		}
+	}
+	return nil
+}
+
+func schemaFields(valueType reflect.Type) (map[string]reflect.Type, []string) {
+	fields := map[string]reflect.Type{}
+	var requiredFields []string
+	for i := 0; i < valueType.NumField(); i++ {
+		field := valueType.Field(i)
+		name := schemaFieldName(field)
+		if name != "" && name != "-" {
+			fields[name] = field.Type
+		}
+		untaggedExported := field.Tag.Get("json") == "" && field.PkgPath == ""
+		if field.Tag.Get("required") == "true" || untaggedExported {
+			requiredFields = append(requiredFields, name)
+		}
+	}
+	return fields, requiredFields
+}
+
+func validateArray(decoder *json.Decoder, valueType reflect.Type, token json.Token, depth int, allowUnknownFields bool) error {
+	if token != json.Delim('[') {
+		return errors.New("expected JSON array")
+	}
+	for decoder.More() {
+		if err := validateValue(decoder, valueType.Elem(), depth+1, allowUnknownFields); err != nil {
+			return err
+		}
+	}
+	end, err := decoder.Token()
+	if err != nil || end != json.Delim(']') {
+		return errors.New("unterminated JSON array")
 	}
 	return nil
 }
