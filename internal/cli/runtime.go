@@ -2,9 +2,9 @@ package cli
 
 import (
 	"context"
+	"errors"
 	"fmt"
 	"io"
-	"strings"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/application"
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
@@ -43,21 +43,16 @@ func RunWithRuntime(ctx context.Context, args []string, out, errOut io.Writer, s
 		}
 		return 0
 	}
-	filtered := args
-	var overrides []ports.AgeOverride
-	var err error
-	if service != nil {
-		filtered, overrides, err = ageOptions(args)
-		if err != nil {
-			_, _ = fmt.Fprintln(errOut, "invocation_invalid: invalid or duplicate age exception.")
-			return 1
-		}
-	}
-	location, age, rest, err := options(filtered)
+	options, err := parseOptions(args, service != nil)
 	if err != nil {
-		_, _ = fmt.Fprintln(errOut, "invocation_invalid: "+err.Error())
+		if errors.Is(err, errInvalidAgeException) {
+			_, _ = fmt.Fprintln(errOut, "invocation_invalid: invalid or duplicate age exception.")
+		} else {
+			_, _ = fmt.Fprintln(errOut, "invocation_invalid: "+err.Error())
+		}
 		return 1
 	}
+	location, age, overrides, rest := options.location, options.minimumAge, options.overrides, options.rest
 	policy := domain.DefaultPolicy()
 	if source != nil {
 		policy, err = source.LoadConfig(location)
@@ -162,29 +157,6 @@ func presentPlan(out io.Writer, prepared ports.Prepared) error {
 		}
 	}
 	return nil
-}
-
-func ageOptions(args []string) ([]string, []ports.AgeOverride, error) {
-	filtered := []string{}
-	overrides := []ports.AgeOverride{}
-	seen := map[string]bool{}
-	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
-		if len(args) < 2 {
-			return nil, nil, fmt.Errorf("missing option value")
-		}
-		if args[0] == "--age-exception" {
-			name, reason, ok := strings.Cut(args[1], "=")
-			if !ok || !domain.ValidFormulaName(name) || !domain.ValidAgeReason(reason) || seen[name] {
-				return nil, nil, fmt.Errorf("invalid age exception")
-			}
-			seen[name] = true
-			overrides = append(overrides, ports.AgeOverride{Name: name, Reason: reason})
-		} else {
-			filtered = append(filtered, args[:2]...)
-		}
-		args = args[2:]
-	}
-	return append(filtered, args...), overrides, nil
 }
 
 func claimName(claim domain.Claim) string {

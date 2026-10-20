@@ -79,8 +79,8 @@ func TestWrapperOptions(t *testing.T) {
 			t.Fatalf("invalid wrapper options %q accepted: %s", args, &diagnostics)
 		}
 	}
-	_, age, rest, err := options([]string{"brew", "install", "--minimum-release-age", "0h"})
-	if err != nil || age != nil || len(rest) != 4 {
-		t.Fatalf("want all four child arguments preserved without age override: age=%v rest=%q error=%v", age, rest, err)
+	options, err := parseOptions([]string{"brew", "install", "--minimum-release-age", "0h"}, false)
+	if err != nil || options.minimumAge != nil || len(options.rest) != 4 {
+		t.Fatalf("want all four child arguments preserved without age override: age=%v rest=%q error=%v", options.minimumAge, options.rest, err)
 	}
 }
