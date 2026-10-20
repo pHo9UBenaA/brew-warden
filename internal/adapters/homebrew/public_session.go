@@ -337,11 +337,14 @@ func (w workspace) checkPublicRuntime(ctx context.Context, revision string) erro
 	if errors.Is(err, context.Canceled) || errors.Is(err, context.DeadlineExceeded) {
 		return err
 	}
-	if err == nil && actual != revision {
+	if err != nil {
+		if revision != brewRevision {
+			return errors.New("installed Homebrew release is no longer reviewed")
+		}
+		// The legacy tar-only prefix has no reviewed Git checkout; the file
+		// comparison below still binds its contents to the selected revision.
+	} else if actual != revision {
 		return errors.New("installed Homebrew release changed before execution")
-	}
-	if err != nil && revision != brewRevision {
-		return errors.New("installed Homebrew release is no longer reviewed")
 	}
 	source := filepath.Join(w.root, "runtime/brew")
 	for _, directory := range []string{"bin", "Library"} {
@@ -503,11 +506,9 @@ func (s *publicSession) Revalidate(ctx context.Context) (ports.Prepared, error) 
 	return fresh, nil
 }
 
-// executionAllowed recomputes the assessment at the current second and reports
-// whether the plan is within its issuance window and policy still permits
-// execution. The caller supplies the error message for its own stage.
-func (s *publicSession) executionAllowed(fresh *ports.Prepared) bool {
-	fresh.Assessment.Now = time.Now().Unix()
+// executionAllowed reports whether the assessment's explicit time is inside the
+// plan's issuance window and policy still permits execution.
+func (s *publicSession) executionAllowed(fresh ports.Prepared) bool {
 	return fresh.Assessment.Now >= s.plan.IssuedAt &&
 		fresh.Assessment.Now < s.plan.ExpiresAt &&
 		domain.Evaluate(fresh.Assessment).Outcome == domain.Allow
@@ -522,7 +523,8 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 	if err != nil {
 		return ports.ExecutionResult{}, err
 	}
-	if !s.executionAllowed(&fresh) {
+	fresh.Assessment.Now = time.Now().Unix()
+	if !s.executionAllowed(fresh) {
 		return ports.ExecutionResult{}, errors.New("execution policy or plan expired")
 	}
 	s.prepared = fresh
@@ -542,7 +544,8 @@ func (s *publicSession) Run(ctx context.Context, binding domain.Binding) (ports.
 		if selected.Name == "" {
 			return ports.ExecutionResult{}, errors.New("cyclic execution plan")
 		}
-		if !s.executionAllowed(&fresh) {
+		fresh.Assessment.Now = time.Now().Unix()
+		if !s.executionAllowed(fresh) {
 			return ports.ExecutionResult{}, errors.New("execution plan expired")
 		}
 		if err := s.w.checkPublicRuntime(ctx, s.plan.Environment.BrewRevision); err != nil {

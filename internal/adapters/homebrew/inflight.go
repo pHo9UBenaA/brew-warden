@@ -82,7 +82,11 @@ func saveInFlight(directory string, record inFlight) error {
 		return errors.New("invalid owned Homebrew process")
 	}
 	file := filepath.Join(directory, "inflight.json")
-	if previous, err := readInFlight(file); err != nil || previous != nil {
+	previous, err := readInFlight(file)
+	if err != nil {
+		return err
+	}
+	if previous != nil {
 		return errors.New("another Homebrew process is recorded")
 	}
 	pending := filepath.Join(directory, "inflight.pending")

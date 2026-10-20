@@ -106,15 +106,15 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 	if err != nil {
 		return err
 	}
-	parsed, err := w.metadata(ctx, profile, request.Targets)
+	metadataJSON, err := w.metadata(ctx, profile, request.Targets)
 	if err != nil {
 		return err
 	}
-	metadata, err := readRegular(filepath.Join(w.root, metadataCachePath), 80*1024*1024)
+	signedMetadata, err := readRegular(filepath.Join(w.root, metadataCachePath), 80*1024*1024)
 	if err != nil {
 		return err
 	}
-	candidates, err := parseMetadata(parsed, request.Targets)
+	candidates, err := parseMetadata(metadataJSON, request.Targets)
 	if err != nil {
 		return err
 	}
@@ -138,8 +138,8 @@ func (c *Collector) collect(ctx context.Context, result *Collection, request por
 		PublicResult   domain.Digest
 		Runtime        domain.Digest
 	}{
-		SignedMetadata: digestBytes(metadata),
-		PublicResult:   digestBytes(parsed), Runtime: result.runtimeDigest,
+		SignedMetadata: digestBytes(signedMetadata),
+		PublicResult:   digestBytes(metadataJSON), Runtime: result.runtimeDigest,
 	})
 	for _, candidate := range candidates {
 		node, err := c.collectCandidateEvidence(ctx, result, candidate, candidates, metadataClaim)

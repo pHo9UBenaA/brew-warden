@@ -130,14 +130,15 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 		}
 	}
 	names := make([]string, 0, len(candidates))
-	args := []string{"vulns", "--json"}
+	formulae := make([]string, 0, len(candidates))
 	for _, candidate := range candidates {
 		if !candidate.artifact().Valid() || !domain.ValidRequest("install", []string{candidate.Name}) || slices.Contains(names, candidate.Name) {
 			return fail(errors.New("invalid advisory candidate"))
 		}
 		names = append(names, candidate.Name)
-		args = append(args, "homebrew/core/"+candidate.Name)
+		formulae = append(formulae, "homebrew/core/"+candidate.Name)
 	}
+	args := append([]string{"vulns", "--json"}, formulae...)
 	for _, candidate := range candidates {
 		for _, dependency := range candidate.Dependencies {
 			if !slices.Contains(names, dependency) {
@@ -154,7 +155,7 @@ func (w workspace) scanCandidateVulnerabilities(ctx context.Context, candidates 
 	}
 	// Reconcile public metadata in the same inspection context, before invoking
 	// the scanner. No installed SBOM can replace the selected current version.
-	infoArgs := append([]string{"info", "--json=v2", "--formula"}, args[2:]...)
+	infoArgs := append([]string{"info", "--json=v2", "--formula"}, formulae...)
 	info, err := w.invoke(ctx, "advisory-candidate-info", profile, infoArgs...)
 	if err != nil {
 		return fail(err)
