@@ -98,29 +98,37 @@ func (w workspace) publicState(ctx context.Context, profile string, nodes []doma
 		return nil, "", err
 	}
 	slices.SortFunc(document.Formulae, func(a, b installedFormula) int { return strings.Compare(a.Name, b.Name) })
-	for i := range document.Formulae {
-		formula := &document.Formulae[i]
-		// Public info represents linked_keg as null for keg-only formulae.
-		// Observe the opt link, and for normal formulae also require Homebrew's
-		// linked-keg record. A partially poured but unlinked keg is not a
-		// successfully installed formula, even if its opt link exists.
-		formula.ActiveVersion, formula.LinkIncomplete, err = installedLink("/opt/homebrew", formula.Name, formula.KegOnly)
-		if err != nil {
-			return nil, "", err
-		}
-		node, exists := nodesByName[formula.Name]
-		if !exists {
-			return nil, "", errors.New("installed formula is outside the verified plan")
-		}
-		if err := formula.bindInstalledReceipts(node.Artifact); err != nil {
-			return nil, "", err
-		}
+	if err := bindInstalledFormulae(document.Formulae, nodesByName); err != nil {
+		return nil, "", err
 	}
 	digest, err := w.saveInstalledState(document.Formulae)
 	if err != nil {
 		return nil, "", err
 	}
 	return document.Formulae, digest, nil
+}
+
+func bindInstalledFormulae(formulae []installedFormula, nodesByName map[string]domain.Node) error {
+	for i := range formulae {
+		formula := &formulae[i]
+		// Public info represents linked_keg as null for keg-only formulae.
+		// Observe the opt link, and for normal formulae also require Homebrew's
+		// linked-keg record. A partially poured but unlinked keg is not a
+		// successfully installed formula, even if its opt link exists.
+		activeVersion, linkIncomplete, err := installedLink("/opt/homebrew", formula.Name, formula.KegOnly)
+		if err != nil {
+			return err
+		}
+		formula.ActiveVersion, formula.LinkIncomplete = activeVersion, linkIncomplete
+		node, exists := nodesByName[formula.Name]
+		if !exists {
+			return errors.New("installed formula is outside the verified plan")
+		}
+		if err := formula.bindInstalledReceipts(node.Artifact); err != nil {
+			return err
+		}
+	}
+	return nil
 }
 
 // Store the exact observation once; an existing digest path must still contain
