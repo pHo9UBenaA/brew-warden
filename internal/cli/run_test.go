@@ -84,3 +84,13 @@ func TestWrapperOptions(t *testing.T) {
 		t.Fatalf("want all four child arguments preserved without age override: age=%v rest=%q error=%v", options.minimumAge, options.rest, err)
 	}
 }
+
+func TestWrapperOptionsRequireValues(t *testing.T) {
+	for _, option := range []string{"--config", "--minimum-release-age", "--age-exception"} {
+		var out, diagnostics bytes.Buffer
+		code := RunWithConfig([]string{option}, &out, &diagnostics, configSource{})
+		if code == 0 || !strings.Contains(diagnostics.String(), "requires a value") {
+			t.Fatalf("option %q without a value: exit=%d diagnostics=%q", option, code, &diagnostics)
+		}
+	}
+}

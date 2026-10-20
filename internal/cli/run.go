@@ -42,13 +42,14 @@ func parseOptions(args []string, allowAgeExceptions bool) (invocationOptions, er
 	configSeen := false
 	ageExceptionNames := map[string]bool{}
 	for len(args) > 0 && strings.HasPrefix(args[0], "--") {
+		option := args[0]
 		if len(args) < 2 {
-			if allowAgeExceptions {
+			if option == "--age-exception" && allowAgeExceptions {
 				return invocationOptions{}, errInvalidAgeException
 			}
 			return invocationOptions{}, fmt.Errorf("wrapper option requires a value")
 		}
-		switch args[0] {
+		switch option {
 		case "--config":
 			if configSeen || args[1] == "" {
 				return invocationOptions{}, fmt.Errorf("configuration path must occur once and be nonempty")

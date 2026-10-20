@@ -76,6 +76,18 @@ func TestRuntimeCLIRejectsChildOptionsAndRemovedCommands(t *testing.T) {
 	}
 }
 
+func TestRuntimeCLIReportsMissingWrapperOptionValue(t *testing.T) {
+	for _, option := range []string{"--config", "--minimum-release-age"} {
+		planner := &servicePlanner{}
+		s := application.Service{Planner: planner, Clock: &executionClock{now: 1000}}
+		var out bytes.Buffer
+		code := cli.RunWithRuntime(context.Background(), []string{option}, &out, &out, nil, &s)
+		if code == 0 || planner.calls != 0 || !strings.Contains(out.String(), "requires a value") {
+			t.Fatalf("option %q without a value reached the planner or hid the missing value: exit=%d calls=%d output=%q", option, code, planner.calls, &out)
+		}
+	}
+}
+
 func TestRuntimeCLIPreservesExitCodeAndPrintableAgeReason(t *testing.T) {
 	p := preparedExecution(t)
 	session := &executionSession{prepared: p, result: ports.ExecutionResult{ExitKnown: true, ExitCode: 7, AfterState: p.BeforeState}}
