@@ -3,6 +3,7 @@ package attestation
 import (
 	"encoding/json"
 	"errors"
+	"slices"
 
 	"github.com/pHo9UBenaA/brew-warden/internal/domain"
 )
@@ -49,14 +50,9 @@ func verifiedResultMatchesSubjectAndSigner(verification ghVerificationResult, ar
 		return false, errors.New("unsupported provenance statement")
 	}
 	// Homebrew merges byte-identical platform bottles into an `all` bottle after
-	// attestation. Require the exact current-platform name and the same digest.
-	platformName := ""
-	if artifact.BottleTag == "all" && artifact.OS == "macos" && artifact.Arch == "arm64" {
-		platform := artifact
-		platform.BottleTag = "arm64_tahoe"
-		platformName = bottleName(platform)
-	}
-	expectedName := bottleName(artifact)
+	// attestation. The candidate's exact name and the merged platform name are the
+	// only accepted subjects; every subject using either name must match the digest.
+	acceptedNames := acceptedSubjectNames(artifact)
 	matched := false
 	for _, rawSubject := range statement.Subjects {
 		var subject struct {
@@ -72,8 +68,7 @@ func verifiedResultMatchesSubjectAndSigner(verification ghVerificationResult, ar
 		if err := decodeObject(subject.Digest, &digest, "sha256"); err != nil {
 			return false, err
 		}
-		matchesSubjectName := subject.Name == expectedName || (platformName != "" && subject.Name == platformName)
-		if !matchesSubjectName {
+		if !slices.Contains(acceptedNames, subject.Name) {
 			continue
 		}
 		if digest.SHA256 != artifact.SHA256 {
@@ -82,4 +77,14 @@ func verifiedResultMatchesSubjectAndSigner(verification ghVerificationResult, ar
 		matched = true
 	}
 	return matched, nil
+}
+
+func acceptedSubjectNames(artifact domain.Artifact) []string {
+	names := []string{bottleName(artifact)}
+	if artifact.BottleTag == "all" && artifact.OS == "macos" && artifact.Arch == "arm64" {
+		platform := artifact
+		platform.BottleTag = "arm64_tahoe"
+		names = append(names, bottleName(platform))
+	}
+	return names
 }

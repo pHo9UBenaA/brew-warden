@@ -207,40 +207,55 @@ func oldestVerifiedTimestamp(data []byte, artifact domain.Artifact, now int64) (
 	}
 	oldest := now
 	for _, raw := range results {
-		var result struct {
-			Verification json.RawMessage `json:"verificationResult"`
-		}
-		if err := decodeObject(raw, &result, "verificationResult"); err != nil {
+		resultOldest, err := verifiedResultOldestTimestamp(raw, artifact, now)
+		if err != nil {
 			return 0, err
 		}
-		var verification ghVerificationResult
-		if err := decodeObject(result.Verification, &verification, "signature", "statement", "verifiedTimestamps"); err != nil || len(verification.Timestamps) == 0 {
-			return 0, errors.New("missing verified attestation timestamps")
+		oldest = min(oldest, resultOldest)
+	}
+	return oldest, nil
+}
+
+// verifiedResultOldestTimestamp validates one result and returns its earliest
+// verified timestamp. A result cannot borrow a subject or signer from another.
+func verifiedResultOldestTimestamp(raw json.RawMessage, artifact domain.Artifact, now int64) (int64, error) {
+	var result struct {
+		Verification json.RawMessage `json:"verificationResult"`
+	}
+	if err := decodeObject(raw, &result, "verificationResult"); err != nil {
+		return 0, err
+	}
+	var verification ghVerificationResult
+	if err := decodeObject(result.Verification, &verification, "signature", "statement", "verifiedTimestamps"); err != nil || len(verification.Timestamps) == 0 {
+		return 0, errors.New("missing verified attestation timestamps")
+	}
+	matched, err := verifiedResultMatchesSubjectAndSigner(verification, artifact)
+	if err != nil || !matched {
+		return 0, errors.New("public attestation subject or signer mismatch")
+	}
+	oldest := now
+	for _, value := range verification.Timestamps {
+		var timestamp struct {
+			Type string `json:"type"`
+			URI  string `json:"uri"`
+			Time string `json:"timestamp"`
 		}
-		matched, err := verifiedResultMatchesSubjectAndSigner(verification, artifact)
-		if err != nil || !matched {
-			return 0, errors.New("public attestation subject or signer mismatch")
+		if err := decodeObject(value, &timestamp, "type", "uri", "timestamp"); err != nil || timestamp.Type != "Tlog" || timestamp.URI != "https://rekor.sigstore.dev" {
+			return 0, errors.New("unsupported verified timestamp")
 		}
-		for _, value := range verification.Timestamps {
-			var timestamp struct {
-				Type string `json:"type"`
-				URI  string `json:"uri"`
-				Time string `json:"timestamp"`
-			}
-			if err := decodeObject(value, &timestamp, "type", "uri", "timestamp"); err != nil || timestamp.Type != "Tlog" || timestamp.URI != "https://rekor.sigstore.dev" {
-				return 0, errors.New("unsupported verified timestamp")
-			}
-			verifiedTime, err := time.Parse(time.RFC3339Nano, timestamp.Time)
-			if err != nil || verifiedTime.Unix() <= 0 || verifiedTime.After(time.Unix(now, 0)) {
-				return 0, errors.New("invalid verified attestation time")
-			}
-			oldest = min(oldest, verifiedTime.Unix())
+		verifiedTime, err := time.Parse(time.RFC3339Nano, timestamp.Time)
+		if err != nil || verifiedTime.Unix() <= 0 || verifiedTime.After(time.Unix(now, 0)) {
+			return 0, errors.New("invalid verified attestation time")
 		}
+		oldest = min(oldest, verifiedTime.Unix())
 	}
 	return oldest, nil
 }
 
 func decodeJSONArray(data []byte, out *[]json.RawMessage) error {
+	if len(data) > maxResponse {
+		return errors.New("invalid public attestation output size")
+	}
 	if !utf8.Valid(data) {
 		return errors.New("invalid public attestation UTF-8")
 	}

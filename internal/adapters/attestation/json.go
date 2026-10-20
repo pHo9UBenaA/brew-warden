@@ -9,7 +9,9 @@ import (
 	"unicode/utf8"
 )
 
-func decodeObject(data []byte, out any, keys ...string) error {
+// decodeObject enforces exact spelling and non-null values for the named fields.
+// Presence and type remain the typed decode's responsibility; other fields are allowed.
+func decodeObject(data []byte, out any, exactCasedNonNullFields ...string) error {
 	if len(data) > maxResponse || !utf8.Valid(data) {
 		return errors.New("provenance response exceeds bounds")
 	}
@@ -26,11 +28,11 @@ func decodeObject(data []byte, out any, keys ...string) error {
 		return errors.New("provenance response is not an object")
 	}
 	for name, value := range fields {
-		for _, key := range keys {
-			if !strings.EqualFold(name, key) {
+		for _, expected := range exactCasedNonNullFields {
+			if !strings.EqualFold(name, expected) {
 				continue
 			}
-			if name != key {
+			if name != expected {
 				return errors.New("provenance field casing is ambiguous")
 			}
 			if bytes.Equal(bytes.TrimSpace(value), []byte("null")) {
