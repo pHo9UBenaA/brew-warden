@@ -407,12 +407,12 @@ func (w workspace) checkPublicRuntime(ctx context.Context, revision string) erro
 			}
 			destination := filepath.Join("/opt/homebrew", relative)
 			if entry.Type()&os.ModeSymlink != 0 {
-				copiedLink, err := os.Readlink(path)
+				supportedTarget, err := os.Readlink(path)
 				if err != nil {
 					return err
 				}
-				installedLink, err := os.Readlink(destination)
-				if err != nil || copiedLink != installedLink {
+				installedTarget, err := os.Readlink(destination)
+				if err != nil || supportedTarget != installedTarget {
 					return errors.New("installed Homebrew runtime link differs from supported build")
 				}
 				return nil
