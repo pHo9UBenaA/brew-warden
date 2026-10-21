@@ -198,11 +198,12 @@ func (formula *installedFormula) bindInstalledReceipts(candidate domain.Artifact
 // installedReceiptDigest binds a recorded official-core installation to its
 // receipt bytes. It does not authenticate the installed payload itself.
 func installedReceiptDigest(candidate domain.Artifact, version string) (domain.Digest, error) {
-	candidate.Version = version
-	if !candidate.Valid() {
+	installedArtifact := candidate
+	installedArtifact.Version = version
+	if !installedArtifact.Valid() {
 		return "", errors.New("invalid installed version path")
 	}
-	keg := filepath.Join("/opt/homebrew/Cellar", candidate.Name, version)
+	keg := filepath.Join("/opt/homebrew/Cellar", installedArtifact.Name, installedArtifact.Version)
 	resolved, err := filepath.EvalSymlinks(keg)
 	if err != nil || resolved != keg {
 		return "", errors.New("installed keg escapes expected prefix")
