@@ -140,11 +140,17 @@ func (w workspace) saveInstalledState(formulae []installedFormula) (domain.Diges
 	}
 	digest := digestBytes(raw)
 	destination := filepath.Join(w.root, "states", string(digest)+".json")
-	if old, err := readRegular(destination, maxManifest); err == nil {
-		if digestBytes(old) != digest {
+	existing, err := readRegular(destination, maxManifest)
+	if err == nil {
+		if digestBytes(existing) != digest {
 			return "", errors.New("saved installed observation changed")
 		}
-	} else if err := writeRecord(destination, raw); err != nil {
+		return digest, nil
+	}
+	if !errors.Is(err, os.ErrNotExist) {
+		return "", err
+	}
+	if err := writeRecord(destination, raw); err != nil {
 		return "", err
 	}
 	return digest, nil

@@ -59,8 +59,7 @@ func checkLegacyState(path string) error {
 	if path == "" {
 		return nil
 	}
-	_, err := os.Lstat(path)
-	if err == nil || !errors.Is(err, os.ErrNotExist) {
+	if _, err := os.Lstat(path); !errors.Is(err, os.ErrNotExist) {
 		return errors.New(
 			"legacy attempt journal requires the matching older build for recovery before this version can run; " +
 				"archive it only after confirming no owned process remains",
